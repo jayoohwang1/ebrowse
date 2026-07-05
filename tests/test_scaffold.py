@@ -1,4 +1,4 @@
-"""Phase 0 smoke tests: model round-trips, config loading, CLI stub, fixture server."""
+"""Scaffold smoke tests: model round-trips, config loading, CLI stub, fixture server."""
 
 from __future__ import annotations
 

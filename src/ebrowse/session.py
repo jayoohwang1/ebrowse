@@ -33,7 +33,7 @@ GOTO_TIMEOUT_MS = 45_000
 
 # Kept in sync with ebrowse.dev: full-chromium new headless + a plain Chrome UA
 # passes Akamai fronts that reject the default headless shell (see
-# IMPLEMENTATION_LOG.md Phase 1 smoke findings).
+# docs/adr/0002-full-chromium-with-plain-ua.md).
 BROWSER_ARGS = ["--disable-blink-features=AutomationControlled"]
 USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -490,8 +490,8 @@ class Session(CompoundMixin, ActionsMixin):
             )
 
     async def _resolve_locator(self, target: str):
-        """Minimal @ref/CSS resolution for getters. Phase 3 hardens this into
-        core/locate.py with the full descriptor chain + occlusion checks."""
+        """@ref/CSS resolution for getters (refs delegate to core/locate.py;
+        no occlusion pre-check — getters don't click)."""
         if not target.startswith("@"):
             loc = self.page.locator(target)
             if await loc.count() == 0:

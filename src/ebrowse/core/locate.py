@@ -2,8 +2,8 @@
 
 Strategy chain (adapted from WebChallenger get_elem_locator, agent.py ~L1424):
 id > testid > role+name > placeholder > href suffix > text. Each candidate is
-verified for existence; ambiguous matches fall back to nth_hint order. Phase 3
-adds the occlusion pre-check and bbox sanity verification.
+verified for existence; ambiguous matches fall back to nth_hint order. The
+occlusion pre-check lives in actions.py.
 """
 
 from __future__ import annotations

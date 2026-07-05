@@ -1,7 +1,8 @@
-"""MCP stdio server (ROADMAP R3): the same daemon, speakable by MCP hosts.
+"""MCP stdio server: the same daemon, speakable by MCP hosts.
 
 Minimal by design — newline-delimited JSON-RPC 2.0 over stdio, tools only.
-No SDK dependency. Tool outputs are the §4 renderer texts VERBATIM; the tool
+No SDK dependency (docs/adr/0005-mcp-server-without-sdk.md). Tool outputs are
+the renderer texts VERBATIM; the tool
 set is small (act multiplexes the action verbs) to keep schema token cost low
 for the host model.
 

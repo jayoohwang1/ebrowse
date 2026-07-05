@@ -89,7 +89,7 @@ async def test_capture_performance_on_huge_page(server, page):
 
 
 async def test_dropdown_reveal_appears_in_recapture(server, page):
-    """Pre-Phase-3 sanity for the diff story: hidden menu items appear after click."""
+    """Sanity for the diff story: hidden menu items appear after click."""
     await page.goto(server.url("dropdown.html"))
     snap1 = await capture(page)
     n_before = sum(1 for n in snap1.root.walk() if n.attrs.get("role") == "menuitem")

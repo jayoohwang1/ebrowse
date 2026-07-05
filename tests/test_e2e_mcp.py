@@ -1,4 +1,4 @@
-"""E2E test for the MCP stdio server (ROADMAP R3)."""
+"""E2E test for the MCP stdio server."""
 
 from __future__ import annotations
 

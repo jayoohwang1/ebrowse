@@ -1,4 +1,4 @@
-"""Compound verbs: multi-step interactions as single commands (ROADMAP R1).
+"""Compound verbs: multi-step interactions as single commands.
 
 Deterministic state machines over the same act→diff machinery as atomic verbs
 (adapted from WebChallenger submit_form / dropdown_action / search workflows).

@@ -5,14 +5,14 @@ pages as **skimmable section outlines**, lets you **expand only the sections you
 need** (as markdown with stable element refs), and answers every action with a
 **diff of what changed** instead of a full page snapshot.
 
-> **Status: v1 complete** (DESIGN.md phases 0–5). Navigation, observation,
-> actions-with-diffs, and optional LLM section labels all work end-to-end,
-> validated on real sites. Roadmap phases R1 (compound verbs), R2 (query), and
-> R3 (MCP server) are done — see [ROADMAP.md](ROADMAP.md) for what's next.
+> **Status: v0.1.0.** Navigation, observation, actions-with-diffs, compound
+> verbs, query, an MCP server, and optional LLM section labels/captions all
+> work end-to-end, validated on real sites — see [CHANGELOG.md](CHANGELOG.md).
+> Planned work is tracked in
+> [GitHub issues](https://github.com/jayoohwang1/ebrowse/issues).
 >
 > Measured on real pages: outlines are 1–9% of the token cost of a full aria
-> snapshot on large pages (recreation.gov: 725 vs 7,924 tokens). Deferred from
-> the v1 design: VLM image captions (see IMPLEMENTATION_LOG.md).
+> snapshot on large pages (recreation.gov: 725 vs 7,924 tokens).
 
 ## Install (dev)
 
@@ -109,7 +109,8 @@ uv run python -m ebrowse.dev <url> capture out.json
 ## Configuration
 
 `~/.config/ebrowse/config.toml`, overridable via `EBROWSE_<SECTION>_<KEY>` env
-vars (e.g. `EBROWSE_BROWSER_HEADLESS=false`). See DESIGN.md §6 for all keys.
+vars (e.g. `EBROWSE_BROWSER_HEADLESS=false`). See
+[docs/configuration.md](docs/configuration.md) for all keys.
 The optional summarizer points at any OpenAI-compatible server (default:
 `http://127.0.0.1:5001/v1`, e.g. a local llama.cpp). When available, outline
 labels upgrade from verbatim page text (`|`) to model-written one-liners (`≈`),
@@ -125,7 +126,10 @@ s4 list  32 items, 32 links  ~1.0kt ≈ Espresso gear products with prices and r
 
 ## Documentation
 
-- [DESIGN.md](DESIGN.md) — architecture, output contracts, phased plan.
-- [AGENTS.md](AGENTS.md) — implementer guide + phase status.
-- [IMPLEMENTATION_LOG.md](IMPLEMENTATION_LOG.md) — append-only decision log.
 - [SKILL.md](SKILL.md) — **how agents should drive the tool** (operating loop, diff vocabulary, recipes).
+- [AGENTS.md](AGENTS.md) — contributor guide (principles, layout, conventions).
+- [docs/architecture.md](docs/architecture.md) — components, flows, accepted tradeoffs.
+- [docs/output-contracts.md](docs/output-contracts.md) — the frozen output formats.
+- [docs/configuration.md](docs/configuration.md) — every config key.
+- [docs/adr/](docs/adr/README.md) — records of non-obvious design decisions.
+- [CHANGELOG.md](CHANGELOG.md) — what shipped, per release.

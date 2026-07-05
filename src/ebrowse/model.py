@@ -1,6 +1,6 @@
-"""Core data model. FROZEN interface per DESIGN.md §3.
+"""Core data model. FROZEN interface per docs/output-contracts.md.
 
-Phases communicate exclusively through these types plus the renderers.
+Modules communicate exclusively through these types plus the renderers.
 Extend by adding optional fields; never repurpose existing ones.
 All types are JSON-serializable via to_dict()/from_dict().
 """

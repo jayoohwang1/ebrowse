@@ -1,4 +1,4 @@
-"""E2E tests for compound verbs (ROADMAP R1): fill-form, select machine, search."""
+"""E2E tests for compound verbs: fill-form, select machine, search."""
 
 from __future__ import annotations
 

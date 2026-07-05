@@ -5,8 +5,9 @@ Request : {"id": str, "session": str, "verb": str, "args": {...}}
 Response: {"id": str, "ok": bool, "output": str, "error": str|null,
            "exit_code": int, "data": {...}|null}
 
-`output` is the human/agent-facing text (§4 formats). `data` carries the same
-info as JSON when the CLI was invoked with --json. `exit_code` follows §4.4:
+`output` is the human/agent-facing text (docs/output-contracts.md formats).
+`data` carries the same info as JSON when the CLI was invoked with --json.
+`exit_code` follows the contract:
 0 ok, 1 action failed, 2 bad usage/stale ref, 3 daemon/browser failure.
 """
 

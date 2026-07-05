@@ -1,4 +1,4 @@
-"""Configuration loading per DESIGN.md §6.
+"""Configuration loading per docs/configuration.md.
 
 Precedence: built-in defaults < ~/.config/ebrowse/config.toml < EBROWSE_* env vars
 < CLI flags (applied by callers). Unknown TOML keys warn, never fail.

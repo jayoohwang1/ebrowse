@@ -1,6 +1,6 @@
 [project]
 name = "ebrowse"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Token-efficient browser control CLI for AI agents: sectioned page outlines, durable element refs, diff-based action results."
 readme = "README.md"
 requires-python = ">=3.11"

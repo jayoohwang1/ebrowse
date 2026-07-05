@@ -1,7 +1,7 @@
 """Pure orchestration: DomSnapshot -> PageMem.
 
 build_page() coordinates split -> extract -> refs -> labels -> fingerprints and
-is shared by the dev harness (Phase 1) and the daemon session (Phase 2+).
+is shared by the dev harness and the daemon session.
 No Playwright, no I/O.
 """
 

@@ -1,6 +1,7 @@
-"""Renderers: PageMem -> outline text, Section -> markdown. FROZEN formats (§4).
+"""Renderers: PageMem -> outline text, Section -> markdown. FROZEN formats.
 
-Format changes require updating tests/golden/ and DESIGN.md in the same commit.
+Format changes require updating tests/golden/ and docs/output-contracts.md in
+the same commit.
 Provenance markers: '≈' = LLM summary (model-paraphrased page content, untrusted),
 '|' = deterministic label (verbatim page text, quoted).
 """
@@ -292,7 +293,7 @@ _MAX_DIFF_ELEMENTS = 12
 
 
 def render_diff(action_line: str, diff: Diff, observe: ObserveConfig | None = None) -> str:
-    """§4.3 action-result rendering. `action_line` is 'CLICK @e42 (button "…")'.
+    """Action-result rendering. `action_line` is 'CLICK @e42 (button "…")'.
     Compound verbs pass multi-line action_lines (header + step lines); the
     outcome arrow always goes on the FIRST line."""
     del observe  # reserved for future pagination of huge diffs

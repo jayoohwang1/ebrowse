@@ -1,6 +1,6 @@
 """ebrowse CLI entry point.
 
-Thin client per DESIGN.md §2: parse argv, ensure daemon, send one request, print
+Thin client per docs/architecture.md: parse argv, ensure daemon, send one request, print
 response. No page logic lives here. Help text is written for LLM agents: short,
 example-first, ≤6 lines per verb.
 """

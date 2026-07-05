@@ -1,6 +1,6 @@
 """Stable identity: section fingerprints, element descriptors, and the RefRegistry.
 
-Section fingerprints (DESIGN.md §3.2) survive DOM mutations and revisits so diffs
+Section fingerprints (docs/output-contracts.md) survive DOM mutations and revisits so diffs
 and summary caches can say "same section, changed contents". Element refs are
 session-scoped, assigned once per durable descriptor, and reused across
 re-snapshots and navigations (a persistent header keeps its refs on every page).
@@ -83,7 +83,7 @@ class RefRegistry:
     Matching is exact on ElementDesc.match_key() with nth-order disambiguation:
     the k-th element with a given key on the page binds to the k-th registered
     ref for that key. Strict by design — misbinding is worse than ref churn
-    (see DESIGN.md §12).
+    (see docs/adr/0003-strict-ref-matching.md).
     """
 
     def __init__(self) -> None:

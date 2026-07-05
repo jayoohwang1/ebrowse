@@ -1,4 +1,4 @@
-// discover.js — single-pass DOM walk returning a JSON tree (DESIGN.md Phase 1).
+// discover.js — single-pass DOM walk returning a JSON tree.
 //
 // This is the ONLY code that runs inside the page. It must stay:
 //  - read-only (never mutate the DOM),

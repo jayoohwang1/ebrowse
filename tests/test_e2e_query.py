@@ -1,4 +1,4 @@
-"""E2E tests for the query verb (ROADMAP R2)."""
+"""E2E tests for the query verb."""
 
 from __future__ import annotations
 

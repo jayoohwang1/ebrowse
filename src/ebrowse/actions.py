@@ -1,6 +1,7 @@
 """Action verbs: resolve -> pre-check -> act -> quiesce -> re-observe -> diff.
 
-Mixed into Session. Every action returns the §4.3 diff rendering, never a full
+Mixed into Session. Every action returns the diff rendering
+(docs/output-contracts.md), never a full
 snapshot. Playwright errors are mapped to actionable CommandErrors.
 """
 
@@ -80,7 +81,7 @@ class ActionsMixin:
         return await resolve(self.page, element.desc), desc
 
     async def _check_occlusion(self, loc, target: str) -> None:
-        """Fail fast when another element would swallow the click (§4.3)."""
+        """Fail fast when another element would swallow the click."""
         try:
             handle = await loc.element_handle(timeout=2000)
             # handle.evaluate runs in the element's own frame — essential for
