@@ -1,4 +1,4 @@
-.PHONY: test test-browser test-all lint fmt setup
+.PHONY: test test-browser test-all lint fmt typecheck setup
 
 setup:
 	uv sync --extra dev
@@ -20,3 +20,6 @@ lint:
 fmt:
 	uv run ruff format src tests
 	uv run ruff check --fix src tests
+
+typecheck:
+	uv run pyright

@@ -18,7 +18,7 @@ action answers with a diff of what changed. Read
    Renderer changes require updating `tests/golden/` + docs/output-contracts.md together.
 5. No site-specific heuristics, ever.
 6. Defaults need zero flags; complexity is opt-in.
-7. Every change ends with a working tool (`make lint test` green, prior verbs intact).
+7. Every change ends with a working tool (`make lint typecheck test` green, prior verbs intact).
 8. Errors name the recovery action ("run 'ebrowse outline'").
 
 ## Layout & commands
@@ -28,7 +28,9 @@ action answers with a diff of what changed. Read
   `python tests/fixtures/generate.py` (edit the generator, not the output).
 - `make setup` — uv sync + playwright chromium.
 - `make test` — pure tests only (fast, no browser).
-- `make test-browser` — includes `browser`/`e2e` marks. `make lint` / `make fmt`.
+- `make test-browser` — includes `browser`/`e2e` marks. `make lint` / `make fmt` /
+  `make typecheck` (pyright, basic mode). CI (`.github/workflows/ci.yml`) runs
+  lint+typecheck+pure tests and a separate browser-test job on every push/PR.
 - Dev harness (no daemon): `uv run python -m ebrowse.dev <url> outline`.
 
 ## Real-site testing

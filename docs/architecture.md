@@ -29,7 +29,8 @@ observation, one round trip per micro-interaction, and session amnesia.
    generic visual structure, never by a particular website.
 6. **Sensible defaults, escape hatches.** Default behavior needs zero flags; complexity
    is opt-in.
-7. **Every change ends with a working tool.** `make lint test` green, prior verbs intact.
+7. **Every change ends with a working tool.** `make lint typecheck test` green, prior
+   verbs intact.
 8. **Fail loud and actionable.** Every error states what failed and the next command
    the agent should try (stale ref → "re-run `ebrowse outline`").
 

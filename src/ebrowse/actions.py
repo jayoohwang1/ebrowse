@@ -10,7 +10,15 @@ from __future__ import annotations
 import contextlib
 import json
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 from urllib.parse import urldefrag
+
+if TYPE_CHECKING:
+    from playwright.async_api import Page
+
+    from ebrowse.config import Config
+    from ebrowse.core.split import RawSection
+    from ebrowse.model import Section
 
 from ebrowse.core import render
 from ebrowse.core.diff import diff_pages, navigation_diff
@@ -48,8 +56,24 @@ class ActionSnapshot:
 
 
 class ActionsMixin:
-    """Requires (from Session): page, page_mem, raw_by_sid, registry, cfg,
-    nav_id, observe(), _ensure_browser(), _notes."""
+    """Verb mixin for Session. The block below is its typed contract: everything
+    the host class must provide, declared so the checker verifies both sides."""
+
+    if TYPE_CHECKING:
+        cfg: Config
+        nav_id: int
+        page_mem: PageMem | None
+        raw_by_sid: dict[str, RawSection]
+        _notes: list[str]
+
+        @property
+        def page(self) -> Page: ...
+        async def observe(self, wait_summaries: bool = ..., no_summaries: bool = ...) -> str: ...
+        async def _ensure_browser(self) -> None: ...
+        def _require_page_mem(self) -> PageMem: ...
+        def _get_section(self, sid: str) -> Section: ...
+        # satisfied by CompoundMixin on the same host (custom-dropdown select)
+        async def _select_custom(self, element: Element, target: str, value: str) -> str: ...
 
     # ------------------------------------------------------------ plumbing ----
 
@@ -156,11 +180,12 @@ class ActionsMixin:
         if navigated:
             self.nav_id += 1
         await self.observe()  # rebuilds self.page_mem / raw_by_sid
+        new = self._require_page_mem()
 
         if prev is None or navigated:
-            diff = navigation_diff(prev, self.page_mem)
+            diff = navigation_diff(prev, new)
         else:
-            diff = diff_pages(prev, self.page_mem, begin_state.texts, self._section_texts())
+            diff = diff_pages(prev, new, begin_state.texts, self._section_texts())
         diff.notes = list(self._notes)
         return render.render_diff(action_line, diff)
 
@@ -265,6 +290,7 @@ class ActionsMixin:
             # scroll to a section or element
             if direction.startswith("@"):
                 element, desc = self._element_for(direction)
+                assert element is not None  # _element_for never returns None for @refs
                 bbox = element.state.bbox
             else:
                 bbox, desc = self._get_section(direction).bbox, direction

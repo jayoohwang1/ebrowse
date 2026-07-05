@@ -12,7 +12,7 @@ import asyncio
 import contextlib
 import json
 
-from ebrowse.actions import _map_playwright_error
+from ebrowse.actions import ActionsMixin, _map_playwright_error
 from ebrowse.core.diff import diff_pages
 from ebrowse.core.locate import resolve
 from ebrowse.errors import CommandError, ExitCode
@@ -95,8 +95,8 @@ def _revealed_elements(prev: PageMem | None, new: PageMem) -> list[Element]:
     return revealed
 
 
-class CompoundMixin:
-    """Requires ActionsMixin (same host class: Session)."""
+class CompoundMixin(ActionsMixin):
+    """Extends ActionsMixin (same host class: Session) with multi-step verbs."""
 
     # ------------------------------------------------------------- select ----
 
@@ -112,7 +112,7 @@ class CompoundMixin:
             raise _map_playwright_error(e) from e
         await self._quiesce()
         await self.observe(no_summaries=True)
-        return _revealed_elements(prev, self.page_mem)
+        return _revealed_elements(prev, self._require_page_mem())
 
     async def _match_one(self, value: str, revealed: list[Element]) -> Element:
         """The single revealed element matching `value`, or an actionable error
@@ -316,11 +316,11 @@ class CompoundMixin:
         begin_state = self._begin_action()
         steps = [f'SEARCH "{query}"']
 
-        loc = (
-            await resolve(self.page, box.desc)
-            if box
-            else self.page.locator(target).first  # CSS --in
-        )
+        if box:
+            loc = await resolve(self.page, box.desc)
+        else:
+            assert target is not None  # box is None only on the CSS --in path
+            loc = self.page.locator(target).first
         try:
             await loc.click(timeout=5000)
             await loc.fill(query, timeout=5000)
@@ -332,7 +332,7 @@ class CompoundMixin:
 
         # suggestions?
         await self.observe(no_summaries=True)
-        revealed = _revealed_elements(begin_state.page, self.page_mem)
+        revealed = _revealed_elements(begin_state.page, self._require_page_mem())
 
         if pick:
             matches = _best_matches(pick, revealed)
@@ -347,7 +347,7 @@ class CompoundMixin:
                 await self.observe(no_summaries=True)
                 fallback = [
                     e
-                    for s in self.page_mem.sections
+                    for s in self._require_page_mem().sections
                     for e in s.elements
                     if e.desc.role in ("option", "menuitem", "menuitemcheckbox", "listitem")
                 ]

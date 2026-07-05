@@ -179,7 +179,7 @@ def _tool_call(name: str, args: dict[str, Any], session: str) -> list[dict[str, 
             return [{"type": "image", "data": data, "mimeType": "image/png"}]
     else:
         return [{"type": "text", "text": f"error: unknown tool {name}"}]
-    content = [{"type": "text", "text": out}]
+    content: list[dict[str, Any]] = [{"type": "text", "text": out}]
     if not ok:
         content[0]["_isError"] = True
     return content

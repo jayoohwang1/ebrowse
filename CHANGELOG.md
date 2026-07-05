@@ -6,6 +6,14 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ## [Unreleased]
 
+### Added
+
+- GitHub Actions CI: lint + typecheck + pure tests on every push/PR, plus a
+  browser/e2e job with Playwright chromium.
+- pyright type checking (`make typecheck`, basic mode); `ActionsMixin` and
+  `CompoundMixin` now declare the typed contract Session must satisfy, so
+  the mixin wiring is checker-verified.
+
 ### Fixed
 
 - `security.allowed_domains` is now enforced on every observed URL, so link

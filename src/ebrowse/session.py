@@ -11,9 +11,12 @@ import contextlib
 import tempfile
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from playwright.async_api import Browser, BrowserContext, Dialog, FloatRect, Page, Playwright
 
 from ebrowse.actions import ActionsMixin
 from ebrowse.compound import CompoundMixin
@@ -57,10 +60,10 @@ class Session(CompoundMixin, ActionsMixin):
         self.cfg = cfg
         self.lock = asyncio.Lock()
         self.registry = RefRegistry()
-        self._pw = None
-        self._browser = None  # launch mode only
-        self._context = None
-        self._page = None
+        self._pw: Playwright | None = None
+        self._browser: Browser | None = None  # launch mode only
+        self._context: BrowserContext | None = None
+        self._page: Page | None = None
         self._cdp_url: str | None = cfg.browser.cdp_url or None
         # observation state
         self.page_mem: PageMem | None = None
@@ -113,18 +116,18 @@ class Session(CompoundMixin, ActionsMixin):
         self._page = pages[0] if pages else await self._context.new_page()
         self._wire_page(self._page)
 
-    def _on_new_page(self, page) -> None:
+    def _on_new_page(self, page: Page) -> None:
         # adopt tabs opened by the page (target=_blank etc.) as the active tab
         logger.info(f"[{self.name}] new tab: adopting")
         self._notes.append(f"a new tab opened and is now active: {page.url[:100]}")
         self._page = page
         self._wire_page(page)
 
-    def _wire_page(self, page) -> None:
+    def _wire_page(self, page: Page) -> None:
         page.set_default_timeout(10_000)
         page.on("dialog", self._on_dialog)
 
-    def _on_dialog(self, dialog) -> None:
+    def _on_dialog(self, dialog: Dialog) -> None:
         # Native dialogs block everything; default policy is accept (dismiss for
         # prompts, which would otherwise inject empty text) and surface the event
         # in the next diff's notes so the agent knows it happened.
@@ -135,7 +138,7 @@ class Session(CompoundMixin, ActionsMixin):
         task.add_done_callback(lambda t: t.exception())  # swallow late errors
 
     @property
-    def page(self):
+    def page(self) -> Page:
         if self._page is None:
             raise CommandError("no page open — run 'ebrowse open <url>' first", ExitCode.USAGE)
         return self._page
@@ -187,7 +190,7 @@ class Session(CompoundMixin, ActionsMixin):
 
     def _fill_from_cache(self) -> tuple[int, int]:
         """Apply cached summaries to current sections; returns (cached, total)."""
-        page = self.page_mem
+        page = self._require_page_mem()
         sections = [s for s in page.sections if not s.cross_origin]
         cached = self._summary_cache().get_many([s.content_hash for s in sections])
         for s in sections:
@@ -197,19 +200,18 @@ class Session(CompoundMixin, ActionsMixin):
     async def _apply_summaries(self, wait: bool) -> str | None:
         """Fill summaries from cache; backfill misses (inline when `wait`).
         Returns the outline status note, or None when nothing is pending."""
+        page_mem = self._require_page_mem()
         have, total = self._fill_from_cache()
         if have == total:
             return None
         if not self._summarizer.available:
             return "summaries: unavailable (deterministic labels shown)"
         if wait:
-            await self._backfill(self.page_mem, self._section_texts())
+            await self._backfill(page_mem, self._section_texts())
             self._fill_from_cache()
             return None
         missing = frozenset(
-            s.content_hash
-            for s in self.page_mem.sections
-            if s.summary is None and not s.cross_origin
+            s.content_hash for s in page_mem.sections if s.summary is None and not s.cross_origin
         )
         already_running = (
             self._backfill_task and not self._backfill_task.done() and missing <= self._backfill_sig
@@ -217,7 +219,7 @@ class Session(CompoundMixin, ActionsMixin):
         if not already_running:
             # snapshot page + texts now: the task runs outside the session lock
             # and must not race later observations
-            page, texts = self.page_mem, self._section_texts()
+            page, texts = page_mem, self._section_texts()
             self._backfill_sig = missing
             self._backfill_task = asyncio.create_task(self._backfill(page, texts))
             self._backfill_task.add_done_callback(_log_task_error)
@@ -398,7 +400,7 @@ class Session(CompoundMixin, ActionsMixin):
         full: bool = False,
     ) -> str:
         page_mem = self.page_mem
-        clip = None
+        clip: FloatRect | None = None
         if section or ref:
             if page_mem is None:
                 raise CommandError(
@@ -484,6 +486,7 @@ class Session(CompoundMixin, ActionsMixin):
         await self.close()
         self._cdp_url = url
         await self._ensure_browser()
+        assert self._context is not None  # _ensure_browser postcondition
         return f"attached over CDP: {url} ({len(self._context.pages)} tab(s))"
 
     # ------------------------------------------------------------ helpers ----
