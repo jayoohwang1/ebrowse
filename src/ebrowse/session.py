@@ -23,8 +23,8 @@ from ebrowse.core.fingerprint import RefRegistry
 from ebrowse.core.pipeline import build_page
 from ebrowse.core.snapshot import capture
 from ebrowse.core.split import RawSection
-from ebrowse.errors import CommandError
-from ebrowse.model import PageMem
+from ebrowse.errors import CommandError, ExitCode
+from ebrowse.model import PageMem, Section
 from ebrowse.summarize.batch import caption_image, summarize_page
 from ebrowse.summarize.cache import SummaryCache
 from ebrowse.summarize.client import SummarizerClient
@@ -86,7 +86,8 @@ class Session(CompoundMixin, ActionsMixin):
                 url = self._cdp_url or self.cfg.browser.cdp_url
                 if not url:
                     raise CommandError(
-                        "cdp mode configured but no cdp_url — run 'ebrowse connect <port>'", 2
+                        "cdp mode configured but no cdp_url — run 'ebrowse connect <port>'",
+                        ExitCode.USAGE,
                     )
                 self._browser = await self._pw.chromium.connect_over_cdp(url)
                 contexts = self._browser.contexts
@@ -104,7 +105,9 @@ class Session(CompoundMixin, ActionsMixin):
         except CommandError:
             raise
         except Exception as e:
-            raise CommandError(f"could not start browser: {e} — try 'ebrowse doctor'", 3) from e
+            raise CommandError(
+                f"could not start browser: {e} — try 'ebrowse doctor'", ExitCode.INTERNAL
+            ) from e
         self._context.on("page", self._on_new_page)
         pages = self._context.pages
         self._page = pages[0] if pages else await self._context.new_page()
@@ -134,7 +137,7 @@ class Session(CompoundMixin, ActionsMixin):
     @property
     def page(self):
         if self._page is None:
-            raise CommandError("no page open — run 'ebrowse open <url>' first", 2)
+            raise CommandError("no page open — run 'ebrowse open <url>' first", ExitCode.USAGE)
         return self._page
 
     async def close(self) -> None:
@@ -163,6 +166,9 @@ class Session(CompoundMixin, ActionsMixin):
     async def observe(self, wait_summaries: bool = False, no_summaries: bool = False) -> str:
         """Capture -> build PageMem -> apply/queue summaries -> outline text.
         The one observation path (actions and navigation verbs go through it)."""
+        # enforce allowed_domains on the *landed* URL too — link clicks and
+        # redirects can leave the domain even when the opened URL was allowed
+        self._check_url_allowed(self.page.url, landed=True)
         snap = await capture(self.page)
         self.page_mem, self.raw_by_sid = build_page(
             snap, self.registry, self.cfg.observe, nav_id=self.nav_id
@@ -229,8 +235,19 @@ class Session(CompoundMixin, ActionsMixin):
 
     def _require_page_mem(self) -> PageMem:
         if self.page_mem is None:
-            raise CommandError("nothing observed yet — run 'ebrowse outline'", 2)
+            raise CommandError("nothing observed yet — run 'ebrowse outline'", ExitCode.USAGE)
         return self.page_mem
+
+    def _get_section(self, sid: str) -> Section:
+        """Section by sid on the current page, or a recovery-action error."""
+        page_mem = self._require_page_mem()
+        section = page_mem.section(sid)
+        if section is None:
+            sids = ", ".join(s.sid for s in page_mem.sections)
+            raise CommandError(
+                f"no section '{sid}' (have: {sids}) — run 'ebrowse outline'", ExitCode.USAGE
+            )
+        return section
 
     # -------------------------------------------------------------- verbs ----
 
@@ -242,7 +259,9 @@ class Session(CompoundMixin, ActionsMixin):
         try:
             await self.page.goto(url, wait_until="domcontentloaded", timeout=GOTO_TIMEOUT_MS)
         except Exception as e:
-            raise CommandError(f"navigation failed: {_first_line(e)}", 1) from e
+            raise CommandError(
+                f"navigation failed: {_first_line(e)}", ExitCode.ACTION_FAILED
+            ) from e
         await self._settle()
         self.nav_id += 1
         return await self.observe()
@@ -256,7 +275,7 @@ class Session(CompoundMixin, ActionsMixin):
     async def verb_back(self) -> str:
         resp = await self.page.go_back(wait_until="domcontentloaded", timeout=GOTO_TIMEOUT_MS)
         if resp is None:
-            raise CommandError("no history to go back to", 1)
+            raise CommandError("no history to go back to", ExitCode.ACTION_FAILED)
         await self._settle()
         self.nav_id += 1
         return await self.observe()
@@ -264,7 +283,7 @@ class Session(CompoundMixin, ActionsMixin):
     async def verb_forward(self) -> str:
         resp = await self.page.go_forward(wait_until="domcontentloaded", timeout=GOTO_TIMEOUT_MS)
         if resp is None:
-            raise CommandError("no history to go forward to", 1)
+            raise CommandError("no history to go forward to", ExitCode.ACTION_FAILED)
         await self._settle()
         self.nav_id += 1
         return await self.observe()
@@ -278,7 +297,7 @@ class Session(CompoundMixin, ActionsMixin):
         del refresh  # observation is always fresh; flag reserved for future caching
         await self._ensure_browser()
         if self.page.url in ("about:blank", ""):
-            raise CommandError("no page open — run 'ebrowse open <url>' first", 2)
+            raise CommandError("no page open — run 'ebrowse open <url>' first", ExitCode.USAGE)
         return await self.observe(wait_summaries=wait_summaries, no_summaries=no_summaries)
 
     async def verb_expand(self, target: str, cursor: int = 0, show_all: bool = False) -> str:
@@ -288,13 +307,11 @@ class Session(CompoundMixin, ActionsMixin):
             found = page_mem.find_element(target)
             if not found:
                 raise CommandError(
-                    f"unknown ref {target} on current page — run 'ebrowse outline'", 2
+                    f"unknown ref {target} on current page — run 'ebrowse outline'",
+                    ExitCode.USAGE,
                 )
             sid = found[0].sid
-        section = page_mem.section(sid)
-        if section is None:
-            sids = ", ".join(s.sid for s in page_mem.sections)
-            raise CommandError(f"no section '{sid}' (have: {sids}) — run 'ebrowse outline'", 2)
+        section = self._get_section(sid)
         await self._caption_section_images(sid)
         return render.render_section_markdown(
             section, self.raw_by_sid[sid], self.cfg.observe, cursor=cursor, show_all=show_all
@@ -352,16 +369,13 @@ class Session(CompoundMixin, ActionsMixin):
         limit: int | None = None,
     ) -> str:
         page_mem = self._require_page_mem()
-        section = page_mem.section(sid)
-        if section is None:
-            sids = ", ".join(s.sid for s in page_mem.sections)
-            raise CommandError(f"no section '{sid}' (have: {sids}) — run 'ebrowse outline'", 2)
+        section = self._get_section(sid)
         if section.type not in ("list", "table"):
             listy = ", ".join(s.sid for s in page_mem.sections if s.type in ("list", "table"))
             raise CommandError(
                 f"{sid} is a {section.type} section — query works on list/table "
                 f"sections ({listy or 'none on this page'})",
-                2,
+                ExitCode.USAGE,
             )
         out = render.render_query(
             section,
@@ -373,7 +387,7 @@ class Session(CompoundMixin, ActionsMixin):
             limit=limit,
         )
         if out.startswith("error-cols: "):
-            raise CommandError(out[len("error-cols: ") :], 2)
+            raise CommandError(out[len("error-cols: ") :], ExitCode.USAGE)
         return out
 
     async def verb_screenshot(
@@ -387,23 +401,24 @@ class Session(CompoundMixin, ActionsMixin):
         clip = None
         if section or ref:
             if page_mem is None:
-                raise CommandError("run 'ebrowse outline' before section/ref screenshots", 2)
+                raise CommandError(
+                    "run 'ebrowse outline' before section/ref screenshots", ExitCode.USAGE
+                )
             if section:
-                s = page_mem.section(section)
-                if s is None:
-                    raise CommandError(f"no section '{section}' — run 'ebrowse outline'", 2)
-                bbox = s.bbox
+                bbox = self._get_section(section).bbox
             elif (ref or "").startswith("@i"):
                 node = next((n for n in self._img_nodes() if n.ref == ref), None)
                 if node is None:
-                    raise CommandError(f"unknown image ref {ref} — run 'ebrowse outline'", 2)
+                    raise CommandError(
+                        f"unknown image ref {ref} — run 'ebrowse outline'", ExitCode.USAGE
+                    )
                 from ebrowse.model import BBox as _BBox
 
                 bbox = _BBox(*node.rect)
             else:
                 found = page_mem.find_element(ref or "")
                 if not found:
-                    raise CommandError(f"unknown ref {ref} — run 'ebrowse outline'", 2)
+                    raise CommandError(f"unknown ref {ref} — run 'ebrowse outline'", ExitCode.USAGE)
                 bbox = found[1].state.bbox
             clip = {
                 "x": max(0, bbox.x - 4),
@@ -426,7 +441,7 @@ class Session(CompoundMixin, ActionsMixin):
         if what == "title":
             return await self.page.title()
         if not target:
-            raise CommandError(f"get {what} needs a target (@ref or CSS selector)", 2)
+            raise CommandError(f"get {what} needs a target (@ref or CSS selector)", ExitCode.USAGE)
         loc = await self._resolve_locator(target)
         if what == "text":
             return (await loc.inner_text())[:4000]
@@ -436,14 +451,14 @@ class Session(CompoundMixin, ActionsMixin):
             return await loc.input_value()
         if what == "attr":
             if not attr:
-                raise CommandError("get attr needs an attribute name", 2)
+                raise CommandError("get attr needs an attribute name", ExitCode.USAGE)
             val = await loc.get_attribute(attr)
             return val if val is not None else "(no such attribute)"
-        raise CommandError(f"unknown getter '{what}'", 2)
+        raise CommandError(f"unknown getter '{what}'", ExitCode.USAGE)
 
     async def verb_tabs(self) -> str:
         if self._context is None:
-            raise CommandError("no browser running — run 'ebrowse open <url>'", 2)
+            raise CommandError("no browser running — run 'ebrowse open <url>'", ExitCode.USAGE)
         lines = []
         for i, p in enumerate(self._context.pages):
             marker = "*" if p == self._page else " "
@@ -455,10 +470,10 @@ class Session(CompoundMixin, ActionsMixin):
 
     async def verb_tab(self, index: int) -> str:
         if self._context is None:
-            raise CommandError("no browser running — run 'ebrowse open <url>'", 2)
+            raise CommandError("no browser running — run 'ebrowse open <url>'", ExitCode.USAGE)
         pages = self._context.pages
         if not 0 <= index < len(pages):
-            raise CommandError(f"no tab {index} (have 0..{len(pages) - 1})", 2)
+            raise CommandError(f"no tab {index} (have 0..{len(pages) - 1})", ExitCode.USAGE)
         self._page = pages[index]
         await self._page.bring_to_front()
         self.nav_id += 1
@@ -477,16 +492,24 @@ class Session(CompoundMixin, ActionsMixin):
         with contextlib.suppress(Exception):
             await self.page.wait_for_load_state("networkidle", timeout=3000)
 
-    def _check_url_allowed(self, url: str) -> None:
+    def _check_url_allowed(self, url: str, landed: bool = False) -> None:
         allowed = self.cfg.security.allowed_domains
         if not allowed:
             return
         from urllib.parse import urlsplit
 
-        host = urlsplit(url).netloc.lower()
+        parts = urlsplit(url)
+        if landed and parts.scheme not in ("http", "https"):
+            return  # about:blank, chrome-error:// etc.
+        host = parts.netloc.lower()
         if not any(host == d or host.endswith("." + d) for d in allowed):
+            hint = (
+                "run 'ebrowse back' or edit security.allowed_domains"
+                if landed
+                else "edit config to allow it"
+            )
             raise CommandError(
-                f"domain {host} not in security.allowed_domains — edit config to allow it", 2
+                f"domain {host} not in security.allowed_domains — {hint}", ExitCode.USAGE
             )
 
     async def _resolve_locator(self, target: str):
@@ -495,13 +518,13 @@ class Session(CompoundMixin, ActionsMixin):
         if not target.startswith("@"):
             loc = self.page.locator(target)
             if await loc.count() == 0:
-                raise CommandError(f"no element matches CSS '{target}'", 2)
+                raise CommandError(f"no element matches CSS '{target}'", ExitCode.USAGE)
             return loc.first
         page_mem = self._require_page_mem()
         found = page_mem.find_element(target)
         if not found:
             raise CommandError(
-                f"stale ref {target}: not on current page — run 'ebrowse outline'", 2
+                f"stale ref {target}: not on current page — run 'ebrowse outline'", ExitCode.USAGE
             )
         _, element = found
         from ebrowse.core.locate import resolve

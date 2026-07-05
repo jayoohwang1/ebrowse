@@ -2,13 +2,11 @@
 connection. Deliberately dumb — the CLI sends one line, reads one line, exits.
 
 Request : {"id": str, "session": str, "verb": str, "args": {...}}
-Response: {"id": str, "ok": bool, "output": str, "error": str|null,
-           "exit_code": int, "data": {...}|null}
+Response: {"id": str, "ok": bool, "output": str, "error": str|null, "exit_code": int}
 
 `output` is the human/agent-facing text (docs/output-contracts.md formats).
-`data` carries the same info as JSON when the CLI was invoked with --json.
-`exit_code` follows the contract:
-0 ok, 1 action failed, 2 bad usage/stale ref, 3 daemon/browser failure.
+`exit_code` follows the contract: 0 ok, 1 action failed, 2 bad usage/stale ref,
+3 daemon/browser failure.
 """
 
 from __future__ import annotations
@@ -18,9 +16,9 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-from ebrowse.errors import CommandError
+from ebrowse.errors import CommandError, ExitCode
 
-__all__ = ["Request", "Response", "CommandError"]
+__all__ = ["Request", "Response", "CommandError", "ExitCode"]
 
 
 @dataclass(slots=True)
@@ -56,7 +54,6 @@ class Response:
     output: str = ""
     error: str | None = None
     exit_code: int = 0
-    data: dict[str, Any] | None = None
 
     def encode(self) -> bytes:
         return (
@@ -67,7 +64,6 @@ class Response:
                     "output": self.output,
                     "error": self.error,
                     "exit_code": self.exit_code,
-                    "data": self.data,
                 }
             )
             + "\n"
@@ -81,6 +77,5 @@ class Response:
             ok=d.get("ok", False),
             output=d.get("output", ""),
             error=d.get("error"),
-            exit_code=d.get("exit_code", 3),
-            data=d.get("data"),
+            exit_code=d.get("exit_code", ExitCode.INTERNAL),
         )

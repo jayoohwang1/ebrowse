@@ -8,13 +8,14 @@ choices — never a silent guess. Several internal steps produce ONE final diff.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 
 from ebrowse.actions import _map_playwright_error
 from ebrowse.core.diff import diff_pages
 from ebrowse.core.locate import resolve
-from ebrowse.errors import CommandError
+from ebrowse.errors import CommandError, ExitCode
 from ebrowse.model import Element, PageMem, Section
 
 _TEXTY_INPUTS = {
@@ -81,10 +82,56 @@ def _describe_pool(pool: list[Element], limit: int = 15) -> str:
     return ", ".join(names) + more
 
 
+def _revealed_elements(prev: PageMem | None, new: PageMem) -> list[Element]:
+    """Elements that appeared between two observations (dropdown options,
+    search suggestions): added elements plus everything in appeared sections."""
+    if prev is None:
+        return []
+    revealed: list[Element] = []
+    for sd in diff_pages(prev, new).sections:
+        revealed.extend(sd.added)
+        if sd.kind == "appeared" and sd.section:
+            revealed.extend(sd.section.elements)
+    return revealed
+
+
 class CompoundMixin:
     """Requires ActionsMixin (same host class: Session)."""
 
     # ------------------------------------------------------------- select ----
+
+    async def _open_and_reveal(self, element: Element) -> list[Element]:
+        """Click a dropdown trigger, settle, re-observe; return what it revealed."""
+        loc = await resolve(self.page, element.desc)
+        with contextlib.suppress(Exception):
+            await loc.scroll_into_view_if_needed(timeout=2000)
+        prev = self.page_mem
+        try:
+            await loc.click(timeout=5000)
+        except Exception as e:
+            raise _map_playwright_error(e) from e
+        await self._quiesce()
+        await self.observe(no_summaries=True)
+        return _revealed_elements(prev, self.page_mem)
+
+    async def _match_one(self, value: str, revealed: list[Element]) -> Element:
+        """The single revealed element matching `value`, or an actionable error
+        (Escape is pressed first to close the dropdown; harmless if not open)."""
+        matches = _best_matches(value, revealed)
+        if len(matches) == 1:
+            return matches[0]
+        with contextlib.suppress(Exception):
+            await self.page.keyboard.press("Escape")
+        if matches:
+            raise CommandError(
+                f'"{value}" is ambiguous among: {_describe_pool(matches)} — '
+                "use the exact option text",
+                ExitCode.USAGE,
+            )
+        raise CommandError(
+            f'no option matching "{value}" — revealed: {_describe_pool(revealed)}',
+            ExitCode.USAGE,
+        )
 
     async def _select_custom(self, element: Element, target: str, value: str) -> str:
         """Custom-dropdown machine: click trigger → diff → match option → click."""
@@ -92,51 +139,14 @@ class CompoundMixin:
         begin_state = self._begin_action()
         steps: list[str] = [f'SELECT {target} ({element.desc.short_desc()}) = "{value}"']
 
-        # step 1: open the dropdown
-        loc = await resolve(self.page, element.desc)
-        with contextlib.suppress(Exception):
-            await loc.scroll_into_view_if_needed(timeout=2000)
-        try:
-            await loc.click(timeout=5000)
-        except Exception as e:
-            raise _map_playwright_error(e) from e
-        await self._quiesce()
-
-        # step 2: what did it reveal?
-        prev = begin_state[0]
-        await self.observe(no_summaries=True)
-        mid = diff_pages(prev, self.page_mem) if prev else None
-        revealed: list[Element] = []
-        if mid:
-            for sd in mid.sections:
-                revealed.extend(sd.added)
-                if sd.kind == "appeared" and sd.section:
-                    revealed.extend(sd.section.elements)
+        revealed = await self._open_and_reveal(element)
         if not revealed:
             steps.append("  ✗ clicking it revealed no options — is it a dropdown?")
-            final = await self._finish_action("\n".join(steps), begin_state)
-            return final
+            return await self._finish_action("\n".join(steps), begin_state)
 
-        # step 3: match the option
-        matches = _best_matches(value, revealed)
-        if not matches:
-            # close it back if possible (Escape is harmless when not applicable)
-            with contextlib.suppress(Exception):
-                await self.page.keyboard.press("Escape")
-            raise CommandError(
-                f'no option matching "{value}" — revealed: {_describe_pool(revealed)}',
-                2,
-            )
-        if len(matches) > 1:
-            raise CommandError(
-                f'"{value}" is ambiguous among: {_describe_pool(matches)} — '
-                "use the exact option text",
-                2,
-            )
-        option = matches[0]
+        option = await self._match_one(value, revealed)
         steps.append(f"  ✓ opened, {len(revealed)} options revealed")
 
-        # step 4: click the option
         opt_loc = await resolve(self.page, option.desc)
         try:
             await opt_loc.click(timeout=5000)
@@ -151,15 +161,13 @@ class CompoundMixin:
         try:
             data = json.loads(data_json)
         except json.JSONDecodeError as e:
-            raise CommandError(f"--data is not valid JSON: {e}", 2) from e
+            raise CommandError(f"--data is not valid JSON: {e}", ExitCode.USAGE) from e
         if not isinstance(data, dict) or not data:
-            raise CommandError('--data must be a non-empty JSON object {"field": value}', 2)
+            raise CommandError(
+                '--data must be a non-empty JSON object {"field": value}', ExitCode.USAGE
+            )
 
-        page_mem = self._require_page_mem()
-        section = page_mem.section(sid)
-        if section is None:
-            sids = ", ".join(s.sid for s in page_mem.sections)
-            raise CommandError(f"no section '{sid}' (have: {sids}) — run 'ebrowse outline'", 2)
+        section = self._get_section(sid)
 
         controls = [
             e
@@ -168,7 +176,7 @@ class CompoundMixin:
             or (e.desc.tag == "button" and e.state.expanded is not None)
         ]  # fmt: skip
         if not controls:
-            raise CommandError(f"{sid} has no form controls — expand it to check", 2)
+            raise CommandError(f"{sid} has no form controls — expand it to check", ExitCode.USAGE)
 
         await self._ensure_browser()
         begin_state = self._begin_action()
@@ -187,7 +195,7 @@ class CompoundMixin:
         if filled == 0:
             raise CommandError(
                 f"no fields matched. Available: {_describe_pool(controls)}",
-                2,
+                ExitCode.USAGE,
             )
         return await self._finish_action("\n".join(steps), begin_state)
 
@@ -208,15 +216,17 @@ class CompoundMixin:
             await loc.set_checked(True, timeout=5000)
             return f'{key} = "{value}" (radio)'
         if not matches:
-            raise CommandError(f"no matching field (have: {_describe_pool(controls)})", 2)
+            raise CommandError(
+                f"no matching field (have: {_describe_pool(controls)})", ExitCode.USAGE
+            )
         if len(matches) > 1:
-            raise CommandError(f"ambiguous among: {_describe_pool(matches)}", 2)
+            raise CommandError(f"ambiguous among: {_describe_pool(matches)}", ExitCode.USAGE)
         el = matches[0]
         d = el.desc
 
         if isinstance(value, bool):
             if d.input_type not in ("checkbox", "radio"):
-                raise CommandError(f"{d.short_desc()} is not a checkbox", 2)
+                raise CommandError(f"{d.short_desc()} is not a checkbox", ExitCode.USAGE)
             loc = await resolve(self.page, d)
             await loc.set_checked(value, timeout=5000)
             return f"{key} = {str(value).lower()}"
@@ -244,28 +254,13 @@ class CompoundMixin:
             # It runs its own observe; our final diff still covers everything.
             await self._select_custom_inline(el, value)
             return f'{key} = "{value}" (dropdown)'
-        raise CommandError(f"don't know how to fill {d.short_desc()}", 2)
+        raise CommandError(f"don't know how to fill {d.short_desc()}", ExitCode.USAGE)
 
     async def _select_custom_inline(self, element: Element, value: str) -> None:
         """Open→match→click without emitting its own diff (used by fill-form)."""
-        loc = await resolve(self.page, element.desc)
-        prev = self.page_mem
-        await loc.click(timeout=5000)
-        await self._quiesce()
-        await self.observe(no_summaries=True)
-        revealed: list[Element] = []
-        for sd in diff_pages(prev, self.page_mem).sections:
-            revealed.extend(sd.added)
-            if sd.kind == "appeared" and sd.section:
-                revealed.extend(sd.section.elements)
-        matches = _best_matches(value, revealed)
-        if len(matches) != 1:
-            with contextlib.suppress(Exception):
-                await self.page.keyboard.press("Escape")
-            pool = _describe_pool(matches or revealed)
-            word = "ambiguous among" if matches else "no option matching value; revealed"
-            raise CommandError(f"{word}: {pool}", 2)
-        opt_loc = await resolve(self.page, matches[0].desc)
+        revealed = await self._open_and_reveal(element)
+        option = await self._match_one(value, revealed)
+        opt_loc = await resolve(self.page, option.desc)
         await opt_loc.click(timeout=5000)
 
     # -------------------------------------------------------------- search ----
@@ -290,13 +285,15 @@ class CompoundMixin:
             raise CommandError(
                 "no search box found on this page — pass one explicitly: "
                 "ebrowse search <query> --in @ref",
-                2,
+                ExitCode.USAGE,
             )
         top = max(r for r, _e in boxes)
         best = [e for r, e in boxes if r == top]
         if len(best) > 1:
             names = ", ".join(f"{e.ref} ({e.desc.short_desc()})" for e in best[:6])
-            raise CommandError(f"multiple search boxes: {names} — pick one with --in", 2)
+            raise CommandError(
+                f"multiple search boxes: {names} — pick one with --in", ExitCode.USAGE
+            )
         return best[0]
 
     async def verb_search(
@@ -311,7 +308,7 @@ class CompoundMixin:
         if target:
             found = page_mem.find_element(target) if target.startswith("@") else None
             if target.startswith("@") and not found:
-                raise CommandError(f"stale ref {target} — run 'ebrowse outline'", 2)
+                raise CommandError(f"stale ref {target} — run 'ebrowse outline'", ExitCode.USAGE)
             box = found[1] if found else None
         else:
             box = self._find_search_box(page_mem)
@@ -334,13 +331,8 @@ class CompoundMixin:
         await self._quiesce()
 
         # suggestions?
-        prev = begin_state[0]
         await self.observe(no_summaries=True)
-        revealed: list[Element] = []
-        for sd in diff_pages(prev, self.page_mem).sections:
-            revealed.extend(sd.added)
-            if sd.kind == "appeared" and sd.section:
-                revealed.extend(sd.section.elements)
+        revealed = _revealed_elements(begin_state.page, self.page_mem)
 
         if pick:
             matches = _best_matches(pick, revealed)
@@ -351,9 +343,7 @@ class CompoundMixin:
                 # (b) the suggestion XHR outlives the quiescence window (DOM is
                 # quiet while the request is in flight — recreation.gov). Wait
                 # briefly, re-observe, and match option-ish elements page-wide.
-                import asyncio as _asyncio
-
-                await _asyncio.sleep(1.2)
+                await asyncio.sleep(1.2)
                 await self.observe(no_summaries=True)
                 fallback = [
                     e
@@ -367,7 +357,7 @@ class CompoundMixin:
             if len(matches) != 1:
                 pool = _describe_pool(matches or revealed)
                 word = "ambiguous among" if matches else f'no suggestion matching "{pick}"; saw'
-                raise CommandError(f"{word}: {pool}", 2)
+                raise CommandError(f"{word}: {pool}", ExitCode.USAGE)
             opt = await resolve(self.page, matches[0].desc)
             await opt.click(timeout=5000)
             steps.append(f"  ✓ picked suggestion {matches[0].desc.short_desc()}")

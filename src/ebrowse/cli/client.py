@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 from ebrowse.config import cache_dir, socket_path
-from ebrowse.daemon.protocol import Request, Response
+from ebrowse.daemon.protocol import ExitCode, Request, Response
 
 _AUTOSTART_WAIT_S = 12.0
 
@@ -59,7 +59,7 @@ def _autostart_daemon() -> None:
         f"check {cache_dir() / 'daemon.log'}",
         file=sys.stderr,
     )
-    raise SystemExit(3)
+    raise SystemExit(ExitCode.INTERNAL)
 
 
 def _build_request(args: argparse.Namespace) -> Request | None:
@@ -152,7 +152,7 @@ def run_command(args: argparse.Namespace) -> int:
     req = _build_request(args)
     if req is None:
         print(f"error: unhandled verb '{args.verb}'", file=sys.stderr)
-        return 2
+        return ExitCode.USAGE
 
     if not _daemonless_ok(req.verb) and not _daemon_running():
         _autostart_daemon()
@@ -165,10 +165,10 @@ def run_command(args: argparse.Namespace) -> int:
         resp = _send(req, timeout_s)
     except TimeoutError:
         print(f"error: no reply within {timeout_s:.0f}s — daemon busy or hung", file=sys.stderr)
-        return 3
+        return ExitCode.INTERNAL
     except OSError as e:
         print(f"error: cannot reach daemon: {e}", file=sys.stderr)
-        return 3
+        return ExitCode.INTERNAL
 
     if args.json:
         print(json.dumps({"ok": resp.ok, "output": resp.output, "error": resp.error}))
@@ -178,7 +178,7 @@ def run_command(args: argparse.Namespace) -> int:
             print(resp.output)
         return 0
     print(f"error: {resp.error}", file=sys.stderr)
-    return resp.exit_code or 1
+    return resp.exit_code or ExitCode.ACTION_FAILED
 
 
 def _daemonless_ok(verb: str) -> bool:

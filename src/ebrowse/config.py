@@ -48,7 +48,6 @@ class ObserveConfig:
     quiescence_max_ms: int = 3000
     preview_chars: int = 120
     list_page_size: int = 20
-    resummarize_element_delta: int = 3
     max_sections: int = 60
 
 

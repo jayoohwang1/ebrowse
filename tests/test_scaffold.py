@@ -167,3 +167,24 @@ def test_fixture_server_serves():
     with FixtureServer() as srv, urllib.request.urlopen(srv.url("form.html"), timeout=5) as resp:
         body = resp.read().decode()
     assert "Create your account" in body
+
+
+def test_allowed_domains_enforced_on_landed_urls():
+    """security.allowed_domains must catch link-click/redirect navigations, not
+    just opened URLs — observe() checks the landed URL (landed=True)."""
+    import pytest
+
+    from ebrowse.errors import CommandError
+    from ebrowse.session import Session
+
+    cfg = Config()
+    cfg.security.allowed_domains = ["example.com"]
+    s = Session("t", cfg)
+    s._check_url_allowed("https://example.com/x")  # exact domain ok
+    s._check_url_allowed("https://shop.example.com/")  # subdomain ok
+    s._check_url_allowed("about:blank", landed=True)  # non-http landed pages skip
+    with pytest.raises(CommandError) as ei:
+        s._check_url_allowed("https://evil.test/", landed=True)
+    assert "ebrowse back" in str(ei.value)
+    with pytest.raises(CommandError):
+        s._check_url_allowed("https://evil.test/")

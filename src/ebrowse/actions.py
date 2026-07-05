@@ -1,21 +1,22 @@
 """Action verbs: resolve -> pre-check -> act -> quiesce -> re-observe -> diff.
 
 Mixed into Session. Every action returns the diff rendering
-(docs/output-contracts.md), never a full
-snapshot. Playwright errors are mapped to actionable CommandErrors.
+(docs/output-contracts.md), never a full snapshot. Playwright errors are
+mapped to actionable CommandErrors.
 """
 
 from __future__ import annotations
 
 import contextlib
 import json
+from dataclasses import dataclass, field
 from urllib.parse import urldefrag
 
 from ebrowse.core import render
 from ebrowse.core.diff import diff_pages, navigation_diff
 from ebrowse.core.locate import resolve
-from ebrowse.errors import CommandError
-from ebrowse.model import Element
+from ebrowse.errors import CommandError, ExitCode
+from ebrowse.model import Element, PageMem
 
 _ACTION_TIMEOUT_MS = 8_000
 
@@ -37,6 +38,15 @@ _QUIESCE_JS = """
 """
 
 
+@dataclass(slots=True)
+class ActionSnapshot:
+    """Pre-action state captured by _begin_action, consumed by _finish_action."""
+
+    page: PageMem | None
+    texts: dict[str, str] = field(default_factory=dict)
+    url: str = ""  # fragment-stripped; basis for navigation detection
+
+
 class ActionsMixin:
     """Requires (from Session): page, page_mem, raw_by_sid, registry, cfg,
     nav_id, observe(), _ensure_browser(), _notes."""
@@ -54,29 +64,35 @@ class ActionsMixin:
             await self.page.wait_for_load_state("domcontentloaded", timeout=ob.quiescence_max_ms)
             await self.page.evaluate(_QUIESCE_JS, [ob.quiescence_ms, ob.quiescence_max_ms])
 
-    async def _element_for(self, target: str) -> tuple[Element | None, str]:
+    def _element_for(self, target: str) -> tuple[Element | None, str]:
         """target -> (Element from current PageMem or None for CSS, description)."""
         if not target or not target.strip():
-            raise CommandError("empty target — pass a @ref from expand output or a CSS selector", 2)
+            raise CommandError(
+                "empty target — pass a @ref from expand output or a CSS selector",
+                ExitCode.USAGE,
+            )
         if target.startswith("@"):
             if self.page_mem is None:
-                raise CommandError("nothing observed yet — run 'ebrowse outline' first", 2)
+                raise CommandError(
+                    "nothing observed yet — run 'ebrowse outline' first", ExitCode.USAGE
+                )
             found = self.page_mem.find_element(target)
             if not found:
                 raise CommandError(
-                    f"stale ref {target}: not on the current page — run 'ebrowse outline'", 2
+                    f"stale ref {target}: not on the current page — run 'ebrowse outline'",
+                    ExitCode.USAGE,
                 )
             element = found[1]
             return element, f"{target} ({element.desc.short_desc()})"
         return None, f"css '{target}'"
 
     async def _locator_for(self, target: str):
-        element, desc = await self._element_for(target)
+        element, desc = self._element_for(target)
         if element is None:
             loc = self.page.locator(target)
             n = await loc.count()
             if n == 0:
-                raise CommandError(f"no element matches CSS '{target}'", 2)
+                raise CommandError(f"no element matches CSS '{target}'", ExitCode.USAGE)
             return loc.first, desc
         return await resolve(self.page, element.desc), desc
 
@@ -110,7 +126,7 @@ class ActionsMixin:
             raise CommandError(
                 f"blocked: {target} is covered by {what} — interact with that first "
                 "(run 'ebrowse outline' to see it)",
-                1,
+                ExitCode.ACTION_FAILED,
             )
 
     def _section_texts(self) -> dict[str, str]:
@@ -119,22 +135,24 @@ class ActionsMixin:
             for sid, raw in self.raw_by_sid.items()
         }
 
-    def _begin_action(self) -> tuple:
+    def _begin_action(self) -> ActionSnapshot:
         """Snapshot pre-action state; pairs with _finish_action."""
         prev = self.page_mem
-        prev_texts = self._section_texts() if prev else {}
-        prev_url = urldefrag(self.page.url)[0]
         self._notes = []
-        return prev, prev_texts, prev_url
+        return ActionSnapshot(
+            page=prev,
+            texts=self._section_texts() if prev else {},
+            url=urldefrag(self.page.url)[0],
+        )
 
-    async def _finish_action(self, action_line: str, begin_state: tuple) -> str:
+    async def _finish_action(self, action_line: str, begin_state: ActionSnapshot) -> str:
         """Quiesce, re-observe, diff against the _begin_action snapshot."""
-        prev, prev_texts, prev_url = begin_state
+        prev = begin_state.page
         with contextlib.suppress(Exception):
             await self.page.wait_for_load_state("domcontentloaded", timeout=5000)
         await self._quiesce()
 
-        navigated = urldefrag(self.page.url)[0] != prev_url
+        navigated = urldefrag(self.page.url)[0] != begin_state.url
         if navigated:
             self.nav_id += 1
         await self.observe()  # rebuilds self.page_mem / raw_by_sid
@@ -142,7 +160,7 @@ class ActionsMixin:
         if prev is None or navigated:
             diff = navigation_diff(prev, self.page_mem)
         else:
-            diff = diff_pages(prev, self.page_mem, prev_texts, self._section_texts())
+            diff = diff_pages(prev, self.page_mem, begin_state.texts, self._section_texts())
         diff.notes = list(self._notes)
         return render.render_diff(action_line, diff)
 
@@ -218,7 +236,7 @@ class ActionsMixin:
         return await self._act(f"{'CHECK' if checked else 'UNCHECK'} {desc}", do)
 
     async def verb_select(self, target: str, value: str) -> str:
-        element, desc = await self._element_for(target)
+        element, desc = self._element_for(target)
         if element is not None and element.desc.tag != "select":
             # custom dropdown: run the compound state machine (compound.py)
             return await self._select_custom(element, target, value)
@@ -245,17 +263,11 @@ class ActionsMixin:
             line = f"SCROLL {direction} {pages} page(s)"
         else:
             # scroll to a section or element
-            bbox = None
             if direction.startswith("@"):
-                element, desc = await self._element_for(direction)
-                bbox = element.state.bbox if element else None
+                element, desc = self._element_for(direction)
+                bbox = element.state.bbox
             else:
-                if self.page_mem is None:
-                    raise CommandError("run 'ebrowse outline' before scrolling to a section", 2)
-                s = self.page_mem.section(direction)
-                if s is None:
-                    raise CommandError(f"no section '{direction}' — run 'ebrowse outline'", 2)
-                bbox, desc = s.bbox, direction
+                bbox, desc = self._get_section(direction).bbox, direction
             y = max(0, int(bbox.y) - 80)
 
             async def do() -> None:
@@ -312,14 +324,14 @@ def _map_playwright_error(e: Exception) -> CommandError:
         return CommandError(
             f"click blocked: another element intercepts the pointer ({msg}) — "
             "an overlay or dialog is probably open; run 'ebrowse outline'",
-            1,
+            ExitCode.ACTION_FAILED,
         )
     if "Timeout" in type(e).__name__ or "timeout" in msg.lower():
         return CommandError(
             f"action timed out: {msg} — the element may be hidden or detached; "
             "run 'ebrowse outline' and retry with a fresh ref",
-            1,
+            ExitCode.ACTION_FAILED,
         )
     if "not an <input>" in msg or "Element is not an" in msg:
-        return CommandError(f"wrong element kind: {msg}", 2)
-    return CommandError(f"action failed: {msg}", 1)
+        return CommandError(f"wrong element kind: {msg}", ExitCode.USAGE)
+    return CommandError(f"action failed: {msg}", ExitCode.ACTION_FAILED)

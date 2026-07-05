@@ -19,7 +19,7 @@ from loguru import logger
 
 from ebrowse import __version__
 from ebrowse.config import Config, cache_dir, load_config, socket_path
-from ebrowse.daemon.protocol import CommandError, Request, Response
+from ebrowse.daemon.protocol import CommandError, ExitCode, Request, Response
 from ebrowse.session import Session
 
 _VERB_TIMEOUT_S = 120  # hard ceiling per command; goto has its own 45s budget
@@ -98,7 +98,9 @@ class Daemon:
                 req = Request.decode(line)
             except Exception as e:
                 writer.write(
-                    Response(id="", ok=False, error=f"bad request: {e}", exit_code=3).encode()
+                    Response(
+                        id="", ok=False, error=f"bad request: {e}", exit_code=ExitCode.INTERNAL
+                    ).encode()
                 )
                 return
             resp = await self._dispatch(req)
@@ -145,7 +147,7 @@ class Daemon:
                 ok=False,
                 error=f"'{req.verb}' timed out after {_VERB_TIMEOUT_S}s — the page may be "
                 "stuck loading; try 'ebrowse reload' or 'ebrowse close'",
-                exit_code=1,
+                exit_code=ExitCode.ACTION_FAILED,
             )
         except Exception as e:
             logger.exception(f"[{req.session}] {req.verb} crashed")
@@ -153,7 +155,7 @@ class Daemon:
                 id=req.id,
                 ok=False,
                 error=f"internal error in '{req.verb}': {e} — see daemon.log",
-                exit_code=3,
+                exit_code=ExitCode.INTERNAL,
             )
 
     async def _run_verb(self, session: Session, verb: str, args: dict[str, Any]) -> str:
@@ -238,7 +240,7 @@ class Daemon:
             await session.close()
             self.sessions.pop(session.name, None)
             return f"session '{session.name}' closed"
-        raise CommandError(f"unknown verb '{verb}' — this daemon is v{__version__}", 2)
+        raise CommandError(f"unknown verb '{verb}' — this daemon is v{__version__}", ExitCode.USAGE)
 
     def _status_text(self) -> str:
         lines = [

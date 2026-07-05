@@ -8,7 +8,7 @@ occlusion pre-check lives in actions.py.
 
 from __future__ import annotations
 
-from ebrowse.errors import CommandError
+from ebrowse.errors import CommandError, ExitCode
 from ebrowse.model import ElementDesc
 
 _CSS_ESCAPE = str.maketrans({c: f"\\{c}" for c in "!\"#$%&'()*+,./:;<=>?@[\\]^`{|}~"})
@@ -66,5 +66,5 @@ async def resolve(page, desc: ElementDesc):
     raise CommandError(
         f"could not locate {desc.short_desc()} on the live page "
         "(it may have changed) — run 'ebrowse outline'",
-        2,
+        ExitCode.USAGE,
     )

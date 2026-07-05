@@ -6,6 +6,19 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ## [Unreleased]
 
+### Fixed
+
+- `security.allowed_domains` is now enforced on every observed URL, so link
+  clicks and redirects that leave the allowed set fail with a recovery hint —
+  previously only `open <url>` was checked.
+
+### Removed
+
+- Dead `data` field from the wire protocol's Response (was documented for
+  `--json` but never populated).
+- Dead `observe.resummarize_element_delta` config key (invalidation is
+  structural via content hashes; the key was read by nothing).
+
 ## [0.1.0] — 2026-07-05
 
 First working release: the complete v1 design plus the first four roadmap extensions
