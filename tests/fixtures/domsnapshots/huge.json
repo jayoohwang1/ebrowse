@@ -1,0 +1,6161 @@
+{
+ "url": "http://127.0.0.1:8901/huge.html",
+ "title": "The Long Travelogue \u2014 Fixture",
+ "vw": 1280,
+ "vh": 1280,
+ "scrollY": 0,
+ "docH": 17793,
+ "truncated": false,
+ "root": {
+  "t": "body",
+  "r": [
+   0,
+   0,
+   1280,
+   17793
+  ],
+  "c": [
+   {
+    "t": "main",
+    "r": [
+     256,
+     0,
+     768,
+     17793
+    ],
+    "c": [
+     {
+      "t": "h1",
+      "r": [
+       280,
+       45,
+       720,
+       37
+      ],
+      "x": "The Long Travelogue"
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       104,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         136,
+         720,
+         28
+        ],
+        "x": "Chapter 1: Notes from Turin"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         184,
+         720,
+         18
+        ],
+        "x": "Entry 1 in a very long travelogue. The espresso in Turin was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         218,
+         109,
+         17
+        ],
+        "a": {
+         "href": "/chapter1.html"
+        },
+        "x": "Read chapter 1",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       249,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         281,
+         720,
+         28
+        ],
+        "x": "Chapter 2: Notes from Milan"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         329,
+         720,
+         18
+        ],
+        "x": "Entry 2 in a very long travelogue. The espresso in Milan was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         363,
+         109,
+         17
+        ],
+        "a": {
+         "href": "/chapter2.html"
+        },
+        "x": "Read chapter 2",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       394,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         425,
+         720,
+         28
+        ],
+        "x": "Chapter 3: Notes from Naples"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         473,
+         720,
+         18
+        ],
+        "x": "Entry 3 in a very long travelogue. The espresso in Naples was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         507,
+         109,
+         17
+        ],
+        "a": {
+         "href": "/chapter3.html"
+        },
+        "x": "Read chapter 3",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       538,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         570,
+         720,
+         28
+        ],
+        "x": "Chapter 4: Notes from Seoul"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         618,
+         720,
+         18
+        ],
+        "x": "Entry 4 in a very long travelogue. The espresso in Seoul was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         652,
+         109,
+         17
+        ],
+        "a": {
+         "href": "/chapter4.html"
+        },
+        "x": "Read chapter 4",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       683,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         715,
+         720,
+         28
+        ],
+        "x": "Chapter 5: Notes from Portland"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         763,
+         720,
+         18
+        ],
+        "x": "Entry 5 in a very long travelogue. The espresso in Portland was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         797,
+         109,
+         17
+        ],
+        "a": {
+         "href": "/chapter5.html"
+        },
+        "x": "Read chapter 5",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       828,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         860,
+         720,
+         28
+        ],
+        "x": "Chapter 6: Notes from Vienna"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         908,
+         720,
+         18
+        ],
+        "x": "Entry 6 in a very long travelogue. The espresso in Vienna was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         942,
+         109,
+         17
+        ],
+        "a": {
+         "href": "/chapter6.html"
+        },
+        "x": "Read chapter 6",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       973,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         1005,
+         720,
+         28
+        ],
+        "x": "Chapter 7: Notes from Melbourne"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         1053,
+         720,
+         18
+        ],
+        "x": "Entry 7 in a very long travelogue. The espresso in Melbourne was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         1087,
+         109,
+         17
+        ],
+        "a": {
+         "href": "/chapter7.html"
+        },
+        "x": "Read chapter 7",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       1118,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         1149,
+         720,
+         28
+        ],
+        "x": "Chapter 8: Notes from Osaka"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         1197,
+         720,
+         18
+        ],
+        "x": "Entry 8 in a very long travelogue. The espresso in Osaka was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         1231,
+         109,
+         17
+        ],
+        "a": {
+         "href": "/chapter8.html"
+        },
+        "x": "Read chapter 8",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       1262,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         1294,
+         720,
+         28
+        ],
+        "x": "Chapter 9: Notes from Lisbon"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         1342,
+         720,
+         18
+        ],
+        "x": "Entry 9 in a very long travelogue. The espresso in Lisbon was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         1376,
+         109,
+         17
+        ],
+        "a": {
+         "href": "/chapter9.html"
+        },
+        "x": "Read chapter 9",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       1407,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         1439,
+         720,
+         28
+        ],
+        "x": "Chapter 10: Notes from Oslo"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         1487,
+         720,
+         18
+        ],
+        "x": "Entry 10 in a very long travelogue. The espresso in Oslo was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         1521,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter10.html"
+        },
+        "x": "Read chapter 10",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       1552,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         1584,
+         720,
+         28
+        ],
+        "x": "Chapter 11: Notes from Turin"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         1632,
+         720,
+         18
+        ],
+        "x": "Entry 11 in a very long travelogue. The espresso in Turin was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         1666,
+         117,
+         17
+        ],
+        "a": {
+         "href": "/chapter11.html"
+        },
+        "x": "Read chapter 11",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       1697,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         1729,
+         720,
+         28
+        ],
+        "x": "Chapter 12: Notes from Milan"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         1777,
+         720,
+         18
+        ],
+        "x": "Entry 12 in a very long travelogue. The espresso in Milan was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         1811,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter12.html"
+        },
+        "x": "Read chapter 12",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       1842,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         1874,
+         720,
+         28
+        ],
+        "x": "Chapter 13: Notes from Naples"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         1921,
+         720,
+         18
+        ],
+        "x": "Entry 13 in a very long travelogue. The espresso in Naples was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         1955,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter13.html"
+        },
+        "x": "Read chapter 13",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       1986,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         2018,
+         720,
+         28
+        ],
+        "x": "Chapter 14: Notes from Seoul"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         2066,
+         720,
+         18
+        ],
+        "x": "Entry 14 in a very long travelogue. The espresso in Seoul was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         2100,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter14.html"
+        },
+        "x": "Read chapter 14",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       2131,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         2163,
+         720,
+         28
+        ],
+        "x": "Chapter 15: Notes from Portland"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         2211,
+         720,
+         18
+        ],
+        "x": "Entry 15 in a very long travelogue. The espresso in Portland was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         2245,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter15.html"
+        },
+        "x": "Read chapter 15",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       2276,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         2308,
+         720,
+         28
+        ],
+        "x": "Chapter 16: Notes from Vienna"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         2356,
+         720,
+         18
+        ],
+        "x": "Entry 16 in a very long travelogue. The espresso in Vienna was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         2390,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter16.html"
+        },
+        "x": "Read chapter 16",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       2421,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         2453,
+         720,
+         28
+        ],
+        "x": "Chapter 17: Notes from Melbourne"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         2501,
+         720,
+         36
+        ],
+        "x": "Entry 17 in a very long travelogue. The espresso in Melbourne was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         2553,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter17.html"
+        },
+        "x": "Read chapter 17",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       2584,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         2616,
+         720,
+         28
+        ],
+        "x": "Chapter 18: Notes from Osaka"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         2664,
+         720,
+         18
+        ],
+        "x": "Entry 18 in a very long travelogue. The espresso in Osaka was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         2698,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter18.html"
+        },
+        "x": "Read chapter 18",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       2729,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         2760,
+         720,
+         28
+        ],
+        "x": "Chapter 19: Notes from Lisbon"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         2808,
+         720,
+         18
+        ],
+        "x": "Entry 19 in a very long travelogue. The espresso in Lisbon was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         2842,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter19.html"
+        },
+        "x": "Read chapter 19",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       2873,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         2905,
+         720,
+         28
+        ],
+        "x": "Chapter 20: Notes from Oslo"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         2953,
+         720,
+         18
+        ],
+        "x": "Entry 20 in a very long travelogue. The espresso in Oslo was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         2987,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter20.html"
+        },
+        "x": "Read chapter 20",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       3018,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         3050,
+         720,
+         28
+        ],
+        "x": "Chapter 21: Notes from Turin"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         3098,
+         720,
+         18
+        ],
+        "x": "Entry 21 in a very long travelogue. The espresso in Turin was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         3132,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter21.html"
+        },
+        "x": "Read chapter 21",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       3163,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         3195,
+         720,
+         28
+        ],
+        "x": "Chapter 22: Notes from Milan"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         3243,
+         720,
+         18
+        ],
+        "x": "Entry 22 in a very long travelogue. The espresso in Milan was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         3277,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter22.html"
+        },
+        "x": "Read chapter 22",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       3308,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         3340,
+         720,
+         28
+        ],
+        "x": "Chapter 23: Notes from Naples"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         3388,
+         720,
+         18
+        ],
+        "x": "Entry 23 in a very long travelogue. The espresso in Naples was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         3422,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter23.html"
+        },
+        "x": "Read chapter 23",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       3453,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         3484,
+         720,
+         28
+        ],
+        "x": "Chapter 24: Notes from Seoul"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         3532,
+         720,
+         18
+        ],
+        "x": "Entry 24 in a very long travelogue. The espresso in Seoul was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         3566,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter24.html"
+        },
+        "x": "Read chapter 24",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       3597,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         3629,
+         720,
+         28
+        ],
+        "x": "Chapter 25: Notes from Portland"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         3677,
+         720,
+         36
+        ],
+        "x": "Entry 25 in a very long travelogue. The espresso in Portland was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         3729,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter25.html"
+        },
+        "x": "Read chapter 25",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       3760,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         3792,
+         720,
+         28
+        ],
+        "x": "Chapter 26: Notes from Vienna"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         3840,
+         720,
+         18
+        ],
+        "x": "Entry 26 in a very long travelogue. The espresso in Vienna was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         3874,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter26.html"
+        },
+        "x": "Read chapter 26",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       3905,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         3937,
+         720,
+         28
+        ],
+        "x": "Chapter 27: Notes from Melbourne"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         3985,
+         720,
+         36
+        ],
+        "x": "Entry 27 in a very long travelogue. The espresso in Melbourne was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         4037,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter27.html"
+        },
+        "x": "Read chapter 27",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       4068,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         4100,
+         720,
+         28
+        ],
+        "x": "Chapter 28: Notes from Osaka"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         4148,
+         720,
+         18
+        ],
+        "x": "Entry 28 in a very long travelogue. The espresso in Osaka was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         4182,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter28.html"
+        },
+        "x": "Read chapter 28",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       4213,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         4245,
+         720,
+         28
+        ],
+        "x": "Chapter 29: Notes from Lisbon"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         4292,
+         720,
+         18
+        ],
+        "x": "Entry 29 in a very long travelogue. The espresso in Lisbon was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         4326,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter29.html"
+        },
+        "x": "Read chapter 29",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       4357,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         4389,
+         720,
+         28
+        ],
+        "x": "Chapter 30: Notes from Oslo"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         4437,
+         720,
+         18
+        ],
+        "x": "Entry 30 in a very long travelogue. The espresso in Oslo was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         4471,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter30.html"
+        },
+        "x": "Read chapter 30",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       4502,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         4534,
+         720,
+         28
+        ],
+        "x": "Chapter 31: Notes from Turin"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         4582,
+         720,
+         18
+        ],
+        "x": "Entry 31 in a very long travelogue. The espresso in Turin was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         4616,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter31.html"
+        },
+        "x": "Read chapter 31",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       4647,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         4679,
+         720,
+         28
+        ],
+        "x": "Chapter 32: Notes from Milan"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         4727,
+         720,
+         18
+        ],
+        "x": "Entry 32 in a very long travelogue. The espresso in Milan was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         4761,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter32.html"
+        },
+        "x": "Read chapter 32",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       4792,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         4824,
+         720,
+         28
+        ],
+        "x": "Chapter 33: Notes from Naples"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         4872,
+         720,
+         18
+        ],
+        "x": "Entry 33 in a very long travelogue. The espresso in Naples was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         4906,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter33.html"
+        },
+        "x": "Read chapter 33",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       4937,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         4969,
+         720,
+         28
+        ],
+        "x": "Chapter 34: Notes from Seoul"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         5017,
+         720,
+         18
+        ],
+        "x": "Entry 34 in a very long travelogue. The espresso in Seoul was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         5051,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter34.html"
+        },
+        "x": "Read chapter 34",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       5082,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         5113,
+         720,
+         28
+        ],
+        "x": "Chapter 35: Notes from Portland"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         5161,
+         720,
+         18
+        ],
+        "x": "Entry 35 in a very long travelogue. The espresso in Portland was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         5195,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter35.html"
+        },
+        "x": "Read chapter 35",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       5226,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         5258,
+         720,
+         28
+        ],
+        "x": "Chapter 36: Notes from Vienna"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         5306,
+         720,
+         18
+        ],
+        "x": "Entry 36 in a very long travelogue. The espresso in Vienna was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         5340,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter36.html"
+        },
+        "x": "Read chapter 36",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       5371,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         5403,
+         720,
+         28
+        ],
+        "x": "Chapter 37: Notes from Melbourne"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         5451,
+         720,
+         36
+        ],
+        "x": "Entry 37 in a very long travelogue. The espresso in Melbourne was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         5503,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter37.html"
+        },
+        "x": "Read chapter 37",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       5534,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         5566,
+         720,
+         28
+        ],
+        "x": "Chapter 38: Notes from Osaka"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         5614,
+         720,
+         18
+        ],
+        "x": "Entry 38 in a very long travelogue. The espresso in Osaka was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         5648,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter38.html"
+        },
+        "x": "Read chapter 38",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       5679,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         5711,
+         720,
+         28
+        ],
+        "x": "Chapter 39: Notes from Lisbon"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         5759,
+         720,
+         18
+        ],
+        "x": "Entry 39 in a very long travelogue. The espresso in Lisbon was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         5793,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter39.html"
+        },
+        "x": "Read chapter 39",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       5824,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         5855,
+         720,
+         28
+        ],
+        "x": "Chapter 40: Notes from Oslo"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         5903,
+         720,
+         18
+        ],
+        "x": "Entry 40 in a very long travelogue. The espresso in Oslo was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         5937,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter40.html"
+        },
+        "x": "Read chapter 40",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       5968,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         6000,
+         720,
+         28
+        ],
+        "x": "Chapter 41: Notes from Turin"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         6048,
+         720,
+         18
+        ],
+        "x": "Entry 41 in a very long travelogue. The espresso in Turin was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         6082,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter41.html"
+        },
+        "x": "Read chapter 41",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       6113,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         6145,
+         720,
+         28
+        ],
+        "x": "Chapter 42: Notes from Milan"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         6193,
+         720,
+         18
+        ],
+        "x": "Entry 42 in a very long travelogue. The espresso in Milan was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         6227,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter42.html"
+        },
+        "x": "Read chapter 42",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       6258,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         6290,
+         720,
+         28
+        ],
+        "x": "Chapter 43: Notes from Naples"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         6338,
+         720,
+         18
+        ],
+        "x": "Entry 43 in a very long travelogue. The espresso in Naples was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         6372,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter43.html"
+        },
+        "x": "Read chapter 43",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       6403,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         6435,
+         720,
+         28
+        ],
+        "x": "Chapter 44: Notes from Seoul"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         6483,
+         720,
+         18
+        ],
+        "x": "Entry 44 in a very long travelogue. The espresso in Seoul was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         6517,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter44.html"
+        },
+        "x": "Read chapter 44",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       6548,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         6580,
+         720,
+         28
+        ],
+        "x": "Chapter 45: Notes from Portland"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         6627,
+         720,
+         36
+        ],
+        "x": "Entry 45 in a very long travelogue. The espresso in Portland was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         6679,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter45.html"
+        },
+        "x": "Read chapter 45",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       6710,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         6742,
+         720,
+         28
+        ],
+        "x": "Chapter 46: Notes from Vienna"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         6790,
+         720,
+         18
+        ],
+        "x": "Entry 46 in a very long travelogue. The espresso in Vienna was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         6824,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter46.html"
+        },
+        "x": "Read chapter 46",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       6855,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         6887,
+         720,
+         28
+        ],
+        "x": "Chapter 47: Notes from Melbourne"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         6935,
+         720,
+         36
+        ],
+        "x": "Entry 47 in a very long travelogue. The espresso in Melbourne was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         6987,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter47.html"
+        },
+        "x": "Read chapter 47",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       7018,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         7050,
+         720,
+         28
+        ],
+        "x": "Chapter 48: Notes from Osaka"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         7098,
+         720,
+         18
+        ],
+        "x": "Entry 48 in a very long travelogue. The espresso in Osaka was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         7132,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter48.html"
+        },
+        "x": "Read chapter 48",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       7163,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         7195,
+         720,
+         28
+        ],
+        "x": "Chapter 49: Notes from Lisbon"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         7243,
+         720,
+         18
+        ],
+        "x": "Entry 49 in a very long travelogue. The espresso in Lisbon was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         7277,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter49.html"
+        },
+        "x": "Read chapter 49",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       7308,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         7340,
+         720,
+         28
+        ],
+        "x": "Chapter 50: Notes from Oslo"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         7388,
+         720,
+         18
+        ],
+        "x": "Entry 50 in a very long travelogue. The espresso in Oslo was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         7422,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter50.html"
+        },
+        "x": "Read chapter 50",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       7453,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         7484,
+         720,
+         28
+        ],
+        "x": "Chapter 51: Notes from Turin"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         7532,
+         720,
+         18
+        ],
+        "x": "Entry 51 in a very long travelogue. The espresso in Turin was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         7566,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter51.html"
+        },
+        "x": "Read chapter 51",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       7597,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         7629,
+         720,
+         28
+        ],
+        "x": "Chapter 52: Notes from Milan"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         7677,
+         720,
+         18
+        ],
+        "x": "Entry 52 in a very long travelogue. The espresso in Milan was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         7711,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter52.html"
+        },
+        "x": "Read chapter 52",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       7742,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         7774,
+         720,
+         28
+        ],
+        "x": "Chapter 53: Notes from Naples"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         7822,
+         720,
+         18
+        ],
+        "x": "Entry 53 in a very long travelogue. The espresso in Naples was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         7856,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter53.html"
+        },
+        "x": "Read chapter 53",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       7887,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         7919,
+         720,
+         28
+        ],
+        "x": "Chapter 54: Notes from Seoul"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         7967,
+         720,
+         18
+        ],
+        "x": "Entry 54 in a very long travelogue. The espresso in Seoul was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         8001,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter54.html"
+        },
+        "x": "Read chapter 54",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       8032,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         8064,
+         720,
+         28
+        ],
+        "x": "Chapter 55: Notes from Portland"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         8112,
+         720,
+         18
+        ],
+        "x": "Entry 55 in a very long travelogue. The espresso in Portland was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         8146,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter55.html"
+        },
+        "x": "Read chapter 55",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       8177,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         8208,
+         720,
+         28
+        ],
+        "x": "Chapter 56: Notes from Vienna"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         8256,
+         720,
+         18
+        ],
+        "x": "Entry 56 in a very long travelogue. The espresso in Vienna was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         8290,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter56.html"
+        },
+        "x": "Read chapter 56",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       8321,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         8353,
+         720,
+         28
+        ],
+        "x": "Chapter 57: Notes from Melbourne"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         8401,
+         720,
+         36
+        ],
+        "x": "Entry 57 in a very long travelogue. The espresso in Melbourne was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         8453,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter57.html"
+        },
+        "x": "Read chapter 57",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       8484,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         8516,
+         720,
+         28
+        ],
+        "x": "Chapter 58: Notes from Osaka"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         8564,
+         720,
+         18
+        ],
+        "x": "Entry 58 in a very long travelogue. The espresso in Osaka was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         8598,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter58.html"
+        },
+        "x": "Read chapter 58",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       8629,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         8661,
+         720,
+         28
+        ],
+        "x": "Chapter 59: Notes from Lisbon"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         8709,
+         720,
+         18
+        ],
+        "x": "Entry 59 in a very long travelogue. The espresso in Lisbon was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         8743,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter59.html"
+        },
+        "x": "Read chapter 59",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       8774,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         8806,
+         720,
+         28
+        ],
+        "x": "Chapter 60: Notes from Oslo"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         8854,
+         720,
+         18
+        ],
+        "x": "Entry 60 in a very long travelogue. The espresso in Oslo was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         8888,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter60.html"
+        },
+        "x": "Read chapter 60",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       8919,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         8951,
+         720,
+         28
+        ],
+        "x": "Chapter 61: Notes from Turin"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         8998,
+         720,
+         18
+        ],
+        "x": "Entry 61 in a very long travelogue. The espresso in Turin was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         9032,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter61.html"
+        },
+        "x": "Read chapter 61",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       9063,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         9095,
+         720,
+         28
+        ],
+        "x": "Chapter 62: Notes from Milan"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         9143,
+         720,
+         18
+        ],
+        "x": "Entry 62 in a very long travelogue. The espresso in Milan was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         9177,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter62.html"
+        },
+        "x": "Read chapter 62",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       9208,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         9240,
+         720,
+         28
+        ],
+        "x": "Chapter 63: Notes from Naples"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         9288,
+         720,
+         18
+        ],
+        "x": "Entry 63 in a very long travelogue. The espresso in Naples was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         9322,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter63.html"
+        },
+        "x": "Read chapter 63",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       9353,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         9385,
+         720,
+         28
+        ],
+        "x": "Chapter 64: Notes from Seoul"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         9433,
+         720,
+         18
+        ],
+        "x": "Entry 64 in a very long travelogue. The espresso in Seoul was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         9467,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter64.html"
+        },
+        "x": "Read chapter 64",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       9498,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         9530,
+         720,
+         28
+        ],
+        "x": "Chapter 65: Notes from Portland"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         9578,
+         720,
+         36
+        ],
+        "x": "Entry 65 in a very long travelogue. The espresso in Portland was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         9630,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter65.html"
+        },
+        "x": "Read chapter 65",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       9661,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         9693,
+         720,
+         28
+        ],
+        "x": "Chapter 66: Notes from Vienna"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         9741,
+         720,
+         18
+        ],
+        "x": "Entry 66 in a very long travelogue. The espresso in Vienna was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         9775,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter66.html"
+        },
+        "x": "Read chapter 66",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       9806,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         9837,
+         720,
+         28
+        ],
+        "x": "Chapter 67: Notes from Melbourne"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         9885,
+         720,
+         36
+        ],
+        "x": "Entry 67 in a very long travelogue. The espresso in Melbourne was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         9937,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter67.html"
+        },
+        "x": "Read chapter 67",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       9968,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         10000,
+         720,
+         28
+        ],
+        "x": "Chapter 68: Notes from Osaka"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         10048,
+         720,
+         18
+        ],
+        "x": "Entry 68 in a very long travelogue. The espresso in Osaka was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         10082,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter68.html"
+        },
+        "x": "Read chapter 68",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       10113,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         10145,
+         720,
+         28
+        ],
+        "x": "Chapter 69: Notes from Lisbon"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         10193,
+         720,
+         18
+        ],
+        "x": "Entry 69 in a very long travelogue. The espresso in Lisbon was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         10227,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter69.html"
+        },
+        "x": "Read chapter 69",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       10258,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         10290,
+         720,
+         28
+        ],
+        "x": "Chapter 70: Notes from Oslo"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         10338,
+         720,
+         18
+        ],
+        "x": "Entry 70 in a very long travelogue. The espresso in Oslo was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         10372,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter70.html"
+        },
+        "x": "Read chapter 70",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       10403,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         10435,
+         720,
+         28
+        ],
+        "x": "Chapter 71: Notes from Turin"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         10483,
+         720,
+         18
+        ],
+        "x": "Entry 71 in a very long travelogue. The espresso in Turin was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         10517,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter71.html"
+        },
+        "x": "Read chapter 71",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       10548,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         10579,
+         720,
+         28
+        ],
+        "x": "Chapter 72: Notes from Milan"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         10627,
+         720,
+         18
+        ],
+        "x": "Entry 72 in a very long travelogue. The espresso in Milan was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         10661,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter72.html"
+        },
+        "x": "Read chapter 72",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       10692,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         10724,
+         720,
+         28
+        ],
+        "x": "Chapter 73: Notes from Naples"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         10772,
+         720,
+         18
+        ],
+        "x": "Entry 73 in a very long travelogue. The espresso in Naples was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         10806,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter73.html"
+        },
+        "x": "Read chapter 73",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       10837,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         10869,
+         720,
+         28
+        ],
+        "x": "Chapter 74: Notes from Seoul"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         10917,
+         720,
+         18
+        ],
+        "x": "Entry 74 in a very long travelogue. The espresso in Seoul was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         10951,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter74.html"
+        },
+        "x": "Read chapter 74",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       10982,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         11014,
+         720,
+         28
+        ],
+        "x": "Chapter 75: Notes from Portland"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         11062,
+         720,
+         18
+        ],
+        "x": "Entry 75 in a very long travelogue. The espresso in Portland was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         11096,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter75.html"
+        },
+        "x": "Read chapter 75",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       11127,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         11159,
+         720,
+         28
+        ],
+        "x": "Chapter 76: Notes from Vienna"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         11207,
+         720,
+         18
+        ],
+        "x": "Entry 76 in a very long travelogue. The espresso in Vienna was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         11241,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter76.html"
+        },
+        "x": "Read chapter 76",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       11272,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         11304,
+         720,
+         28
+        ],
+        "x": "Chapter 77: Notes from Melbourne"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         11351,
+         720,
+         36
+        ],
+        "x": "Entry 77 in a very long travelogue. The espresso in Melbourne was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         11403,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter77.html"
+        },
+        "x": "Read chapter 77",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       11434,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         11466,
+         720,
+         28
+        ],
+        "x": "Chapter 78: Notes from Osaka"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         11514,
+         720,
+         18
+        ],
+        "x": "Entry 78 in a very long travelogue. The espresso in Osaka was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         11548,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter78.html"
+        },
+        "x": "Read chapter 78",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       11579,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         11611,
+         720,
+         28
+        ],
+        "x": "Chapter 79: Notes from Lisbon"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         11659,
+         720,
+         18
+        ],
+        "x": "Entry 79 in a very long travelogue. The espresso in Lisbon was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         11693,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter79.html"
+        },
+        "x": "Read chapter 79",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       11724,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         11756,
+         720,
+         28
+        ],
+        "x": "Chapter 80: Notes from Oslo"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         11804,
+         720,
+         18
+        ],
+        "x": "Entry 80 in a very long travelogue. The espresso in Oslo was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         11838,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter80.html"
+        },
+        "x": "Read chapter 80",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       11869,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         11901,
+         720,
+         28
+        ],
+        "x": "Chapter 81: Notes from Turin"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         11949,
+         720,
+         18
+        ],
+        "x": "Entry 81 in a very long travelogue. The espresso in Turin was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         11983,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter81.html"
+        },
+        "x": "Read chapter 81",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       12014,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         12046,
+         720,
+         28
+        ],
+        "x": "Chapter 82: Notes from Milan"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         12094,
+         720,
+         18
+        ],
+        "x": "Entry 82 in a very long travelogue. The espresso in Milan was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         12128,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter82.html"
+        },
+        "x": "Read chapter 82",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       12159,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         12190,
+         720,
+         28
+        ],
+        "x": "Chapter 83: Notes from Naples"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         12238,
+         720,
+         18
+        ],
+        "x": "Entry 83 in a very long travelogue. The espresso in Naples was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         12272,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter83.html"
+        },
+        "x": "Read chapter 83",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       12303,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         12335,
+         720,
+         28
+        ],
+        "x": "Chapter 84: Notes from Seoul"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         12383,
+         720,
+         18
+        ],
+        "x": "Entry 84 in a very long travelogue. The espresso in Seoul was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         12417,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter84.html"
+        },
+        "x": "Read chapter 84",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       12448,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         12480,
+         720,
+         28
+        ],
+        "x": "Chapter 85: Notes from Portland"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         12528,
+         720,
+         36
+        ],
+        "x": "Entry 85 in a very long travelogue. The espresso in Portland was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         12580,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter85.html"
+        },
+        "x": "Read chapter 85",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       12611,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         12643,
+         720,
+         28
+        ],
+        "x": "Chapter 86: Notes from Vienna"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         12691,
+         720,
+         18
+        ],
+        "x": "Entry 86 in a very long travelogue. The espresso in Vienna was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         12725,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter86.html"
+        },
+        "x": "Read chapter 86",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       12756,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         12788,
+         720,
+         28
+        ],
+        "x": "Chapter 87: Notes from Melbourne"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         12836,
+         720,
+         36
+        ],
+        "x": "Entry 87 in a very long travelogue. The espresso in Melbourne was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         12888,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter87.html"
+        },
+        "x": "Read chapter 87",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       12919,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         12950,
+         720,
+         28
+        ],
+        "x": "Chapter 88: Notes from Osaka"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         12998,
+         720,
+         18
+        ],
+        "x": "Entry 88 in a very long travelogue. The espresso in Osaka was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         13032,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter88.html"
+        },
+        "x": "Read chapter 88",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       13063,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         13095,
+         720,
+         28
+        ],
+        "x": "Chapter 89: Notes from Lisbon"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         13143,
+         720,
+         18
+        ],
+        "x": "Entry 89 in a very long travelogue. The espresso in Lisbon was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         13177,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter89.html"
+        },
+        "x": "Read chapter 89",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       13208,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         13240,
+         720,
+         28
+        ],
+        "x": "Chapter 90: Notes from Oslo"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         13288,
+         720,
+         18
+        ],
+        "x": "Entry 90 in a very long travelogue. The espresso in Oslo was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         13322,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter90.html"
+        },
+        "x": "Read chapter 90",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       13353,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         13385,
+         720,
+         28
+        ],
+        "x": "Chapter 91: Notes from Turin"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         13433,
+         720,
+         18
+        ],
+        "x": "Entry 91 in a very long travelogue. The espresso in Turin was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         13467,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter91.html"
+        },
+        "x": "Read chapter 91",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       13498,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         13530,
+         720,
+         28
+        ],
+        "x": "Chapter 92: Notes from Milan"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         13578,
+         720,
+         18
+        ],
+        "x": "Entry 92 in a very long travelogue. The espresso in Milan was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         13612,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter92.html"
+        },
+        "x": "Read chapter 92",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       13643,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         13675,
+         720,
+         28
+        ],
+        "x": "Chapter 93: Notes from Naples"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         13722,
+         720,
+         18
+        ],
+        "x": "Entry 93 in a very long travelogue. The espresso in Naples was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         13756,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter93.html"
+        },
+        "x": "Read chapter 93",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       13787,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         13819,
+         720,
+         28
+        ],
+        "x": "Chapter 94: Notes from Seoul"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         13867,
+         720,
+         18
+        ],
+        "x": "Entry 94 in a very long travelogue. The espresso in Seoul was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         13901,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter94.html"
+        },
+        "x": "Read chapter 94",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       13932,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         13964,
+         720,
+         28
+        ],
+        "x": "Chapter 95: Notes from Portland"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         14012,
+         720,
+         18
+        ],
+        "x": "Entry 95 in a very long travelogue. The espresso in Portland was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         14046,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter95.html"
+        },
+        "x": "Read chapter 95",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       14077,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         14109,
+         720,
+         28
+        ],
+        "x": "Chapter 96: Notes from Vienna"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         14157,
+         720,
+         18
+        ],
+        "x": "Entry 96 in a very long travelogue. The espresso in Vienna was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         14191,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter96.html"
+        },
+        "x": "Read chapter 96",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       14222,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         14254,
+         720,
+         28
+        ],
+        "x": "Chapter 97: Notes from Melbourne"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         14302,
+         720,
+         36
+        ],
+        "x": "Entry 97 in a very long travelogue. The espresso in Melbourne was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         14354,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter97.html"
+        },
+        "x": "Read chapter 97",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       14385,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         14417,
+         720,
+         28
+        ],
+        "x": "Chapter 98: Notes from Osaka"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         14465,
+         720,
+         18
+        ],
+        "x": "Entry 98 in a very long travelogue. The espresso in Osaka was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         14499,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter98.html"
+        },
+        "x": "Read chapter 98",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       14530,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         14561,
+         720,
+         28
+        ],
+        "x": "Chapter 99: Notes from Lisbon"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         14609,
+         720,
+         18
+        ],
+        "x": "Entry 99 in a very long travelogue. The espresso in Lisbon was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         14643,
+         118,
+         17
+        ],
+        "a": {
+         "href": "/chapter99.html"
+        },
+        "x": "Read chapter 99",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       14674,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         14706,
+         720,
+         28
+        ],
+        "x": "Chapter 100: Notes from Oslo"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         14754,
+         720,
+         18
+        ],
+        "x": "Entry 100 in a very long travelogue. The espresso in Oslo was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         14788,
+         127,
+         17
+        ],
+        "a": {
+         "href": "/chapter100.html"
+        },
+        "x": "Read chapter 100",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       14819,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         14851,
+         720,
+         28
+        ],
+        "x": "Chapter 101: Notes from Turin"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         14899,
+         720,
+         18
+        ],
+        "x": "Entry 101 in a very long travelogue. The espresso in Turin was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         14933,
+         127,
+         17
+        ],
+        "a": {
+         "href": "/chapter101.html"
+        },
+        "x": "Read chapter 101",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       14964,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         14996,
+         720,
+         28
+        ],
+        "x": "Chapter 102: Notes from Milan"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         15044,
+         720,
+         18
+        ],
+        "x": "Entry 102 in a very long travelogue. The espresso in Milan was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         15078,
+         127,
+         17
+        ],
+        "a": {
+         "href": "/chapter102.html"
+        },
+        "x": "Read chapter 102",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       15109,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         15141,
+         720,
+         28
+        ],
+        "x": "Chapter 103: Notes from Naples"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         15189,
+         720,
+         18
+        ],
+        "x": "Entry 103 in a very long travelogue. The espresso in Naples was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         15223,
+         127,
+         17
+        ],
+        "a": {
+         "href": "/chapter103.html"
+        },
+        "x": "Read chapter 103",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       15254,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         15285,
+         720,
+         28
+        ],
+        "x": "Chapter 104: Notes from Seoul"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         15333,
+         720,
+         18
+        ],
+        "x": "Entry 104 in a very long travelogue. The espresso in Seoul was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         15367,
+         127,
+         17
+        ],
+        "a": {
+         "href": "/chapter104.html"
+        },
+        "x": "Read chapter 104",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       15398,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         15430,
+         720,
+         28
+        ],
+        "x": "Chapter 105: Notes from Portland"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         15478,
+         720,
+         36
+        ],
+        "x": "Entry 105 in a very long travelogue. The espresso in Portland was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         15530,
+         127,
+         17
+        ],
+        "a": {
+         "href": "/chapter105.html"
+        },
+        "x": "Read chapter 105",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       15561,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         15593,
+         720,
+         28
+        ],
+        "x": "Chapter 106: Notes from Vienna"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         15641,
+         720,
+         18
+        ],
+        "x": "Entry 106 in a very long travelogue. The espresso in Vienna was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         15675,
+         127,
+         17
+        ],
+        "a": {
+         "href": "/chapter106.html"
+        },
+        "x": "Read chapter 106",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       15706,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         15738,
+         720,
+         28
+        ],
+        "x": "Chapter 107: Notes from Melbourne"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         15786,
+         720,
+         36
+        ],
+        "x": "Entry 107 in a very long travelogue. The espresso in Melbourne was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         15838,
+         127,
+         17
+        ],
+        "a": {
+         "href": "/chapter107.html"
+        },
+        "x": "Read chapter 107",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       15869,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         15901,
+         720,
+         28
+        ],
+        "x": "Chapter 108: Notes from Osaka"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         15949,
+         720,
+         18
+        ],
+        "x": "Entry 108 in a very long travelogue. The espresso in Osaka was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         15983,
+         127,
+         17
+        ],
+        "a": {
+         "href": "/chapter108.html"
+        },
+        "x": "Read chapter 108",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       16014,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         16046,
+         720,
+         28
+        ],
+        "x": "Chapter 109: Notes from Lisbon"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         16093,
+         720,
+         18
+        ],
+        "x": "Entry 109 in a very long travelogue. The espresso in Lisbon was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         16127,
+         127,
+         17
+        ],
+        "a": {
+         "href": "/chapter109.html"
+        },
+        "x": "Read chapter 109",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       16158,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         16190,
+         720,
+         28
+        ],
+        "x": "Chapter 110: Notes from Oslo"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         16238,
+         720,
+         18
+        ],
+        "x": "Entry 110 in a very long travelogue. The espresso in Oslo was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         16272,
+         126,
+         17
+        ],
+        "a": {
+         "href": "/chapter110.html"
+        },
+        "x": "Read chapter 110",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       16303,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         16335,
+         720,
+         28
+        ],
+        "x": "Chapter 111: Notes from Turin"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         16383,
+         720,
+         18
+        ],
+        "x": "Entry 111 in a very long travelogue. The espresso in Turin was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         16417,
+         125,
+         17
+        ],
+        "a": {
+         "href": "/chapter111.html"
+        },
+        "x": "Read chapter 111",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       16448,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         16480,
+         720,
+         28
+        ],
+        "x": "Chapter 112: Notes from Milan"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         16528,
+         720,
+         18
+        ],
+        "x": "Entry 112 in a very long travelogue. The espresso in Milan was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         16562,
+         126,
+         17
+        ],
+        "a": {
+         "href": "/chapter112.html"
+        },
+        "x": "Read chapter 112",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       16593,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         16625,
+         720,
+         28
+        ],
+        "x": "Chapter 113: Notes from Naples"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         16673,
+         720,
+         18
+        ],
+        "x": "Entry 113 in a very long travelogue. The espresso in Naples was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         16707,
+         126,
+         17
+        ],
+        "a": {
+         "href": "/chapter113.html"
+        },
+        "x": "Read chapter 113",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       16738,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         16770,
+         720,
+         28
+        ],
+        "x": "Chapter 114: Notes from Seoul"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         16818,
+         720,
+         18
+        ],
+        "x": "Entry 114 in a very long travelogue. The espresso in Seoul was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         16852,
+         126,
+         17
+        ],
+        "a": {
+         "href": "/chapter114.html"
+        },
+        "x": "Read chapter 114",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       16883,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         16914,
+         720,
+         28
+        ],
+        "x": "Chapter 115: Notes from Portland"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         16962,
+         720,
+         18
+        ],
+        "x": "Entry 115 in a very long travelogue. The espresso in Portland was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         16996,
+         126,
+         17
+        ],
+        "a": {
+         "href": "/chapter115.html"
+        },
+        "x": "Read chapter 115",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       17027,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         17059,
+         720,
+         28
+        ],
+        "x": "Chapter 116: Notes from Vienna"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         17107,
+         720,
+         18
+        ],
+        "x": "Entry 116 in a very long travelogue. The espresso in Vienna was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         17141,
+         126,
+         17
+        ],
+        "a": {
+         "href": "/chapter116.html"
+        },
+        "x": "Read chapter 116",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       17172,
+       720,
+       163
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         17204,
+         720,
+         28
+        ],
+        "x": "Chapter 117: Notes from Melbourne"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         17252,
+         720,
+         36
+        ],
+        "x": "Entry 117 in a very long travelogue. The espresso in Melbourne was excellent, and the trains ran on time."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         17304,
+         126,
+         17
+        ],
+        "a": {
+         "href": "/chapter117.html"
+        },
+        "x": "Read chapter 117",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       17335,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         17367,
+         720,
+         28
+        ],
+        "x": "Chapter 118: Notes from Osaka"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         17415,
+         720,
+         18
+        ],
+        "x": "Entry 118 in a very long travelogue. The espresso in Osaka was forgettable, and the trains ran late."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         17449,
+         126,
+         17
+        ],
+        "a": {
+         "href": "/chapter118.html"
+        },
+        "x": "Read chapter 118",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       17480,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         17512,
+         720,
+         28
+        ],
+        "x": "Chapter 119: Notes from Lisbon"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         17560,
+         720,
+         18
+        ],
+        "x": "Entry 119 in a very long travelogue. The espresso in Lisbon was surprising, and the trains ran early."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         17594,
+         126,
+         17
+        ],
+        "a": {
+         "href": "/chapter119.html"
+        },
+        "x": "Read chapter 119",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       280,
+       17625,
+       720,
+       145
+      ],
+      "a": {
+       "cls": "chunk"
+      },
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         280,
+         17656,
+         720,
+         28
+        ],
+        "x": "Chapter 120: Notes from Oslo"
+       },
+       {
+        "t": "p",
+        "r": [
+         280,
+         17704,
+         720,
+         18
+        ],
+        "x": "Entry 120 in a very long travelogue. The espresso in Oslo was legendary, and the trains ran never."
+       },
+       {
+        "t": "a",
+        "r": [
+         280,
+         17738,
+         127,
+         17
+        ],
+        "a": {
+         "href": "/chapter120.html"
+        },
+        "x": "Read chapter 120",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

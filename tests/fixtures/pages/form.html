@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Create Account — Fixture Shop</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    header { background: #1a3; color: #fff; padding: 12px 24px; }
+    header a { color: #fff; margin-right: 12px; }
+    main { max-width: 560px; margin: 0 auto; padding: 24px; }
+    form div { margin-bottom: 14px; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=password], select, textarea { width: 100%; padding: 6px; }
+    .error { color: #c00; display: none; }
+    .error.show { display: block; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/">Fixture Shop</a>
+    <nav aria-label="Main"><a href="/list.html">Products</a> <a href="/deals.html">Deals</a> <a href="/help.html">Help</a></nav>
+  </header>
+
+  <main>
+    <h1>Create your account</h1>
+    <form id="signup" novalidate>
+      <div>
+        <label for="fullname">Full name</label>
+        <input type="text" id="fullname" name="fullname" required>
+      </div>
+      <div>
+        <label for="email">Email address</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" required>
+        <span class="error" id="email-error">Please enter a valid email address.</span>
+      </div>
+      <div>
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required minlength="8">
+      </div>
+      <div>
+        <label for="country">Country</label>
+        <select id="country" name="country">
+          <option value="">Choose a country</option>
+          <option value="us">United States</option>
+          <option value="ca">Canada</option>
+          <option value="kr">South Korea</option>
+          <option value="jp">Japan</option>
+          <option value="de">Germany</option>
+          <option value="fr">France</option>
+        </select>
+      </div>
+      <fieldset>
+        <legend>Account type</legend>
+        <label><input type="radio" name="acct" value="personal" checked> Personal</label>
+        <label><input type="radio" name="acct" value="business"> Business</label>
+      </fieldset>
+      <div>
+        <label for="bio">About you (optional)</label>
+        <textarea id="bio" name="bio" rows="3" placeholder="Tell us about yourself"></textarea>
+      </div>
+      <div>
+        <label><input type="checkbox" id="newsletter" name="newsletter"> Send me the weekly newsletter</label>
+        <label><input type="checkbox" id="tos" name="tos" required> I agree to the <a href="/terms.html">Terms of Service</a></label>
+      </div>
+      <button type="submit" id="submit-btn">Create account</button>
+      <p class="error" id="form-error">Please fix the errors above and try again.</p>
+      <p id="form-success" style="display:none">Account created! Check your email.</p>
+    </form>
+  </main>
+
+  <script>
+    document.getElementById('signup').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const email = document.getElementById('email');
+      const emailErr = document.getElementById('email-error');
+      const formErr = document.getElementById('form-error');
+      const ok = /.+@.+\..+/.test(email.value) && document.getElementById('tos').checked
+        && document.getElementById('fullname').value && document.getElementById('password').value.length >= 8;
+      emailErr.classList.toggle('show', !/.+@.+\..+/.test(email.value));
+      formErr.classList.toggle('show', !ok);
+      if (ok) {
+        formErr.classList.remove('show');
+        document.getElementById('form-success').style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

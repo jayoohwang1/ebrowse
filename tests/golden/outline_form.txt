@@ -1,0 +1,3 @@
+PAGE Create Account — Fixture Shop — http://127.0.0.1:8901/form.html
+s1 header  4 links  ~31t  | "Fixture Shop Products Deals Help"
+s2 form    1 link, 9 inputs, 1 button  ~126t  | "Create your account — Full name Email address Password Country Personal Business About yo…"

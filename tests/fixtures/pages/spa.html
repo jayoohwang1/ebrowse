@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Task Board — Fixture SPA</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    header { background: #339; color: #fff; padding: 12px 24px; }
+    header a { color: #fff; margin-right: 12px; cursor: pointer; }
+    main { max-width: 640px; margin: 0 auto; padding: 24px; }
+    .task { border: 1px solid #ccc; padding: 8px 12px; margin: 6px 0; display: flex; gap: 12px; align-items: center; }
+    .task button { margin-left: auto; }
+    #detail { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <a data-route="board" id="nav-board">Board</a>
+    <a data-route="stats" id="nav-stats">Stats</a>
+  </header>
+
+  <main>
+    <section id="board" aria-label="Task board">
+      <h1>Tasks</h1>
+      <div style="margin-bottom: 12px">
+        <input type="text" id="new-task" placeholder="New task title">
+        <button type="button" id="add-btn">Add task</button>
+      </div>
+      <div id="tasks">
+        <div class="task"><input type="checkbox"> <span>Water the plants</span> <button type="button" class="del">Delete</button></div>
+        <div class="task"><input type="checkbox"> <span>Fix the bike tire</span> <button type="button" class="del">Delete</button></div>
+        <div class="task"><input type="checkbox" checked> <span>Email the landlord</span> <button type="button" class="del">Delete</button></div>
+      </div>
+      <p><span id="count">3</span> tasks</p>
+      <button type="button" id="noop-btn">Sync (does nothing)</button>
+    </section>
+
+    <section id="detail" aria-label="Stats">
+      <h1>Stats</h1>
+      <p>Completed this week: 4. Created this week: 7.</p>
+      <a data-route="board" id="back-link">Back to board</a>
+    </section>
+  </main>
+
+  <script>
+    const board = document.getElementById('board');
+    const detail = document.getElementById('detail');
+    function route(name) {
+      const stats = name === 'stats';
+      board.style.display = stats ? 'none' : 'block';
+      detail.style.display = stats ? 'block' : 'none';
+      history.pushState({}, '', '#' + name);
+      document.title = (stats ? 'Stats' : 'Task Board') + ' — Fixture SPA';
+    }
+    for (const a of document.querySelectorAll('[data-route]')) {
+      a.addEventListener('click', () => route(a.dataset.route));
+    }
+    function refreshCount() {
+      document.getElementById('count').textContent = document.querySelectorAll('.task').length;
+    }
+    document.getElementById('add-btn').addEventListener('click', () => {
+      const input = document.getElementById('new-task');
+      if (!input.value) return;
+      const div = document.createElement('div');
+      div.className = 'task';
+      div.innerHTML = '<input type="checkbox"> <span></span> <button type="button" class="del">Delete</button>';
+      div.querySelector('span').textContent = input.value;
+      div.querySelector('.del').addEventListener('click', () => { div.remove(); refreshCount(); });
+      document.getElementById('tasks').appendChild(div);
+      input.value = '';
+      refreshCount();
+    });
+    for (const btn of document.querySelectorAll('.del')) {
+      btn.addEventListener('click', () => { btn.closest('.task').remove(); refreshCount(); });
+    }
+  </script>
+</body>
+</html>

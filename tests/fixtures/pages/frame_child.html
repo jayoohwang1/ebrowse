@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Payment</title>
+  <style>
+    body { font-family: sans-serif; padding: 16px; }
+    div { margin-bottom: 12px; }
+    label { display: block; font-weight: bold; }
+    input { width: 100%; padding: 6px; }
+  </style>
+</head>
+<body>
+  <form id="payform">
+    <h2>Card details</h2>
+    <div>
+      <label for="cardnum">Card number</label>
+      <input type="text" id="cardnum" placeholder="4242 4242 4242 4242" autocomplete="cc-number">
+    </div>
+    <div>
+      <label for="expiry">Expiry</label>
+      <input type="text" id="expiry" placeholder="MM/YY" autocomplete="cc-exp">
+    </div>
+    <div>
+      <label for="cvc">CVC</label>
+      <input type="text" id="cvc" placeholder="123" autocomplete="cc-csc">
+    </div>
+    <button type="submit">Pay $129.99</button>
+    <p id="paid" style="display:none">Payment accepted.</p>
+  </form>
+  <script>
+    document.getElementById('payform').addEventListener('submit', (e) => {
+      e.preventDefault();
+      document.getElementById('paid').style.display = 'block';
+    });
+  </script>
+</body>
+</html>

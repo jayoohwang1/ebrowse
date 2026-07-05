@@ -1,0 +1,24 @@
+## s4 table
+| # | [ID ▲ (@e8)] | [Description (@e9)] | [Date (@e10)] | [Total (@e11)] | Status | Actions |
+|---|---|---|---|---|---|---|
+| 1 | #4400 | [Order from Turin (@e12)](→ /order.html?id=4400) | 1 Jun 2026 | $24.50 | Open | [Ship (@e13)] [Cancel (@e14)] |
+| 2 | #4401 | [Order from Milan (@e15)](→ /order.html?id=4401) | 4 Jun 2026 | $55.80 | Closed | [Ship (@e16)] [Cancel (@e17)] |
+| 3 | #4402 | [Order from Naples (@e18)](→ /order.html?id=4402) | 7 Jun 2026 | $87.10 | Pending | [Ship (@e19)] [Cancel (@e20)] |
+| 4 | #4403 | [Order from Seoul (@e21)](→ /order.html?id=4403) | 10 Jun 2026 | $118.40 | Open | [Ship (@e22)] [Cancel (@e23)] |
+| 5 | #4404 | [Order from Portland (@e24)](→ /order.html?id=4404) | 13 Jun 2026 | $149.70 | Closed | [Ship (@e25)] [Cancel (@e26)] |
+| 6 | #4405 | [Order from Vienna (@e27)](→ /order.html?id=4405) | 16 Jun 2026 | $181.00 | Pending | [Ship (@e28)] [Cancel (@e29)] |
+| 7 | #4406 | [Order from Melbourne (@e30)](→ /order.html?id=4406) | 19 Jun 2026 | $212.30 | Open | [Ship (@e31)] [Cancel (@e32)] |
+| 8 | #4407 | [Order from Osaka (@e33)](→ /order.html?id=4407) | 22 Jun 2026 | $243.60 | Closed | [Ship (@e34)] [Cancel (@e35)] |
+| 9 | #4408 | [Order from Lisbon (@e36)](→ /order.html?id=4408) | 25 Jun 2026 | $274.90 | Pending | [Ship (@e37)] [Cancel (@e38)] |
+| 10 | #4409 | [Order from Oslo (@e39)](→ /order.html?id=4409) | 28 Jun 2026 | $306.20 | Open | [Ship (@e40)] [Cancel (@e41)] |
+| 11 | #4410 | [Order from Turin (@e42)](→ /order.html?id=4410) | 3 Jun 2026 | $337.50 | Closed | [Ship (@e43)] [Cancel (@e44)] |
+| 12 | #4411 | [Order from Milan (@e45)](→ /order.html?id=4411) | 6 Jun 2026 | $368.80 | Pending | [Ship (@e46)] [Cancel (@e47)] |
+| 13 | #4412 | [Order from Naples (@e48)](→ /order.html?id=4412) | 9 Jun 2026 | $400.10 | Open | [Ship (@e49)] [Cancel (@e50)] |
+| 14 | #4413 | [Order from Seoul (@e51)](→ /order.html?id=4413) | 12 Jun 2026 | $431.40 | Closed | [Ship (@e52)] [Cancel (@e53)] |
+| 15 | #4414 | [Order from Portland (@e54)](→ /order.html?id=4414) | 15 Jun 2026 | $462.70 | Pending | [Ship (@e55)] [Cancel (@e56)] |
+| 16 | #4415 | [Order from Vienna (@e57)](→ /order.html?id=4415) | 18 Jun 2026 | $494.00 | Open | [Ship (@e58)] [Cancel (@e59)] |
+| 17 | #4416 | [Order from Melbourne (@e60)](→ /order.html?id=4416) | 21 Jun 2026 | $525.30 | Closed | [Ship (@e61)] [Cancel (@e62)] |
+| 18 | #4417 | [Order from Osaka (@e63)](→ /order.html?id=4417) | 24 Jun 2026 | $556.60 | Pending | [Ship (@e64)] [Cancel (@e65)] |
+| 19 | #4418 | [Order from Lisbon (@e66)](→ /order.html?id=4418) | 27 Jun 2026 | $587.90 | Open | [Ship (@e67)] [Cancel (@e68)] |
+| 20 | #4419 | [Order from Oslo (@e69)](→ /order.html?id=4419) | 2 Jun 2026 | $619.20 | Closed | [Ship (@e70)] [Cancel (@e71)] |
+… 5 more items — expand s4 --cursor 20

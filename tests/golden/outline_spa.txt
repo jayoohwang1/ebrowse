@@ -1,0 +1,3 @@
+PAGE Task Board — Fixture SPA — http://127.0.0.1:8901/spa.html
+s1 header  2 links  ~10t  | "Board Stats"
+s2 content 4 inputs, 5 buttons  ~65t  | "Tasks — Add task Water the plants Delete Fix the bike tire Delete Email the landlord Dele…"

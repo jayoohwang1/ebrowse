@@ -1,0 +1,551 @@
+{
+ "url": "http://127.0.0.1:8901/form.html",
+ "title": "Create Account \u2014 Fixture Shop",
+ "vw": 1280,
+ "vh": 1280,
+ "scrollY": 0,
+ "docH": 1280,
+ "truncated": false,
+ "root": {
+  "t": "body",
+  "r": [
+   0,
+   0,
+   1280,
+   717
+  ],
+  "c": [
+   {
+    "t": "header",
+    "r": [
+     0,
+     0,
+     1280,
+     60
+    ],
+    "c": [
+     {
+      "t": "a",
+      "r": [
+       24,
+       12,
+       91,
+       17
+      ],
+      "a": {
+       "href": "/"
+      },
+      "x": "Fixture Shop",
+      "k": {
+       "tg": 1,
+       "cp": 1
+      }
+     },
+     {
+      "t": "nav",
+      "r": [
+       24,
+       30,
+       1232,
+       18
+      ],
+      "a": {
+       "nm": "Main"
+      },
+      "c": [
+       {
+        "t": "a",
+        "r": [
+         24,
+         30,
+         63,
+         17
+        ],
+        "a": {
+         "href": "/list.html"
+        },
+        "x": "Products",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       },
+       {
+        "t": "a",
+        "r": [
+         104,
+         30,
+         41,
+         17
+        ],
+        "a": {
+         "href": "/deals.html"
+        },
+        "x": "Deals",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       },
+       {
+        "t": "a",
+        "r": [
+         161,
+         30,
+         33,
+         17
+        ],
+        "a": {
+         "href": "/help.html"
+        },
+        "x": "Help",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "t": "main",
+    "r": [
+     336,
+     60,
+     608,
+     657
+    ],
+    "c": [
+     {
+      "t": "h1",
+      "r": [
+       360,
+       105,
+       560,
+       37
+      ],
+      "x": "Create your account"
+     },
+     {
+      "t": "form",
+      "r": [
+       360,
+       164,
+       560,
+       530
+      ],
+      "a": {
+       "id": "signup"
+      },
+      "c": [
+       {
+        "t": "div",
+        "r": [
+         360,
+         164,
+         560,
+         53
+        ],
+        "c": [
+         {
+          "t": "label",
+          "r": [
+           360,
+           164,
+           560,
+           18
+          ],
+          "a": {
+           "for": 1
+          },
+          "x": "Full name"
+         },
+         {
+          "t": "input",
+          "r": [
+           360,
+           186,
+           576,
+           31
+          ],
+          "a": {
+           "id": "fullname",
+           "nm": "Full name",
+           "typ": "text",
+           "req": 1
+          },
+          "k": {
+           "tg": 1
+          }
+         }
+        ]
+       },
+       {
+        "t": "div",
+        "r": [
+         360,
+         231,
+         560,
+         53
+        ],
+        "c": [
+         {
+          "t": "label",
+          "r": [
+           360,
+           231,
+           560,
+           18
+          ],
+          "a": {
+           "for": 1
+          },
+          "x": "Email address"
+         },
+         {
+          "t": "input",
+          "r": [
+           360,
+           253,
+           576,
+           31
+          ],
+          "a": {
+           "id": "email",
+           "nm": "Email address",
+           "ph": "you@example.com",
+           "typ": "email",
+           "req": 1
+          },
+          "k": {
+           "tg": 1
+          }
+         }
+        ]
+       },
+       {
+        "t": "div",
+        "r": [
+         360,
+         298,
+         560,
+         53
+        ],
+        "c": [
+         {
+          "t": "label",
+          "r": [
+           360,
+           298,
+           560,
+           18
+          ],
+          "a": {
+           "for": 1
+          },
+          "x": "Password"
+         },
+         {
+          "t": "input",
+          "r": [
+           360,
+           320,
+           576,
+           31
+          ],
+          "a": {
+           "id": "password",
+           "nm": "Password",
+           "typ": "password",
+           "req": 1
+          },
+          "k": {
+           "tg": 1
+          }
+         }
+        ]
+       },
+       {
+        "t": "div",
+        "r": [
+         360,
+         365,
+         560,
+         53
+        ],
+        "c": [
+         {
+          "t": "label",
+          "r": [
+           360,
+           365,
+           560,
+           18
+          ],
+          "a": {
+           "for": 1
+          },
+          "x": "Country"
+         },
+         {
+          "t": "select",
+          "r": [
+           360,
+           387,
+           560,
+           31
+          ],
+          "a": {
+           "id": "country",
+           "nm": "Country",
+           "opt": [
+            "Choose a country",
+            "United States",
+            "Canada",
+            "South Korea",
+            "Japan",
+            "Germany",
+            "France"
+           ],
+           "sel": "Choose a country"
+          },
+          "k": {
+           "tg": 1
+          }
+         }
+        ]
+       },
+       {
+        "t": "fieldset",
+        "r": [
+         362,
+         432,
+         556,
+         84
+        ],
+        "c": [
+         {
+          "t": "legend",
+          "r": [
+           376,
+           432,
+           97,
+           18
+          ],
+          "x": "Account type"
+         },
+         {
+          "t": "label",
+          "r": [
+           376,
+           455,
+           528,
+           20
+          ],
+          "x": "Personal",
+          "c": [
+           {
+            "t": "input",
+            "r": [
+             381,
+             458,
+             13,
+             13
+            ],
+            "a": {
+             "nm": "Personal",
+             "typ": "radio",
+             "chk": 1
+            },
+            "k": {
+             "tg": 1
+            }
+           }
+          ]
+         },
+         {
+          "t": "label",
+          "r": [
+           376,
+           479,
+           528,
+           20
+          ],
+          "x": "Business",
+          "c": [
+           {
+            "t": "input",
+            "r": [
+             381,
+             482,
+             13,
+             13
+            ],
+            "a": {
+             "nm": "Business",
+             "typ": "radio",
+             "chk": 0
+            },
+            "k": {
+             "tg": 1
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "t": "div",
+        "r": [
+         360,
+         515,
+         560,
+         85
+        ],
+        "c": [
+         {
+          "t": "label",
+          "r": [
+           360,
+           515,
+           560,
+           18
+          ],
+          "a": {
+           "for": 1
+          },
+          "x": "About you (optional)"
+         },
+         {
+          "t": "textarea",
+          "r": [
+           360,
+           537,
+           574,
+           59
+          ],
+          "a": {
+           "id": "bio",
+           "nm": "About you (optional)",
+           "ph": "Tell us about yourself",
+           "typ": "textarea"
+          },
+          "k": {
+           "tg": 1
+          }
+         }
+        ]
+       },
+       {
+        "t": "div",
+        "r": [
+         360,
+         614,
+         560,
+         44
+        ],
+        "c": [
+         {
+          "t": "label",
+          "r": [
+           360,
+           614,
+           560,
+           20
+          ],
+          "x": "Send me the weekly newsletter",
+          "c": [
+           {
+            "t": "input",
+            "r": [
+             364,
+             617,
+             13,
+             13
+            ],
+            "a": {
+             "id": "newsletter",
+             "nm": "Send me the weekly newsletter",
+             "typ": "checkbox",
+             "chk": 0
+            },
+            "k": {
+             "tg": 1
+            }
+           }
+          ]
+         },
+         {
+          "t": "label",
+          "r": [
+           360,
+           638,
+           560,
+           20
+          ],
+          "x": "I agree to the",
+          "c": [
+           {
+            "t": "input",
+            "r": [
+             364,
+             641,
+             13,
+             13
+            ],
+            "a": {
+             "id": "tos",
+             "nm": "I agree to the Terms of Service",
+             "typ": "checkbox",
+             "chk": 0,
+             "req": 1
+            },
+            "k": {
+             "tg": 1
+            }
+           },
+           {
+            "t": "a",
+            "r": [
+             488,
+             640,
+             128,
+             17
+            ],
+            "a": {
+             "href": "/terms.html"
+            },
+            "x": "Terms of Service",
+            "k": {
+             "tg": 1,
+             "cp": 1
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "t": "button",
+        "r": [
+         360,
+         672,
+         106,
+         21
+        ],
+        "a": {
+         "id": "submit-btn"
+        },
+        "x": "Create account",
+        "k": {
+         "tg": 1
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,285 @@
+"""MCP stdio server (ROADMAP R3): the same daemon, speakable by MCP hosts.
+
+Minimal by design — newline-delimited JSON-RPC 2.0 over stdio, tools only.
+No SDK dependency. Tool outputs are the §4 renderer texts VERBATIM; the tool
+set is small (act multiplexes the action verbs) to keep schema token cost low
+for the host model.
+
+Run: `ebrowse mcp` (host config: command=ebrowse, args=["mcp"]).
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+from ebrowse import __version__
+from ebrowse.cli.client import _autostart_daemon, _daemon_running, _send
+from ebrowse.daemon.protocol import Request
+
+_ACT_VERBS = [
+    "click", "fill", "type", "press", "check", "uncheck", "select",
+    "scroll", "upload", "eval", "back", "forward", "reload",
+    "fill-form", "search", "tabs", "tab", "close",
+]  # fmt: skip
+
+_STR = {"type": "string"}
+_INT = {"type": "integer"}
+_BOOL = {"type": "boolean"}
+
+TOOLS: list[dict[str, Any]] = [
+    {
+        "name": "browse_open",
+        "description": "Navigate to a URL. Returns the page outline (sectioned table of "
+        "contents with sids, element counts, token costs, labels).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"url": _STR},
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "browse_outline",
+        "description": "Re-observe the current page and return its outline. Cheap; but "
+        "prefer reading action diffs over re-outlining.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"wait_summaries": _BOOL, "no_summaries": _BOOL},
+        },
+    },
+    {
+        "name": "browse_expand",
+        "description": "Full content of ONE section as markdown with @refs "
+        "(e.g. [Add to cart (@e15)]). Lists/tables paginate via cursor.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"target": _STR, "cursor": _INT, "all": _BOOL},
+            "required": ["target"],
+        },
+    },
+    {
+        "name": "browse_act",
+        "description": "Perform a browser action; returns a DIFF of what changed (never a "
+        "full snapshot). verb=click/fill/type/press/check/uncheck/select/scroll/upload/"
+        "eval/back/forward/reload/fill-form/search/tabs/tab/close. target is a @ref or CSS "
+        "selector. text for fill/type; value for select; keys for press; direction for "
+        "scroll; data (JSON object string) for fill-form; query/pick for search.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "verb": {"type": "string", "enum": _ACT_VERBS},
+                "target": _STR,
+                "text": _STR,
+                "value": _STR,
+                "keys": _STR,
+                "direction": _STR,
+                "data": {**_STR, "description": 'fill-form JSON, e.g. {"Email": "a@b.c"}'},
+                "query": _STR,
+                "pick": _STR,
+                "enter": _BOOL,
+                "pages": _INT,
+                "index": _INT,
+                "js": _STR,
+                "files": {"type": "array", "items": _STR},
+            },
+            "required": ["verb"],
+        },
+    },
+    {
+        "name": "browse_query",
+        "description": "Filter a list/table section's items (regex over plain text), "
+        "optionally projecting table columns. Rows come back with clickable @refs.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "section": _STR,
+                "filter": _STR,
+                "cols": {"type": "array", "items": _STR},
+                "cursor": _INT,
+                "limit": _INT,
+            },
+            "required": ["section"],
+        },
+    },
+    {
+        "name": "browse_screenshot",
+        "description": "PNG of the viewport, one section (sid), or one element (@ref).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"section": _STR, "ref": _STR, "full": _BOOL},
+        },
+    },
+]
+
+
+def _daemon_call(verb: str, args: dict[str, Any], session: str) -> tuple[bool, str]:
+    if not _daemon_running():
+        _autostart_daemon()
+    resp = _send(Request(verb=verb, session=session, args=args), timeout_s=130.0)
+    if resp.ok:
+        return True, resp.output
+    return False, f"error: {resp.error}"
+
+
+def _tool_call(name: str, args: dict[str, Any], session: str) -> list[dict[str, Any]]:
+    if name == "browse_open":
+        ok, out = _daemon_call("open", {"url": args["url"]}, session)
+    elif name == "browse_outline":
+        ok, out = _daemon_call(
+            "outline",
+            {
+                "refresh": False,
+                "wait_summaries": args.get("wait_summaries", False),
+                "no_summaries": args.get("no_summaries", False),
+            },
+            session,
+        )
+    elif name == "browse_expand":
+        ok, out = _daemon_call(
+            "expand",
+            {
+                "target": args["target"],
+                "cursor": args.get("cursor", 0),
+                "all": args.get("all", False),
+            },
+            session,
+        )
+    elif name == "browse_act":
+        ok, out = _act(args, session)
+    elif name == "browse_query":
+        ok, out = _daemon_call(
+            "query",
+            {
+                "section": args["section"],
+                "filter": args.get("filter"),
+                "cols": args.get("cols"),
+                "cursor": args.get("cursor", 0),
+                "limit": args.get("limit"),
+            },
+            session,
+        )
+    elif name == "browse_screenshot":
+        ok, out = _daemon_call(
+            "screenshot",
+            {
+                "output": None,
+                "section": args.get("section"),
+                "ref": args.get("ref"),
+                "full": args.get("full", False),
+            },
+            session,
+        )
+        if ok and out.startswith("saved "):
+            path = Path(out[len("saved ") :].strip())
+            data = base64.b64encode(path.read_bytes()).decode()
+            return [{"type": "image", "data": data, "mimeType": "image/png"}]
+    else:
+        return [{"type": "text", "text": f"error: unknown tool {name}"}]
+    content = [{"type": "text", "text": out}]
+    if not ok:
+        content[0]["_isError"] = True
+    return content
+
+
+def _act(args: dict[str, Any], session: str) -> tuple[bool, str]:
+    verb = args["verb"]
+    payload: dict[str, Any]
+    if verb in ("click",):
+        payload = {"target": args.get("target"), "double": False, "right": False,
+                   "new_tab": False}  # fmt: skip
+    elif verb in ("fill", "type"):
+        payload = {"target": args.get("target"), "text": args.get("text", "")}
+        if verb == "type":
+            payload["enter"] = args.get("enter", False)
+    elif verb == "press":
+        payload = {"keys": args.get("keys", "Enter")}
+    elif verb in ("check", "uncheck"):
+        payload = {"target": args.get("target")}
+    elif verb == "select":
+        payload = {"target": args.get("target"), "value": args.get("value", "")}
+    elif verb == "scroll":
+        payload = {"direction": args.get("direction", "down"), "pages": args.get("pages", 1)}
+    elif verb == "upload":
+        payload = {"target": args.get("target"), "files": args.get("files", [])}
+    elif verb == "eval":
+        payload = {"js": args.get("js", "")}
+    elif verb == "fill-form":
+        payload = {"section": args.get("target"), "data": args.get("data", "{}")}
+    elif verb == "search":
+        payload = {
+            "query": args.get("query", args.get("text", "")),
+            "target": args.get("target"),
+            "pick": args.get("pick"),
+            "no_submit": False,
+        }
+    elif verb == "tab":
+        payload = {"index": args.get("index", 0)}
+    elif verb in ("back", "forward", "reload", "tabs", "close"):
+        payload = {}
+    else:
+        return False, f"error: unsupported act verb {verb}"
+    return _daemon_call(verb, payload, session)
+
+
+# ------------------------------------------------------------ rpc plumbing ----
+
+
+def _reply(msg_id: Any, result: Any) -> None:
+    sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": msg_id, "result": result}) + "\n")
+    sys.stdout.flush()
+
+
+def _reply_error(msg_id: Any, code: int, message: str) -> None:
+    sys.stdout.write(
+        json.dumps({"jsonrpc": "2.0", "id": msg_id, "error": {"code": code, "message": message}})
+        + "\n"
+    )
+    sys.stdout.flush()
+
+
+def serve(session: str = "mcp") -> int:
+    """Blocking stdio loop. One MCP host per process; daemon state is shared."""
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        method, msg_id = msg.get("method"), msg.get("id")
+        params = msg.get("params") or {}
+        if method == "initialize":
+            _reply(
+                msg_id,
+                {
+                    "protocolVersion": params.get("protocolVersion", "2024-11-05"),
+                    "capabilities": {"tools": {}},
+                    "serverInfo": {"name": "ebrowse", "version": __version__},
+                },
+            )
+        elif method == "tools/list":
+            _reply(msg_id, {"tools": TOOLS})
+        elif method == "tools/call":
+            name = params.get("name", "")
+            args = params.get("arguments") or {}
+            try:
+                content = _tool_call(name, args, session)
+                is_error = any(c.pop("_isError", False) for c in content)
+                _reply(msg_id, {"content": content, "isError": is_error})
+            except Exception as e:  # tool crash -> tool error, not protocol error
+                _reply(
+                    msg_id,
+                    {
+                        "content": [{"type": "text", "text": f"error: {e}"}],
+                        "isError": True,
+                    },
+                )
+        elif method in ("notifications/initialized", "notifications/cancelled"):
+            continue
+        elif msg_id is not None:
+            _reply_error(msg_id, -32601, f"method not found: {method}")
+    return 0

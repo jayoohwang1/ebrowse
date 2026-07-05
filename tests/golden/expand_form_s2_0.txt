@@ -1,0 +1,5 @@
+## s2 form — Create your account
+[Full name (@e5: empty, required)] [Email address (@e6: empty, required)] [Password (@e7: empty, required)]
+[Country (@e8) ▾ "Choose a country"] options: Choose a country | United States | Canada | South Korea | Japan | Germany | France
+Account type [x] Personal (@e9) [ ] Business (@e10) [About you (optional) (@e11: empty)] [ ] Send me the weekly newsletter (@e12)
+[ ] I agree to the Terms of Service (@e13) [Terms of Service (@e14)](→ /terms.html) [Create account (@e15)]

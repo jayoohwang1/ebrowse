@@ -1,0 +1,5 @@
+PAGE The History of Espresso — Fixture News — http://127.0.0.1:8901/article.html
+s1 header  5 links, 1 input, 1 button  ~49t  | "Fixture News World Tech Food Opinion Go"
+s2 content 1 link  ~320t  | "The History of Espresso — By Ada Fixture · June 12, 2026 · Food Espresso was born in Turi…"
+s3 content 3 links  ~48t  | "Related — Grinders matter more than machines The physics of milk foam In defense of robus…"
+s4 footer  8 links  ~74t  | "Sections — World Tech Food About Contact Careers Privacy Terms"

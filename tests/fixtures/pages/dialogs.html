@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Dialogs — Fixture</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    main { max-width: 560px; margin: 0 auto; padding: 24px; }
+    #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; }
+    #overlay.show { display: block; }
+    #modal { position: fixed; top: 20%; left: 50%; transform: translateX(-50%);
+             background: #fff; border: 2px solid #333; padding: 24px; display: none; width: 320px; }
+    #modal.show { display: block; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Dialog playground</h1>
+    <p>Buttons below exercise native dialogs and a DOM modal.</p>
+    <button type="button" id="alert-btn">Show alert</button>
+    <button type="button" id="confirm-btn">Delete item (confirm)</button>
+    <button type="button" id="modal-btn">Open cookie modal</button>
+    <p><button type="button" id="covered-btn">Buy now</button> — covered while the modal is open</p>
+    <p id="result">No dialog action yet.</p>
+  </main>
+
+  <div id="overlay"></div>
+  <div id="modal" role="dialog" aria-label="Cookie consent">
+    <h2>We use cookies</h2>
+    <p>Accept our cookie policy to continue.</p>
+    <button type="button" id="accept-cookies">Accept</button>
+    <button type="button" id="reject-cookies">Reject</button>
+  </div>
+
+  <script>
+    const result = document.getElementById('result');
+    document.getElementById('alert-btn').addEventListener('click', () => {
+      alert('Heads up: this is an alert.');
+      result.textContent = 'Alert was shown.';
+    });
+    document.getElementById('confirm-btn').addEventListener('click', () => {
+      const ok = confirm('Really delete this item?');
+      result.textContent = ok ? 'Item deleted.' : 'Deletion cancelled.';
+    });
+    function setModal(show) {
+      document.getElementById('overlay').classList.toggle('show', show);
+      document.getElementById('modal').classList.toggle('show', show);
+    }
+    document.getElementById('modal-btn').addEventListener('click', () => setModal(true));
+    document.getElementById('accept-cookies').addEventListener('click', () => {
+      setModal(false); result.textContent = 'Cookies accepted.';
+    });
+    document.getElementById('reject-cookies').addEventListener('click', () => {
+      setModal(false); result.textContent = 'Cookies rejected.';
+    });
+    document.getElementById('covered-btn').addEventListener('click', () => {
+      result.textContent = 'Purchase started.';
+    });
+  </script>
+</body>
+</html>

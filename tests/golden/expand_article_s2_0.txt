@@ -1,0 +1,14 @@
+## s2 content — The History of Espresso
+By Ada Fixture · June 12, 2026 · [Food (@e8)](→ /food.html)
+Espresso was born in Turin at the end of the nineteenth century, when Angelo Moriondo patented a machine that forced steam and water through a bed of ground coffee. His device was a bulk brewer, but it planted the idea that pressure could trade time for intensity.
+
+### From steam to lever
+
+Luigi Bezzera and Desiderio Pavoni refined the concept into single-serving machines, and by 1906 espresso was being served at the Milan World's Fair. The real leap came in 1947 with Achille Gaggia's spring-piston lever, which raised brewing pressure past eight bars and produced crema for the first time.
+![A restored 1950s lever espresso machine]
+A restored 1950s lever machine.
+
+### The modern shot
+
+Faema's E61 group head introduced pump-driven brewing and thermal stability in 1961, a design so durable that new machines still ship with it today. Specialty cafés now argue about pressure profiling and flow control, but the fundamentals have not moved: roughly nine bars, ninety-three degrees, and thirty seconds.
+What has changed is measurement. Refractometers, scales, and pressure transducers turned folklore into repeatable recipes, and home machines inherited the instrumentation.

@@ -1,0 +1,336 @@
+{
+ "url": "http://127.0.0.1:8901/iframe.html",
+ "title": "Embedded Checkout \u2014 Fixture",
+ "vw": 1280,
+ "vh": 1280,
+ "scrollY": 0,
+ "docH": 1280,
+ "truncated": false,
+ "root": {
+  "t": "body",
+  "r": [
+   0,
+   0,
+   1280,
+   620
+  ],
+  "c": [
+   {
+    "t": "header",
+    "r": [
+     0,
+     0,
+     1280,
+     42
+    ],
+    "c": [
+     {
+      "t": "a",
+      "r": [
+       24,
+       12,
+       81,
+       17
+      ],
+      "a": {
+       "href": "/"
+      },
+      "x": "Fixture Pay",
+      "k": {
+       "tg": 1,
+       "cp": 1
+      }
+     }
+    ]
+   },
+   {
+    "t": "main",
+    "r": [
+     256,
+     42,
+     768,
+     578
+    ],
+    "c": [
+     {
+      "t": "h1",
+      "r": [
+       280,
+       87,
+       720,
+       37
+      ],
+      "x": "Complete your order"
+     },
+     {
+      "t": "p",
+      "r": [
+       280,
+       146,
+       720,
+       18
+      ],
+      "x": "Order #4417 \u2014 1 \u00d7 Espresso Machine, $129.99. Payment is handled in the embedded frame below."
+     },
+     {
+      "t": "iframe",
+      "r": [
+       280,
+       180,
+       642,
+       362
+      ],
+      "a": {
+       "id": "payframe",
+       "nm": "Payment form",
+       "ttl": "Payment form"
+      },
+      "c": [
+       {
+        "t": "body",
+        "r": [
+         280,
+         179,
+         624,
+         304
+        ],
+        "fp": [
+         "payframe"
+        ],
+        "c": [
+         {
+          "t": "form",
+          "r": [
+           296,
+           215,
+           592,
+           252
+          ],
+          "a": {
+           "id": "payform"
+          },
+          "fp": [
+           "payframe"
+          ],
+          "c": [
+           {
+            "t": "h2",
+            "r": [
+             296,
+             215,
+             592,
+             28
+            ],
+            "x": "Card details",
+            "fp": [
+             "payframe"
+            ]
+           },
+           {
+            "t": "div",
+            "r": [
+             296,
+             263,
+             592,
+             49
+            ],
+            "fp": [
+             "payframe"
+            ],
+            "c": [
+             {
+              "t": "label",
+              "r": [
+               296,
+               263,
+               592,
+               18
+              ],
+              "a": {
+               "for": 1
+              },
+              "x": "Card number",
+              "fp": [
+               "payframe"
+              ]
+             },
+             {
+              "t": "input",
+              "r": [
+               296,
+               281,
+               608,
+               31
+              ],
+              "a": {
+               "id": "cardnum",
+               "nm": "Card number",
+               "ph": "4242 4242 4242 4242",
+               "typ": "text"
+              },
+              "k": {
+               "tg": 1
+              },
+              "fp": [
+               "payframe"
+              ]
+             }
+            ]
+           },
+           {
+            "t": "div",
+            "r": [
+             296,
+             324,
+             592,
+             49
+            ],
+            "fp": [
+             "payframe"
+            ],
+            "c": [
+             {
+              "t": "label",
+              "r": [
+               296,
+               324,
+               592,
+               18
+              ],
+              "a": {
+               "for": 1
+              },
+              "x": "Expiry",
+              "fp": [
+               "payframe"
+              ]
+             },
+             {
+              "t": "input",
+              "r": [
+               296,
+               342,
+               608,
+               31
+              ],
+              "a": {
+               "id": "expiry",
+               "nm": "Expiry",
+               "ph": "MM/YY",
+               "typ": "text"
+              },
+              "k": {
+               "tg": 1
+              },
+              "fp": [
+               "payframe"
+              ]
+             }
+            ]
+           },
+           {
+            "t": "div",
+            "r": [
+             296,
+             385,
+             592,
+             49
+            ],
+            "fp": [
+             "payframe"
+            ],
+            "c": [
+             {
+              "t": "label",
+              "r": [
+               296,
+               385,
+               592,
+               18
+              ],
+              "a": {
+               "for": 1
+              },
+              "x": "CVC",
+              "fp": [
+               "payframe"
+              ]
+             },
+             {
+              "t": "input",
+              "r": [
+               296,
+               403,
+               608,
+               31
+              ],
+              "a": {
+               "id": "cvc",
+               "nm": "CVC",
+               "ph": "123",
+               "typ": "text"
+              },
+              "k": {
+               "tg": 1
+              },
+              "fp": [
+               "payframe"
+              ]
+             }
+            ]
+           },
+           {
+            "t": "button",
+            "r": [
+             296,
+             446,
+             91,
+             21
+            ],
+            "x": "Pay $129.99",
+            "k": {
+             "tg": 1
+            },
+            "fp": [
+             "payframe"
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "t": "p",
+      "r": [
+       280,
+       562,
+       720,
+       18
+      ],
+      "c": [
+       {
+        "t": "a",
+        "r": [
+         280,
+         562,
+         82,
+         17
+        ],
+        "a": {
+         "href": "/help.html"
+        },
+        "x": "Need help?",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

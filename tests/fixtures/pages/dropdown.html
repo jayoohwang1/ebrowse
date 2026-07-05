@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Dropdowns — Fixture Shop</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    header { background: #1a3; color: #fff; padding: 12px 24px; }
+    header a { color: #fff; margin-right: 12px; }
+    main { max-width: 560px; margin: 0 auto; padding: 24px; }
+    .menu { position: relative; display: inline-block; margin-right: 24px; }
+    .menu ul { display: none; position: absolute; top: 100%; left: 0; background: #fff;
+               border: 1px solid #999; list-style: none; margin: 0; padding: 4px 0; min-width: 180px; }
+    .menu.open ul { display: block; }
+    .menu li { padding: 6px 12px; cursor: pointer; }
+    .menu li:hover { background: #def; }
+    #picked { margin-top: 32px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/">Fixture Shop</a>
+    <nav aria-label="Main"><a href="/list.html">Products</a> <a href="/deals.html">Deals</a></nav>
+  </header>
+
+  <main>
+    <h1>Choose your options</h1>
+
+    <div class="menu" id="sort-menu">
+      <button type="button" aria-haspopup="true" aria-expanded="false" id="sort-btn">Sort by: Relevance</button>
+      <ul role="menu" aria-label="Sort options">
+        <li role="menuitem" data-value="relevance">Relevance</li>
+        <li role="menuitem" data-value="price-asc">Price: low to high</li>
+        <li role="menuitem" data-value="price-desc">Price: high to low</li>
+        <li role="menuitem" data-value="rating">Average rating</li>
+        <li role="menuitem" data-value="newest">Newest arrivals</li>
+      </ul>
+    </div>
+
+    <div class="menu" id="size-menu">
+      <button type="button" aria-haspopup="true" aria-expanded="false" id="size-btn">Size: All</button>
+      <ul role="menu" aria-label="Size options">
+        <li role="menuitem" data-value="all">All</li>
+        <li role="menuitem" data-value="s">Small</li>
+        <li role="menuitem" data-value="m">Medium</li>
+        <li role="menuitem" data-value="l">Large</li>
+      </ul>
+    </div>
+
+    <div style="margin-top: 24px">
+      <label for="perpage">Results per page</label>
+      <select id="perpage">
+        <option>10</option>
+        <option selected>25</option>
+        <option>50</option>
+        <option>100</option>
+      </select>
+    </div>
+
+    <p id="picked">Current sort: relevance</p>
+  </main>
+
+  <script>
+    for (const menu of document.querySelectorAll('.menu')) {
+      const btn = menu.querySelector('button');
+      btn.addEventListener('click', () => {
+        const open = menu.classList.toggle('open');
+        btn.setAttribute('aria-expanded', String(open));
+      });
+      for (const item of menu.querySelectorAll('li')) {
+        item.addEventListener('click', () => {
+          menu.classList.remove('open');
+          btn.setAttribute('aria-expanded', 'false');
+          btn.textContent = btn.textContent.split(':')[0] + ': ' + item.textContent;
+          if (menu.id === 'sort-menu') {
+            document.getElementById('picked').textContent = 'Current sort: ' + item.dataset.value;
+          }
+        });
+      }
+    }
+  </script>
+</body>
+</html>

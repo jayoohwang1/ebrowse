@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Orders — Fixture Admin</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    header { background: #333; color: #fff; padding: 12px 24px; }
+    header a { color: #fff; margin-right: 12px; }
+    main { max-width: 960px; margin: 0 auto; padding: 24px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+    th button { background: none; border: none; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/">Fixture Admin</a>
+    <nav aria-label="Main"><a href="/table.html">Orders</a> <a href="/customers.html">Customers</a> <a href="/reports.html">Reports</a></nav>
+  </header>
+  <main>
+    <h1>Orders</h1>
+    <form id="table-filter">
+      <input type="search" placeholder="Filter orders" aria-label="Filter orders">
+      <select aria-label="Status filter"><option>All</option><option>Open</option><option>Closed</option><option>Pending</option></select>
+      <button type="submit">Filter</button>
+    </form>
+    <table>
+      <thead>
+        <tr>
+          <th><button type="button" data-sort="id">ID ▲</button></th>
+          <th><button type="button" data-sort="desc">Description</button></th>
+          <th><button type="button" data-sort="date">Date</button></th>
+          <th><button type="button" data-sort="total">Total</button></th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>#4400</td>
+          <td><a href="/order.html?id=4400">Order from Turin</a></td>
+          <td>1 Jun 2026</td>
+          <td>$24.50</td>
+          <td>Open</td>
+          <td><button type="button" data-order="4400" class="ship">Ship</button>
+              <button type="button" data-order="4400" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4401</td>
+          <td><a href="/order.html?id=4401">Order from Milan</a></td>
+          <td>4 Jun 2026</td>
+          <td>$55.80</td>
+          <td>Closed</td>
+          <td><button type="button" data-order="4401" class="ship">Ship</button>
+              <button type="button" data-order="4401" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4402</td>
+          <td><a href="/order.html?id=4402">Order from Naples</a></td>
+          <td>7 Jun 2026</td>
+          <td>$87.10</td>
+          <td>Pending</td>
+          <td><button type="button" data-order="4402" class="ship">Ship</button>
+              <button type="button" data-order="4402" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4403</td>
+          <td><a href="/order.html?id=4403">Order from Seoul</a></td>
+          <td>10 Jun 2026</td>
+          <td>$118.40</td>
+          <td>Open</td>
+          <td><button type="button" data-order="4403" class="ship">Ship</button>
+              <button type="button" data-order="4403" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4404</td>
+          <td><a href="/order.html?id=4404">Order from Portland</a></td>
+          <td>13 Jun 2026</td>
+          <td>$149.70</td>
+          <td>Closed</td>
+          <td><button type="button" data-order="4404" class="ship">Ship</button>
+              <button type="button" data-order="4404" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4405</td>
+          <td><a href="/order.html?id=4405">Order from Vienna</a></td>
+          <td>16 Jun 2026</td>
+          <td>$181.00</td>
+          <td>Pending</td>
+          <td><button type="button" data-order="4405" class="ship">Ship</button>
+              <button type="button" data-order="4405" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4406</td>
+          <td><a href="/order.html?id=4406">Order from Melbourne</a></td>
+          <td>19 Jun 2026</td>
+          <td>$212.30</td>
+          <td>Open</td>
+          <td><button type="button" data-order="4406" class="ship">Ship</button>
+              <button type="button" data-order="4406" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4407</td>
+          <td><a href="/order.html?id=4407">Order from Osaka</a></td>
+          <td>22 Jun 2026</td>
+          <td>$243.60</td>
+          <td>Closed</td>
+          <td><button type="button" data-order="4407" class="ship">Ship</button>
+              <button type="button" data-order="4407" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4408</td>
+          <td><a href="/order.html?id=4408">Order from Lisbon</a></td>
+          <td>25 Jun 2026</td>
+          <td>$274.90</td>
+          <td>Pending</td>
+          <td><button type="button" data-order="4408" class="ship">Ship</button>
+              <button type="button" data-order="4408" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4409</td>
+          <td><a href="/order.html?id=4409">Order from Oslo</a></td>
+          <td>28 Jun 2026</td>
+          <td>$306.20</td>
+          <td>Open</td>
+          <td><button type="button" data-order="4409" class="ship">Ship</button>
+              <button type="button" data-order="4409" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4410</td>
+          <td><a href="/order.html?id=4410">Order from Turin</a></td>
+          <td>3 Jun 2026</td>
+          <td>$337.50</td>
+          <td>Closed</td>
+          <td><button type="button" data-order="4410" class="ship">Ship</button>
+              <button type="button" data-order="4410" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4411</td>
+          <td><a href="/order.html?id=4411">Order from Milan</a></td>
+          <td>6 Jun 2026</td>
+          <td>$368.80</td>
+          <td>Pending</td>
+          <td><button type="button" data-order="4411" class="ship">Ship</button>
+              <button type="button" data-order="4411" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4412</td>
+          <td><a href="/order.html?id=4412">Order from Naples</a></td>
+          <td>9 Jun 2026</td>
+          <td>$400.10</td>
+          <td>Open</td>
+          <td><button type="button" data-order="4412" class="ship">Ship</button>
+              <button type="button" data-order="4412" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4413</td>
+          <td><a href="/order.html?id=4413">Order from Seoul</a></td>
+          <td>12 Jun 2026</td>
+          <td>$431.40</td>
+          <td>Closed</td>
+          <td><button type="button" data-order="4413" class="ship">Ship</button>
+              <button type="button" data-order="4413" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4414</td>
+          <td><a href="/order.html?id=4414">Order from Portland</a></td>
+          <td>15 Jun 2026</td>
+          <td>$462.70</td>
+          <td>Pending</td>
+          <td><button type="button" data-order="4414" class="ship">Ship</button>
+              <button type="button" data-order="4414" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4415</td>
+          <td><a href="/order.html?id=4415">Order from Vienna</a></td>
+          <td>18 Jun 2026</td>
+          <td>$494.00</td>
+          <td>Open</td>
+          <td><button type="button" data-order="4415" class="ship">Ship</button>
+              <button type="button" data-order="4415" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4416</td>
+          <td><a href="/order.html?id=4416">Order from Melbourne</a></td>
+          <td>21 Jun 2026</td>
+          <td>$525.30</td>
+          <td>Closed</td>
+          <td><button type="button" data-order="4416" class="ship">Ship</button>
+              <button type="button" data-order="4416" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4417</td>
+          <td><a href="/order.html?id=4417">Order from Osaka</a></td>
+          <td>24 Jun 2026</td>
+          <td>$556.60</td>
+          <td>Pending</td>
+          <td><button type="button" data-order="4417" class="ship">Ship</button>
+              <button type="button" data-order="4417" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4418</td>
+          <td><a href="/order.html?id=4418">Order from Lisbon</a></td>
+          <td>27 Jun 2026</td>
+          <td>$587.90</td>
+          <td>Open</td>
+          <td><button type="button" data-order="4418" class="ship">Ship</button>
+              <button type="button" data-order="4418" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4419</td>
+          <td><a href="/order.html?id=4419">Order from Oslo</a></td>
+          <td>2 Jun 2026</td>
+          <td>$619.20</td>
+          <td>Closed</td>
+          <td><button type="button" data-order="4419" class="ship">Ship</button>
+              <button type="button" data-order="4419" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4420</td>
+          <td><a href="/order.html?id=4420">Order from Turin</a></td>
+          <td>5 Jun 2026</td>
+          <td>$650.50</td>
+          <td>Pending</td>
+          <td><button type="button" data-order="4420" class="ship">Ship</button>
+              <button type="button" data-order="4420" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4421</td>
+          <td><a href="/order.html?id=4421">Order from Milan</a></td>
+          <td>8 Jun 2026</td>
+          <td>$681.80</td>
+          <td>Open</td>
+          <td><button type="button" data-order="4421" class="ship">Ship</button>
+              <button type="button" data-order="4421" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4422</td>
+          <td><a href="/order.html?id=4422">Order from Naples</a></td>
+          <td>11 Jun 2026</td>
+          <td>$713.10</td>
+          <td>Closed</td>
+          <td><button type="button" data-order="4422" class="ship">Ship</button>
+              <button type="button" data-order="4422" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4423</td>
+          <td><a href="/order.html?id=4423">Order from Seoul</a></td>
+          <td>14 Jun 2026</td>
+          <td>$744.40</td>
+          <td>Pending</td>
+          <td><button type="button" data-order="4423" class="ship">Ship</button>
+              <button type="button" data-order="4423" class="cancel">Cancel</button></td>
+        </tr>
+        <tr>
+          <td>#4424</td>
+          <td><a href="/order.html?id=4424">Order from Portland</a></td>
+          <td>17 Jun 2026</td>
+          <td>$775.70</td>
+          <td>Open</td>
+          <td><button type="button" data-order="4424" class="ship">Ship</button>
+              <button type="button" data-order="4424" class="cancel">Cancel</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>

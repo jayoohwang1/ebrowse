@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Espresso Gear — Fixture Shop</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    header { background: #1a3; color: #fff; padding: 12px 24px; display: flex; gap: 16px; }
+    header a { color: #fff; margin-right: 12px; }
+    .searchbox { margin-left: auto; }
+    main { display: flex; max-width: 1100px; margin: 0 auto; padding: 24px; gap: 24px; }
+    aside { width: 200px; flex-shrink: 0; }
+    aside div { margin-bottom: 10px; }
+    #grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; flex: 1; }
+    .card { border: 1px solid #ddd; padding: 10px; }
+    .pagination { text-align: center; padding: 24px; }
+    .pagination a { margin: 0 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/">Fixture Shop</a>
+    <nav aria-label="Main"><a href="/list.html">Products</a> <a href="/deals.html">Deals</a> <a href="/help.html">Help</a></nav>
+    <div class="searchbox">
+      <input type="search" placeholder="Search products" aria-label="Search products">
+      <button type="button">Search</button>
+    </div>
+  </header>
+  <main>
+    <aside aria-label="Filters">
+      <h2>Filters</h2>
+      <form id="filters">
+        <h3>Brand</h3>
+        <div><label><input type="checkbox" name="brand" value="bella"> Bella</label></div>
+        <div><label><input type="checkbox" name="brand" value="breville"> Breville</label></div>
+        <div><label><input type="checkbox" name="brand" value="gaggia"> Gaggia</label></div>
+        <h3>Price</h3>
+        <div><input type="text" name="min" placeholder="Min" size="6"> – <input type="text" name="max" placeholder="Max" size="6"></div>
+        <h3>Rating</h3>
+        <div><label><input type="checkbox" name="rating" value="4"> 4★ &amp; up</label></div>
+        <button type="submit">Apply</button>
+      </form>
+    </aside>
+    <section aria-label="Results">
+      <h1>Espresso gear (32 results)</h1>
+      <div id="grid">
+      <div class="card">
+        <img src="p0.png" alt="Bella Espresso Machine Pro" width="160" height="120">
+        <h3><a href="/product.html?id=1000">Bella Espresso Machine Pro</a></h3>
+        <p class="price">$19.99</p>
+        <p class="rating">3.0★ (12)</p>
+        <button type="button" data-id="1000">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p1.png" alt="Breville Espresso Machine Classic" width="160" height="120">
+        <h3><a href="/product.html?id=1001">Breville Espresso Machine Classic</a></h3>
+        <p class="price">$33.69</p>
+        <p class="rating">3.7★ (149)</p>
+        <button type="button" data-id="1001">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p2.png" alt="Gaggia Espresso Machine Mini" width="160" height="120">
+        <h3><a href="/product.html?id=1002">Gaggia Espresso Machine Mini</a></h3>
+        <p class="price">$47.39</p>
+        <p class="rating">4.4★ (286)</p>
+        <button type="button" data-id="1002">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p3.png" alt="Rancilio Moka Pot Max" width="160" height="120">
+        <h3><a href="/product.html?id=1003">Rancilio Moka Pot Max</a></h3>
+        <p class="price">$61.09</p>
+        <p class="rating">3.1★ (423)</p>
+        <button type="button" data-id="1003">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p4.png" alt="DeLonghi Moka Pot Pro" width="160" height="120">
+        <h3><a href="/product.html?id=1004">DeLonghi Moka Pot Pro</a></h3>
+        <p class="price">$74.79</p>
+        <p class="rating">3.8★ (560)</p>
+        <button type="button" data-id="1004">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p5.png" alt="Flair Moka Pot Classic" width="160" height="120">
+        <h3><a href="/product.html?id=1005">Flair Moka Pot Classic</a></h3>
+        <p class="price">$88.49</p>
+        <p class="rating">4.5★ (697)</p>
+        <button type="button" data-id="1005">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p6.png" alt="Cuisinart Burr Grinder Mini" width="160" height="120">
+        <h3><a href="/product.html?id=1006">Cuisinart Burr Grinder Mini</a></h3>
+        <p class="price">$102.19</p>
+        <p class="rating">3.2★ (834)</p>
+        <button type="button" data-id="1006">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p7.png" alt="Krups Burr Grinder Max" width="160" height="120">
+        <h3><a href="/product.html?id=1007">Krups Burr Grinder Max</a></h3>
+        <p class="price">$115.89</p>
+        <p class="rating">3.9★ (971)</p>
+        <button type="button" data-id="1007">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p8.png" alt="Bella Burr Grinder Pro" width="160" height="120">
+        <h3><a href="/product.html?id=1008">Bella Burr Grinder Pro</a></h3>
+        <p class="price">$129.59</p>
+        <p class="rating">4.6★ (1,108)</p>
+        <button type="button" data-id="1008">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p9.png" alt="Breville Milk Frother Classic" width="160" height="120">
+        <h3><a href="/product.html?id=1009">Breville Milk Frother Classic</a></h3>
+        <p class="price">$143.29</p>
+        <p class="rating">3.3★ (1,245)</p>
+        <button type="button" data-id="1009">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p10.png" alt="Gaggia Milk Frother Mini" width="160" height="120">
+        <h3><a href="/product.html?id=1010">Gaggia Milk Frother Mini</a></h3>
+        <p class="price">$156.99</p>
+        <p class="rating">4.0★ (1,382)</p>
+        <button type="button" data-id="1010">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p11.png" alt="Rancilio Milk Frother Max" width="160" height="120">
+        <h3><a href="/product.html?id=1011">Rancilio Milk Frother Max</a></h3>
+        <p class="price">$170.69</p>
+        <p class="rating">4.7★ (1,519)</p>
+        <button type="button" data-id="1011">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p12.png" alt="DeLonghi Scale Pro" width="160" height="120">
+        <h3><a href="/product.html?id=1012">DeLonghi Scale Pro</a></h3>
+        <p class="price">$184.39</p>
+        <p class="rating">3.4★ (1,656)</p>
+        <button type="button" data-id="1012">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p13.png" alt="Flair Scale Classic" width="160" height="120">
+        <h3><a href="/product.html?id=1013">Flair Scale Classic</a></h3>
+        <p class="price">$198.09</p>
+        <p class="rating">4.1★ (1,793)</p>
+        <button type="button" data-id="1013">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p14.png" alt="Cuisinart Scale Mini" width="160" height="120">
+        <h3><a href="/product.html?id=1014">Cuisinart Scale Mini</a></h3>
+        <p class="price">$211.79</p>
+        <p class="rating">4.8★ (1,930)</p>
+        <button type="button" data-id="1014">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p15.png" alt="Krups Kettle Max" width="160" height="120">
+        <h3><a href="/product.html?id=1015">Krups Kettle Max</a></h3>
+        <p class="price">$225.49</p>
+        <p class="rating">3.5★ (2,067)</p>
+        <button type="button" data-id="1015">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p16.png" alt="Bella Kettle Pro" width="160" height="120">
+        <h3><a href="/product.html?id=1016">Bella Kettle Pro</a></h3>
+        <p class="price">$239.19</p>
+        <p class="rating">4.2★ (2,204)</p>
+        <button type="button" data-id="1016">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p17.png" alt="Breville Kettle Classic" width="160" height="120">
+        <h3><a href="/product.html?id=1017">Breville Kettle Classic</a></h3>
+        <p class="price">$252.89</p>
+        <p class="rating">4.9★ (2,341)</p>
+        <button type="button" data-id="1017">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p18.png" alt="Gaggia Portafilter Mini" width="160" height="120">
+        <h3><a href="/product.html?id=1018">Gaggia Portafilter Mini</a></h3>
+        <p class="price">$266.59</p>
+        <p class="rating">3.6★ (2,478)</p>
+        <button type="button" data-id="1018">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p19.png" alt="Rancilio Portafilter Max" width="160" height="120">
+        <h3><a href="/product.html?id=1019">Rancilio Portafilter Max</a></h3>
+        <p class="price">$280.29</p>
+        <p class="rating">4.3★ (2,615)</p>
+        <button type="button" data-id="1019">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p20.png" alt="DeLonghi Portafilter Pro" width="160" height="120">
+        <h3><a href="/product.html?id=1020">DeLonghi Portafilter Pro</a></h3>
+        <p class="price">$293.99</p>
+        <p class="rating">3.0★ (2,752)</p>
+        <button type="button" data-id="1020">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p21.png" alt="Flair Tamper Classic" width="160" height="120">
+        <h3><a href="/product.html?id=1021">Flair Tamper Classic</a></h3>
+        <p class="price">$307.69</p>
+        <p class="rating">3.7★ (2,889)</p>
+        <button type="button" data-id="1021">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p22.png" alt="Cuisinart Tamper Mini" width="160" height="120">
+        <h3><a href="/product.html?id=1022">Cuisinart Tamper Mini</a></h3>
+        <p class="price">$321.39</p>
+        <p class="rating">4.4★ (3,026)</p>
+        <button type="button" data-id="1022">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p23.png" alt="Krups Tamper Max" width="160" height="120">
+        <h3><a href="/product.html?id=1023">Krups Tamper Max</a></h3>
+        <p class="price">$335.09</p>
+        <p class="rating">3.1★ (3,163)</p>
+        <button type="button" data-id="1023">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p24.png" alt="Bella Espresso Machine Pro" width="160" height="120">
+        <h3><a href="/product.html?id=1024">Bella Espresso Machine Pro</a></h3>
+        <p class="price">$348.79</p>
+        <p class="rating">3.8★ (3,300)</p>
+        <button type="button" data-id="1024">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p25.png" alt="Breville Espresso Machine Classic" width="160" height="120">
+        <h3><a href="/product.html?id=1025">Breville Espresso Machine Classic</a></h3>
+        <p class="price">$362.49</p>
+        <p class="rating">4.5★ (3,437)</p>
+        <button type="button" data-id="1025">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p26.png" alt="Gaggia Espresso Machine Mini" width="160" height="120">
+        <h3><a href="/product.html?id=1026">Gaggia Espresso Machine Mini</a></h3>
+        <p class="price">$376.19</p>
+        <p class="rating">3.2★ (3,574)</p>
+        <button type="button" data-id="1026">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p27.png" alt="Rancilio Moka Pot Max" width="160" height="120">
+        <h3><a href="/product.html?id=1027">Rancilio Moka Pot Max</a></h3>
+        <p class="price">$389.89</p>
+        <p class="rating">3.9★ (3,711)</p>
+        <button type="button" data-id="1027">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p28.png" alt="DeLonghi Moka Pot Pro" width="160" height="120">
+        <h3><a href="/product.html?id=1028">DeLonghi Moka Pot Pro</a></h3>
+        <p class="price">$23.59</p>
+        <p class="rating">4.6★ (3,848)</p>
+        <button type="button" data-id="1028">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p29.png" alt="Flair Moka Pot Classic" width="160" height="120">
+        <h3><a href="/product.html?id=1029">Flair Moka Pot Classic</a></h3>
+        <p class="price">$37.29</p>
+        <p class="rating">3.3★ (3,985)</p>
+        <button type="button" data-id="1029">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p30.png" alt="Cuisinart Burr Grinder Mini" width="160" height="120">
+        <h3><a href="/product.html?id=1030">Cuisinart Burr Grinder Mini</a></h3>
+        <p class="price">$50.99</p>
+        <p class="rating">4.0★ (4,122)</p>
+        <button type="button" data-id="1030">Add to cart</button>
+      </div>
+      <div class="card">
+        <img src="p31.png" alt="Krups Burr Grinder Max" width="160" height="120">
+        <h3><a href="/product.html?id=1031">Krups Burr Grinder Max</a></h3>
+        <p class="price">$64.69</p>
+        <p class="rating">4.7★ (59)</p>
+        <button type="button" data-id="1031">Add to cart</button>
+      </div>
+      </div>
+    </section>
+  </main>
+  <nav class="pagination" aria-label="Pagination">
+    <a href="/list.html?page=1">1</a> <a href="/list.html?page=2">2</a>
+    <a href="/list.html?page=3">3</a> <a href="/list.html?page=2">Next</a>
+  </nav>
+</body>
+</html>

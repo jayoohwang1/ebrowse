@@ -1,0 +1,3 @@
+PAGE Embedded Checkout — Fixture — http://127.0.0.1:8901/iframe.html
+s1 header  1 link  ~9t  | "Fixture Pay"
+s2 form    1 link, 3 inputs, 1 button  ~66t  | "Complete your order — Order #4417 — 1 × Espresso Machine, $129.99. Payment is handled in…"

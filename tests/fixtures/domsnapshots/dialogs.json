@@ -1,0 +1,140 @@
+{
+ "url": "http://127.0.0.1:8901/dialogs.html",
+ "title": "Dialogs \u2014 Fixture",
+ "vw": 1280,
+ "vh": 1280,
+ "scrollY": 0,
+ "docH": 1280,
+ "truncated": false,
+ "root": {
+  "t": "body",
+  "r": [
+   0,
+   0,
+   1280,
+   270
+  ],
+  "c": [
+   {
+    "t": "main",
+    "r": [
+     336,
+     0,
+     608,
+     270
+    ],
+    "c": [
+     {
+      "t": "h1",
+      "r": [
+       360,
+       45,
+       560,
+       37
+      ],
+      "x": "Dialog playground"
+     },
+     {
+      "t": "p",
+      "r": [
+       360,
+       104,
+       560,
+       18
+      ],
+      "x": "Buttons below exercise native dialogs and a DOM modal."
+     },
+     {
+      "t": "button",
+      "r": [
+       360,
+       138,
+       79,
+       21
+      ],
+      "a": {
+       "id": "alert-btn"
+      },
+      "x": "Show alert",
+      "k": {
+       "tg": 1
+      }
+     },
+     {
+      "t": "button",
+      "r": [
+       443,
+       138,
+       140,
+       21
+      ],
+      "a": {
+       "id": "confirm-btn"
+      },
+      "x": "Delete item (confirm)",
+      "k": {
+       "tg": 1
+      }
+     },
+     {
+      "t": "button",
+      "r": [
+       588,
+       138,
+       131,
+       21
+      ],
+      "a": {
+       "id": "modal-btn"
+      },
+      "x": "Open cookie modal",
+      "k": {
+       "tg": 1
+      }
+     },
+     {
+      "t": "p",
+      "r": [
+       360,
+       175,
+       560,
+       21
+      ],
+      "x": "\u2014 covered while the modal is open",
+      "c": [
+       {
+        "t": "button",
+        "r": [
+         360,
+         175,
+         67,
+         21
+        ],
+        "a": {
+         "id": "covered-btn"
+        },
+        "x": "Buy now",
+        "k": {
+         "tg": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "p",
+      "r": [
+       360,
+       212,
+       560,
+       18
+      ],
+      "a": {
+       "id": "result"
+      },
+      "x": "No dialog action yet."
+     }
+    ]
+   }
+  ]
+ }
+}

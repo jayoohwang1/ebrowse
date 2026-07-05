@@ -1,0 +1,6 @@
+PAGE Espresso Gear — Fixture Shop — http://127.0.0.1:8901/list.html
+s1 header  4 links, 1 input, 1 button  ~42t  | "Fixture Shop Products Deals Help Search"
+s2 form    6 inputs, 1 button  ~46t  | "Filters — Bella Breville Gaggia – 4★ & up Apply"
+s3 content no elements  ~10t  | "Espresso gear (32 results)"
+s4 list    32 items, 32 links, 32 buttons  ~1.0kt  | "Bella Espresso Machine Pro $19.99 3.0★ (12) Add to cart Breville Espresso Machine Classic…"
+s5 nav     4 links  ~38t  | "Pagination — 1 2 3 Next"

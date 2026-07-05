@@ -1,0 +1,3 @@
+PAGE Dropdowns — Fixture Shop — http://127.0.0.1:8901/dropdown.html
+s1 header  3 links  ~24t  | "Fixture Shop Products Deals"
+s2 content 1 input, 2 buttons  ~46t  | "Choose your options — Sort by: Relevance Size: All Results per page Current sort: relevan…"
