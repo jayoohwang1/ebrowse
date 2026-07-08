@@ -47,7 +47,8 @@ comments where handled.
 
 - **docs/** holds the detailed references: [architecture](docs/architecture.md),
   [output contracts](docs/output-contracts.md) (frozen formats + golden-test anchor),
-  [configuration](docs/configuration.md).
+  [configuration](docs/configuration.md), [model prompting notes](docs/model-prompting.md)
+  (dated per-model summarizer/vision experiments; append findings there).
 - **Non-obvious decisions become ADRs** in [docs/adr/](docs/adr/README.md) — write one
   when a choice would surprise a future reader or got reversed after real-world
   testing. Keep them short (Status/Context/Decision/Consequences).

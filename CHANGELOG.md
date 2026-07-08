@@ -8,6 +8,9 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- `docs/model-prompting.md`: dated per-model lab notebook for summarizer/vision
+  prompting experiments (Qwen reasoning-off findings, screenshot visual-gist
+  prompt comparison + token costs). Referenced from AGENTS.md.
 - `outline --preview` (opt-in): appends a short verbatim text preview after each
   `≈` summary (`≈ summary  | "preview…"`), keeping both provenance markers, for
   when a section's literal text may answer without an `expand`. Preview width is
