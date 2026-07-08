@@ -120,6 +120,53 @@ def test_native_alert_auto_accepted_with_note(server, env):
     assert "Alert was shown." in r.stdout
 
 
+def test_native_confirm_blocks_page_then_dismiss(server, env):
+    ebrowse(env, "open", server.url("dialogs.html"))
+    r = ebrowse(env, "click", "#confirm-btn")
+    assert r.returncode == 0, r.stderr
+    assert "→ dialog opened (blocking)" in r.stdout
+    assert 'native confirm: "Really delete this item?"' in r.stdout
+    # page-touching verbs are refused with a recovery hint while it's pending
+    r = ebrowse(env, "outline")
+    assert r.returncode == 1
+    assert "confirm dialog is blocking" in r.stderr
+    assert "dialog accept" in r.stderr and "dialog dismiss" in r.stderr
+    # status reports the pending dialog without resolving it
+    r = ebrowse(env, "dialog", "status")
+    assert r.returncode == 0, r.stderr
+    assert 'confirm dialog: "Really delete this item?"' in r.stdout
+    # dismiss resolves it and emits the opening action's diff (confirm → false)
+    r = ebrowse(env, "dialog", "dismiss")
+    assert r.returncode == 0, r.stderr
+    assert "dismissed confirm dialog" in r.stdout
+    assert "Deletion cancelled." in r.stdout
+    # the resolved diff must not carry the now-stale "resolve it" note
+    assert "opened (blocking)" not in r.stdout
+    # page is unblocked again
+    assert ebrowse(env, "outline").returncode == 0
+
+
+def test_native_confirm_accept(server, env):
+    ebrowse(env, "open", server.url("dialogs.html"))
+    ebrowse(env, "click", "#confirm-btn")
+    r = ebrowse(env, "dialog", "accept")
+    assert r.returncode == 0, r.stderr
+    assert "accepted confirm dialog" in r.stdout
+    assert "Item deleted." in r.stdout
+
+
+def test_native_prompt_accept_with_text(server, env):
+    ebrowse(env, "open", server.url("dialogs.html"))
+    r = ebrowse(env, "click", "#prompt-btn")
+    assert r.returncode == 0, r.stderr
+    assert "→ dialog opened (blocking)" in r.stdout
+    assert "native prompt:" in r.stdout
+    r = ebrowse(env, "dialog", "accept", "Beans")
+    assert r.returncode == 0, r.stderr
+    assert 'accepted prompt dialog with "Beans"' in r.stdout
+    assert "Renamed to Beans." in r.stdout
+
+
 def test_occluded_click_blocked(server, env):
     ebrowse(env, "click", "#modal-btn")
     r = ebrowse(env, "click", "#covered-btn")

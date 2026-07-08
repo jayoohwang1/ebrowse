@@ -83,6 +83,8 @@ def _build_request(args: argparse.Namespace) -> Request | None:
         a = {"what": args.what, "target": args.target, "attr": args.attr}
     elif verb == "tab":
         a = {"index": args.index}
+    elif verb == "dialog":
+        a = {"response": args.response, "text": args.text}
     elif verb == "connect":
         a = {"target": args.target}
     elif verb == "close":

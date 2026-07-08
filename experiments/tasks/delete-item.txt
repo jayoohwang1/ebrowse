@@ -1,0 +1,7 @@
+Open the page http://127.0.0.1:8901/dialogs.html
+
+There is an item on that page that can be deleted. Delete the item and make sure
+the deletion actually goes through — if the page asks you to confirm anything,
+confirm it so the delete completes.
+
+When you are done, report the final status message that the page displays.

@@ -1,2 +1,2 @@
 PAGE Dialogs — Fixture — http://127.0.0.1:8901/dialogs.html
-s1 content 4 buttons  ~58t  | "Dialog playground — Buttons below exercise native dialogs and a DOM modal. Show alert Del…"
+s1 content 5 buttons  ~66t  | "Dialog playground — Buttons below exercise native dialogs and a DOM modal. Show alert Del…"

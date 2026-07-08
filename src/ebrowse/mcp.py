@@ -24,7 +24,7 @@ from ebrowse.daemon.protocol import Request
 _ACT_VERBS = [
     "click", "fill", "type", "press", "check", "uncheck", "select",
     "scroll", "upload", "eval", "back", "forward", "reload",
-    "fill-form", "search", "tabs", "tab", "close",
+    "fill-form", "search", "tabs", "tab", "dialog", "close",
 ]  # fmt: skip
 
 _STR = {"type": "string"}
@@ -65,9 +65,11 @@ TOOLS: list[dict[str, Any]] = [
         "name": "browse_act",
         "description": "Perform a browser action; returns a DIFF of what changed (never a "
         "full snapshot). verb=click/fill/type/press/check/uncheck/select/scroll/upload/"
-        "eval/back/forward/reload/fill-form/search/tabs/tab/close. target is a @ref or CSS "
-        "selector. text for fill/type; value for select; keys for press; direction for "
-        "scroll; data (JSON object string) for fill-form; query/pick for search.",
+        "eval/back/forward/reload/fill-form/search/tabs/tab/dialog/close. target is a @ref or "
+        "CSS selector. text for fill/type; value for select; keys for press; direction for "
+        "scroll; data (JSON object string) for fill-form; query/pick for search. When an "
+        "action opens a native confirm/prompt the page is blocked until you resolve it with "
+        "verb=dialog, response=accept|dismiss|status (text = a prompt's answer).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -80,6 +82,7 @@ TOOLS: list[dict[str, Any]] = [
                 "data": {**_STR, "description": 'fill-form JSON, e.g. {"Email": "a@b.c"}'},
                 "query": _STR,
                 "pick": _STR,
+                "response": {**_STR, "description": "dialog: accept | dismiss | status"},
                 "enter": _BOOL,
                 "pages": _INT,
                 "index": _INT,
@@ -219,6 +222,8 @@ def _act(args: dict[str, Any], session: str) -> tuple[bool, str]:
         }
     elif verb == "tab":
         payload = {"index": args.get("index", 0)}
+    elif verb == "dialog":
+        payload = {"response": args.get("response", "status"), "text": args.get("text")}
     elif verb in ("back", "forward", "reload", "tabs", "close"):
         payload = {}
     else:

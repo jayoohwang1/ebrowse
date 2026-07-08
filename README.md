@@ -48,7 +48,7 @@ $ ebrowse close                          # close this session's browser
 ```
 
 **Working verbs:** `open/goto, back, forward, reload, outline, expand,
-screenshot, get, tabs, tab, connect, close, daemon status|stop, doctor`;
+screenshot, get, tabs, tab, dialog, connect, close, daemon status|stop, doctor`;
 actions `click, fill, type, press, check, uncheck, select, scroll, upload,
 eval`; compound verbs `fill-form, search` (and `select` handles custom
 dropdowns) that collapse multi-step interactions into one command with one
@@ -66,8 +66,10 @@ CLICK @e15 (button "Create account") → partial change
 ```
 
 Safety rails: clicks covered by an overlay/dialog fail fast naming the covering
-element; native alerts/confirms are auto-handled and reported as notes; actions
-whose effect can't be seen in the DOM honestly report "no change detected".
+element; native `alert`/`beforeunload` are auto-accepted and reported as notes,
+while `confirm`/`prompt` are left for you to resolve with `ebrowse dialog
+accept|dismiss` (they block the page until you do); actions whose effect can't be
+seen in the DOM honestly report "no change detected".
 
 Reading a page costs what you choose to read: skim the outline (~50–700
 tokens), expand only relevant sections. Element refs (`@e7`) are durable — they

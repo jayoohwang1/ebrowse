@@ -373,6 +373,25 @@ def render_diff(action_line: str, diff: Diff, observe: ObserveConfig | None = No
     return "\n".join(out)
 
 
+def render_dialog_pending(action_line: str, dtype: str, message: str, default_value: str) -> str:
+    """Action-result rendering when a native confirm/prompt opened and is now
+    blocking the page. The page can't be observed until the agent resolves it,
+    so this stands in for the diff (docs/output-contracts.md)."""
+    head, _, steps = action_line.partition("\n")
+    out = [f"{head} → dialog opened (blocking)"]
+    if steps:
+        out.append(steps)
+    line = f'native {dtype}: "{message}"'
+    if dtype == "prompt":
+        line += f' (default: "{default_value}")'
+    out.append(line)
+    out.append(
+        "page actions are blocked until you resolve it — "
+        "'ebrowse dialog accept [text]' or 'ebrowse dialog dismiss'"
+    )
+    return "\n".join(out)
+
+
 # ------------------------------------------------------------------ query ----
 
 

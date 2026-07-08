@@ -8,6 +8,10 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- `dialog` verb (`dialog accept [text]` / `dialog dismiss` / `dialog status`) to
+  resolve or inspect a native `confirm`/`prompt` blocking the page. Exposed via the
+  MCP `browse_act` tool (`verb=dialog`, `response=accept|dismiss|status`). See
+  docs/adr/0007.
 - `docs/model-prompting.md`: dated per-model lab notebook for summarizer/vision
   prompting experiments (Qwen reasoning-off findings, screenshot visual-gist
   prompt comparison + token costs). Referenced from AGENTS.md.
@@ -34,6 +38,15 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 - pyright type checking (`make typecheck`, basic mode); `ActionsMixin` and
   `CompoundMixin` now declare the typed contract Session must satisfy, so
   the mixin wiring is checker-verified.
+
+### Changed
+
+- Native dialog policy: `confirm`/`prompt` are no longer auto-answered. They are
+  left open (blocking the page) for the agent to resolve with the new `dialog` verb;
+  the opening action returns `→ dialog opened (blocking)` and page-touching verbs
+  fail fast with a recovery hint until it's resolved (or you `tab` away).
+  `alert`/`beforeunload` are still auto-accepted and noted. Reverses the v1
+  auto-accept-everything policy (docs/adr/0007).
 
 ### Fixed
 

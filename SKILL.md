@@ -58,12 +58,20 @@ Diff vocabulary:
 - `→ partial change` — same page; `+` added elements (with ready-to-use refs),
   `-` removed, `~` state/text changes. `~ s2: new text: "Account created!"`
   quotes what a status message/validation error now says.
-- `→ dialog` — a modal appeared; deal with it first.
+- `→ dialog` — an in-page DOM modal appeared; deal with it first.
+- `→ dialog opened (blocking)` — your action opened a native `confirm`/`prompt`
+  that now blocks the whole page. Nothing else works until you resolve it:
+  `ebrowse dialog accept` (or `dialog accept "text"` to answer a prompt) /
+  `ebrowse dialog dismiss`. Resolving prints what your original action changed.
 - `→ no change detected` — the action had no visible DOM effect. It may have
   been a real no-op or an animation slower than the settle window. Check
   `ebrowse outline` or a screenshot before retrying.
-- `note: native confirm auto-accepted: "…"` — alerts/confirms are handled
-  automatically and reported; you never need to dismiss them.
+- `note: native alert auto-accepted: "…"` — `alert`/`beforeunload` carry no
+  decision, so they're accepted automatically and reported; you never dismiss them.
+  `confirm`/`prompt` are yours to decide (see `→ dialog opened` above).
+- `a native confirm dialog is blocking this tab …` (exit 1) — you tried a page
+  verb while a dialog is pending. Resolve it with `ebrowse dialog accept|dismiss`,
+  or `ebrowse tab <n>` to switch to an unblocked tab.
 - `blocked: @e42 is covered by <dialog "Cookie consent">` (exit 1) — an overlay
   intercepts the click. Interact with the covering element first.
 
@@ -85,6 +93,7 @@ fill-form <sid> --data '{"Field": "value", "Agree": true}'   many fields, one di
 search <query> [--in @ref] [--pick <text>] [--no-submit]     find box, type, submit
 query <sid> [--filter <regex>] [--cols a,b] [--limit N]      filter list/table rows
 screenshot [--section s3|--ref @e5|--full] [-o path]
+dialog accept [text] | dialog dismiss | dialog status   resolve a blocking native confirm/prompt
 tabs / tab <n>        close [--all]         daemon status|stop      doctor
 ```
 
@@ -118,6 +127,12 @@ Never `--all` blindly — the outline row shows item count and token cost.
 **Cookie banners / modals:** they appear as `dialog` sections or as the
 covering element in a blocked-click error. Expand, click the accept/close
 button, continue.
+
+**Native dialogs (`confirm`/`prompt`):** an action that pops one returns
+`→ dialog opened (blocking)` and freezes the page. Decide, then run
+`ebrowse dialog accept` / `dialog accept "your answer"` (prompt) / `dialog dismiss`;
+that unblocks the page and prints what your action changed. `dialog status` shows
+the pending message. (`alert`/`beforeunload` are auto-accepted — nothing to do.)
 
 **Sites blocking the headless browser** ("Access Denied" on open): attach to a
 real Chrome instead — start it with `--remote-debugging-port=9222`, then

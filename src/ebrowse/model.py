@@ -323,7 +323,7 @@ class Diff:
     sections: list[SectionDiff] = field(default_factory=list)  # partial / dialog
     new_page: PageMem | None = None  # navigation
     unchanged_sids: list[str] = field(default_factory=list)  # navigation: matched sections
-    notes: list[str] = field(default_factory=list)  # dialogs auto-handled, popups adopted, ...
+    notes: list[str] = field(default_factory=list)  # alert auto-accepted, popups adopted, ...
 
     def to_dict(self) -> dict[str, Any]:
         return {
