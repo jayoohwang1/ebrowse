@@ -60,12 +60,15 @@ class ActionsMixin:
     the host class must provide, declared so the checker verifies both sides."""
 
     if TYPE_CHECKING:
+        from ebrowse.session import PendingDialog
+
         cfg: Config
         nav_id: int
         page_mem: PageMem | None
         raw_by_sid: dict[str, RawSection]
         _notes: list[str]
 
+        def _active_dialog(self) -> PendingDialog | None: ...
         @property
         def page(self) -> Page: ...
         async def observe(
@@ -173,6 +176,17 @@ class ActionsMixin:
 
     async def _finish_action(self, action_line: str, begin_state: ActionSnapshot) -> str:
         """Quiesce, re-observe, diff against the _begin_action snapshot."""
+        # A native confirm/prompt opened by this action blocks the renderer main
+        # thread, so we cannot observe until it is resolved. Stash the action
+        # context on the pending dialog (so 'dialog accept|dismiss' can emit this
+        # action's diff) and return the blocking notice now.
+        pending = self._active_dialog()
+        if pending is not None:
+            pending.action_line = action_line
+            pending.begin_state = begin_state
+            return render.render_dialog_pending(
+                action_line, pending.type, pending.message, pending.default_value
+            )
         prev = begin_state.page
         with contextlib.suppress(Exception):
             await self.page.wait_for_load_state("domcontentloaded", timeout=5000)
@@ -202,7 +216,11 @@ class ActionsMixin:
         except CommandError:
             raise
         except Exception as e:
-            raise _map_playwright_error(e) from e
+            # If the action opened a blocking confirm/prompt, the triggering call
+            # itself can time out (the renderer is frozen). That timeout is
+            # expected — report the dialog via _finish_action, not a failure.
+            if self._active_dialog() is None:
+                raise _map_playwright_error(e) from e
         return await self._finish_action(action_line, begin_state)
 
     # --------------------------------------------------------------- verbs ----

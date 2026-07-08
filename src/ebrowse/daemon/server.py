@@ -24,6 +24,11 @@ from ebrowse.session import Session
 
 _VERB_TIMEOUT_S = 120  # hard ceiling per command; goto has its own 45s budget
 
+# Verbs allowed while a native dialog blocks the current tab: resolve it, or
+# escape to another tab / re-attach / close. Everything else would touch the
+# frozen page and is refused with a recovery hint.
+_DIALOG_SAFE_VERBS = frozenset({"dialog", "tabs", "tab", "connect", "close"})
+
 
 class Daemon:
     def __init__(self, cfg: Config) -> None:
@@ -159,6 +164,14 @@ class Daemon:
             )
 
     async def _run_verb(self, session: Session, verb: str, args: dict[str, Any]) -> str:
+        # A native confirm/prompt blocks the renderer, so page-touching verbs
+        # would hang; refuse them fast with the recovery action. The escape-hatch
+        # verbs below (resolve the dialog, switch/close tabs, re-attach) stay open.
+        if (
+            verb not in _DIALOG_SAFE_VERBS
+            and (warn := session.dialog_block_warning(verb)) is not None
+        ):
+            raise CommandError(warn, ExitCode.ACTION_FAILED)
         if verb in ("open", "goto"):
             return await session.verb_open(args["url"])
         if verb == "reload":
@@ -191,6 +204,8 @@ class Daemon:
             return await session.verb_tabs()
         if verb == "tab":
             return await session.verb_tab(args["index"])
+        if verb == "dialog":
+            return await session.verb_dialog(args["response"], text=args.get("text"))
         if verb == "connect":
             return await session.verb_connect(args["target"])
         if verb == "click":

@@ -10,6 +10,7 @@ import asyncio
 import contextlib
 import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
@@ -18,6 +19,8 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from playwright.async_api import Browser, BrowserContext, Dialog, FloatRect, Page, Playwright
+
+    from ebrowse.actions import ActionSnapshot
 
 from ebrowse.actions import ActionsMixin
 from ebrowse.compound import CompoundMixin
@@ -41,6 +44,26 @@ GOTO_TIMEOUT_MS = 45_000
 BROWSER_ARGS = ["--disable-blink-features=AutomationControlled"]
 
 CDP_PROBE_TIMEOUT_S = 2.0
+
+# Native dialog types the agent must decide on (a real choice / text input); the
+# rest (alert, beforeunload) are auto-accepted so they never block.
+DECISION_DIALOG_TYPES = ("confirm", "prompt")
+
+
+@dataclass(slots=True)
+class PendingDialog:
+    """A native confirm/prompt left open for the agent to resolve. While it is
+    open the renderer main thread is blocked, so no page-touching verb can run
+    until 'dialog accept|dismiss' resolves it (see docs/adr/0007)."""
+
+    type: str  # "confirm" | "prompt"
+    message: str
+    default_value: str  # prompt's default text ("" for confirm)
+    dialog: Dialog  # live Playwright handle
+    # Context of the action that opened it, so resolving can emit the normal
+    # post-action diff instead of a bare outline. None if opened outside an action.
+    action_line: str | None = None
+    begin_state: ActionSnapshot | None = None
 
 
 async def _check_cdp_reachable(url: str) -> None:
@@ -97,6 +120,9 @@ class Session(CompoundMixin, ActionsMixin):
         self.raw_by_sid: dict[str, RawSection] = {}
         self.nav_id = 0
         self._notes: list[str] = []  # dialog/popup events surfaced in the next diff
+        # native confirm/prompt dialogs awaiting an agent decision, keyed by the
+        # page they blocked (a dialog on a background tab must not block the active one)
+        self._pending_dialogs: dict[Page, PendingDialog] = {}
         # summarizer sidecar (never load-bearing)
         self._summarizer = SummarizerClient(cfg.summarizer)
         self._cache: SummaryCache | None = None
@@ -153,17 +179,47 @@ class Session(CompoundMixin, ActionsMixin):
 
     def _wire_page(self, page: Page) -> None:
         page.set_default_timeout(10_000)
-        page.on("dialog", self._on_dialog)
+        # bind the page so a dialog is attributed to the tab it blocked
+        page.on("dialog", lambda d, p=page: self._on_dialog(d, p))
 
-    def _on_dialog(self, dialog: Dialog) -> None:
-        # Native dialogs block everything; default policy is accept (dismiss for
-        # prompts, which would otherwise inject empty text) and surface the event
-        # in the next diff's notes so the agent knows it happened.
-        action = "dismissed" if dialog.type == "prompt" else "accepted"
-        self._notes.append(f'native {dialog.type} auto-{action}: "{dialog.message[:100]}"')
-        coro = dialog.dismiss() if dialog.type == "prompt" else dialog.accept()
-        task = asyncio.ensure_future(coro)
-        task.add_done_callback(lambda t: t.exception())  # swallow late errors
+    def _on_dialog(self, dialog: Dialog, page: Page) -> None:
+        # `alert` and `beforeunload` carry no decision, so auto-accept them to
+        # unblock immediately and note it. `confirm`/`prompt` are a real choice
+        # (OK/Cancel or text input): leave them OPEN and record them as pending so
+        # the agent decides via 'dialog accept|dismiss'. A registered handler that
+        # does not resolve keeps the dialog up (blocking the page) — exactly what
+        # we want. See docs/adr/0007-agent-resolves-native-dialogs.md.
+        if dialog.type not in DECISION_DIALOG_TYPES:
+            self._notes.append(f'native {dialog.type} auto-accepted: "{dialog.message[:100]}"')
+            task = asyncio.ensure_future(dialog.accept())
+            task.add_done_callback(lambda t: t.exception())  # swallow late errors
+            return
+        self._pending_dialogs[page] = PendingDialog(
+            type=dialog.type,
+            message=dialog.message,
+            default_value=dialog.default_value,
+            dialog=dialog,
+        )
+        self._notes.append(
+            f'native {dialog.type} opened (blocking): "{dialog.message[:100]}" — '
+            "resolve with 'ebrowse dialog accept|dismiss'"
+        )
+
+    def _active_dialog(self) -> PendingDialog | None:
+        """The pending dialog blocking the *current* tab, if any."""
+        return self._pending_dialogs.get(self._page) if self._page is not None else None
+
+    def dialog_block_warning(self, verb: str) -> str | None:
+        """Recovery-action message when `verb` can't run because a native dialog
+        is blocking the current tab; None when nothing is pending."""
+        d = self._active_dialog()
+        if d is None:
+            return None
+        return (
+            f'a native {d.type} dialog is blocking this tab: "{d.message[:100]}" — '
+            "resolve it with 'ebrowse dialog accept' or 'ebrowse dialog dismiss' "
+            f"(or 'ebrowse tab <n>' to switch tabs), then retry '{verb}'"
+        )
 
     @property
     def page(self) -> Page:
@@ -184,6 +240,7 @@ class Session(CompoundMixin, ActionsMixin):
         self._pw = self._browser = self._context = self._page = None
         self.page_mem = None
         self.raw_by_sid = {}
+        self._pending_dialogs = {}
         if self._backfill_task and not self._backfill_task.done():
             self._backfill_task.cancel()
         with contextlib.suppress(Exception):
@@ -199,6 +256,10 @@ class Session(CompoundMixin, ActionsMixin):
     ) -> str:
         """Capture -> build PageMem -> apply/queue summaries -> outline text.
         The one observation path (actions and navigation verbs go through it)."""
+        # a native confirm/prompt blocks the renderer main thread, so capture()'s
+        # evaluate would hang; refuse fast with the recovery action instead
+        if (warn := self.dialog_block_warning("outline")) is not None:
+            raise CommandError(warn, ExitCode.ACTION_FAILED)
         # enforce allowed_domains on the *landed* URL too — link clicks and
         # redirects can leave the domain even when the opened URL was allowed
         self._check_url_allowed(self.page.url, landed=True)
@@ -518,6 +579,47 @@ class Session(CompoundMixin, ActionsMixin):
         await self._page.bring_to_front()
         self.nav_id += 1
         return await self.observe()
+
+    async def verb_dialog(self, response: str, text: str | None = None) -> str:
+        """Resolve or inspect the native dialog blocking the current tab.
+        response ∈ {accept, dismiss, status}. `text` supplies a prompt's answer."""
+        d = self._active_dialog()
+        if response == "status":
+            if d is None:
+                return "no native dialog pending on this tab"
+            line = f'{d.type} dialog: "{d.message}"'
+            if d.type == "prompt":
+                line += f' (default: "{d.default_value}")'
+            return (
+                line + "\nresolve with 'ebrowse dialog accept [text]' or 'ebrowse dialog dismiss'"
+            )
+        if d is None:
+            raise CommandError(
+                f"no native dialog pending on this tab — nothing to {response}", ExitCode.USAGE
+            )
+        if response == "accept":
+            # prompt returns the supplied text (or its default); confirm ignores text
+            await d.dialog.accept(text) if text is not None else await d.dialog.accept()
+            outcome = f"accepted {d.type} dialog"
+            if d.type == "prompt":
+                outcome += f' with "{text if text is not None else d.default_value}"'
+        elif response == "dismiss":
+            await d.dialog.dismiss()
+            outcome = f"dismissed {d.type} dialog"
+        else:
+            raise CommandError(
+                f"unknown dialog response '{response}' — use accept, dismiss, or status",
+                ExitCode.USAGE,
+            )
+        self._pending_dialogs.pop(self.page, None)  # active_dialog() ⇒ page is set
+        # the "opened (blocking)" note was already shown on the opening action; drop it
+        # so the replayed diff below doesn't tell the agent to resolve what it just did
+        self._notes = []
+        # the page is unblocked now; if a verb opened this dialog, emit that verb's
+        # normal post-action diff, otherwise fall back to a fresh outline
+        if d.action_line is not None and d.begin_state is not None:
+            return f"{outcome}\n{await self._finish_action(d.action_line, d.begin_state)}"
+        return f"{outcome}\n{await self.observe()}"
 
     async def verb_connect(self, target: str) -> str:
         url = target if "://" in target else f"http://127.0.0.1:{target}"

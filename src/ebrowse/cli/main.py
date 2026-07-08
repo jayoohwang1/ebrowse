@@ -55,6 +55,14 @@ def build_parser() -> argparse.ArgumentParser:
     v = verb("tab", "switch active tab. ex: ebrowse tab 2")
     v.add_argument("index", type=int)
 
+    v = verb(
+        "dialog",
+        "resolve a native confirm/prompt blocking the page. "
+        'ex: ebrowse dialog accept | ebrowse dialog accept "Jane" | ebrowse dialog dismiss',
+    )
+    v.add_argument("response", choices=["accept", "dismiss", "status"])
+    v.add_argument("text", nargs="?", help="answer text for a prompt (accept only)")
+
     v = verb("connect", "attach to running Chrome over CDP. ex: ebrowse connect 9222")
     v.add_argument("target", help="port or ws:// CDP url")
 

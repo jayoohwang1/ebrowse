@@ -105,9 +105,31 @@ s7 dialog  3 links, 1 button  ~200t  | "Added to cart — Sprite Stasis Ball"  [
   `~ @ref field: "old" → "new"`, `~ sid: new text: "status/validation message"`.
 - `no change detected` carries the honest caveat (may be a real no-op, or the effect
   is outside the DOM / slower than the settle window).
-- Notes always surface: `note: native confirm auto-accepted: "…"`, new-tab adoption.
+- Notes always surface: `note: native alert auto-accepted: "…"`, new-tab adoption.
 - Occluded clicks fail *before* acting:
   `blocked: @e42 is covered by <dialog "Cookie consent"> — interact with that first` (exit 1).
+
+### Native dialog opened (blocking)
+
+`alert`/`beforeunload` are auto-accepted (a `note:` records it). A `confirm`/`prompt`
+is a *decision*, so it is left open for the agent and blocks the page. The opening
+action returns this instead of a diff (see ADR 0007):
+
+```
+CLICK @e8 (button "Delete item") → dialog opened (blocking)
+native confirm: "Really delete this item?"
+page actions are blocked until you resolve it — 'ebrowse dialog accept [text]' or 'ebrowse dialog dismiss'
+```
+
+- A `prompt` line also shows its default: `native prompt: "New name:" (default: "Untitled")`.
+- While a dialog is pending, every page-touching verb fails fast (exit 1) with
+  `a native <type> dialog is blocking this tab: "…" — resolve it with 'ebrowse dialog
+  accept' or 'ebrowse dialog dismiss' (or 'ebrowse tab <n>' to switch tabs)…`. Only
+  `dialog`, `tabs`, `tab`, `connect`, `close` run.
+- `dialog accept [text]` / `dialog dismiss` resolve it, then print the opening action's
+  normal diff (`accepted confirm dialog\n<diff>`); `dialog status` reports the pending
+  dialog without resolving it. Note: this is distinct from the `dialog` outcome above
+  (an in-page DOM modal that appeared as a section).
 
 ### Compound verbs (`fill-form`, `search`, custom-dropdown `select`)
 

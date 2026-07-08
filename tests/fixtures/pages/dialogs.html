@@ -19,6 +19,7 @@
     <p>Buttons below exercise native dialogs and a DOM modal.</p>
     <button type="button" id="alert-btn">Show alert</button>
     <button type="button" id="confirm-btn">Delete item (confirm)</button>
+    <button type="button" id="prompt-btn">Rename item (prompt)</button>
     <button type="button" id="modal-btn">Open cookie modal</button>
     <p><button type="button" id="covered-btn">Buy now</button> — covered while the modal is open</p>
     <p id="result">No dialog action yet.</p>
@@ -41,6 +42,10 @@
     document.getElementById('confirm-btn').addEventListener('click', () => {
       const ok = confirm('Really delete this item?');
       result.textContent = ok ? 'Item deleted.' : 'Deletion cancelled.';
+    });
+    document.getElementById('prompt-btn').addEventListener('click', () => {
+      const name = prompt('New name for this item:', 'Untitled');
+      result.textContent = name === null ? 'Rename cancelled.' : 'Renamed to ' + name + '.';
     });
     function setModal(show) {
       document.getElementById('overlay').classList.toggle('show', show);
