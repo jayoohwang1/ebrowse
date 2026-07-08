@@ -48,7 +48,7 @@ TOOLS: list[dict[str, Any]] = [
         "prefer reading action diffs over re-outlining.",
         "inputSchema": {
             "type": "object",
-            "properties": {"wait_summaries": _BOOL, "no_summaries": _BOOL},
+            "properties": {"wait_summaries": _BOOL, "no_summaries": _BOOL, "preview": _BOOL},
         },
     },
     {
@@ -135,6 +135,7 @@ def _tool_call(name: str, args: dict[str, Any], session: str) -> list[dict[str, 
                 "refresh": False,
                 "wait_summaries": args.get("wait_summaries", False),
                 "no_summaries": args.get("no_summaries", False),
+                "preview": args.get("preview", False),
             },
             session,
         )

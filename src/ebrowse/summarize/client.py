@@ -49,15 +49,16 @@ class SummarizerClient:
         if not self.available:
             return None
         try:
-            resp = await self._http().post(
-                "/chat/completions",
-                json={
-                    "model": self.cfg.model,
-                    "messages": messages,
-                    "max_tokens": max_tokens,
-                    "temperature": 0,
-                },
-            )
+            body: dict[str, Any] = {
+                "model": self.cfg.model,
+                "messages": messages,
+                "max_tokens": max_tokens,
+                "temperature": 0,
+            }
+            # Provider-specific knobs (e.g. reasoning-off) live in config, not
+            # code; merged last so an operator can override any default above.
+            body.update(self.cfg.extra_body)
+            resp = await self._http().post("/chat/completions", json=body)
             resp.raise_for_status()
             content = resp.json()["choices"][0]["message"]["content"]
             self._failures = 0

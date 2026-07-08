@@ -28,22 +28,37 @@ def fmt_tokens(n: int) -> str:
 # ---------------------------------------------------------------- outline ----
 
 
-def render_outline(page: PageMem, summaries_note: str | None = None) -> str:
+def render_outline(
+    page: PageMem,
+    summaries_note: str | None = None,
+    *,
+    preview: bool = False,
+    preview_chars: int = 60,
+) -> str:
     lines = [f"PAGE {page.title} — {page.url}" if page.title else f"PAGE {page.url}"]
     for s in page.sections:
-        lines.append(outline_line(s))
+        lines.append(outline_line(s, preview=preview, preview_chars=preview_chars))
     if summaries_note:
         lines.append(summaries_note)
     return "\n".join(lines)
 
 
-def outline_line(s: Section) -> str:
+def outline_line(s: Section, *, preview: bool = False, preview_chars: int = 60) -> str:
     if s.cross_origin:
         return f"{s.sid} iframe  ({s.preview})"
     counts = s.counts_desc()
     tok = fmt_tokens(s.token_estimate)
     if s.summary:
         label = f"≈ {s.summary}"
+        # Hybrid (`outline --preview`): append a short verbatim text preview after
+        # the summary, keeping BOTH provenance markers so the trust boundary stays
+        # visible (≈ = model paraphrase, | = verbatim page text). Opt-in: the
+        # default line is unchanged. No-op when there is no summary (the line is
+        # already the `|` deterministic preview).
+        if preview:
+            det = deterministic_label(s.heading, s.preview, max_len=preview_chars)
+            if det:
+                label = f'{label}  | "{det}"'
     else:
         det = deterministic_label(s.heading, s.preview)
         label = f'| "{det}"' if det else "|"

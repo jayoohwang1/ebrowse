@@ -172,6 +172,7 @@ class Daemon:
                 refresh=args.get("refresh", False),
                 wait_summaries=args.get("wait_summaries", False),
                 no_summaries=args.get("no_summaries", False),
+                preview=args.get("preview", False),
             )
         if verb == "expand":
             return await session.verb_expand(

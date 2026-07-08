@@ -27,6 +27,10 @@ api_key = ""
 vision = true                   # image captions on expand (needs a multimodal model)
 max_input_tokens = 100000       # input budget per page summarization call
 timeout_s = 60
+# extra_body: merged verbatim into every /chat/completions request. Model/
+# provider knobs live here as config, not code (see below). Default: {}.
+[summarizer.extra_body]
+# chat_template_kwargs = { enable_thinking = false }   # llama.cpp + Qwen: reasoning off
 
 [observe]
 quiescence_ms = 300             # post-action DOM-quiet debounce
@@ -61,3 +65,21 @@ allowed_domains = []            # empty = all; subdomains of listed domains allo
   breaker opens.
 - Injection hygiene: model output is length-clamped (140 chars), control-stripped,
   and `(@eN)` tokens are removed; the `≈` provenance marker is added by the renderer.
+
+### Provider-specific knobs (`extra_body`)
+
+ebrowse hard-codes no per-provider logic — the summarizer only speaks the
+OpenAI `/chat/completions` shape. Anything a specific backend needs goes in
+`[summarizer.extra_body]` as config data, merged verbatim into each request
+(after ebrowse's own fields, so it can override them). Leave it empty unless you
+know your backend supports the field — some servers reject unknown body keys.
+
+Reasoning models are the common case: section labeling needs no reasoning, and
+the hidden thinking both slows the call and can blow the output budget. Recipes:
+
+| Backend | `extra_body` |
+|---|---|
+| llama.cpp / Qwen (reasoning off) | `chat_template_kwargs = { enable_thinking = false }` |
+| OpenAI reasoning models | `reasoning_effort = "low"` |
+
+Env form (JSON): `EBROWSE_SUMMARIZER_EXTRA_BODY='{"chat_template_kwargs":{"enable_thinking":false}}'`.

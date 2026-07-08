@@ -73,6 +73,7 @@ def _build_request(args: argparse.Namespace) -> Request | None:
             "refresh": args.refresh,
             "wait_summaries": args.wait_summaries,
             "no_summaries": args.no_summaries,
+            "preview": args.preview,
         }
     elif verb == "expand":
         a = {"target": args.target, "cursor": args.cursor, "all": args.all}

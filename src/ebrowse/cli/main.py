@@ -70,6 +70,11 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("--refresh", action="store_true", help="force re-observation")
     v.add_argument("--wait-summaries", action="store_true", help="block until LLM labels ready")
     v.add_argument("--no-summaries", action="store_true", help="deterministic labels only")
+    v.add_argument(
+        "--preview",
+        action="store_true",
+        help="append a short verbatim text preview after each ≈ summary",
+    )
 
     v = verb("expand", "full content of one section as markdown with @refs. ex: ebrowse expand s3")
     v.add_argument("target", help="section id (s3) or element ref (@e5)")

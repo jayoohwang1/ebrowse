@@ -60,6 +60,11 @@ summaries: 3/4 cached · backfill running (rerun outline to see them)
   exactly what `expand` would cost.
 - Cross-origin iframes are listed but not entered.
 - Final status line only when the summarizer is enabled and not fully cached.
+- `--preview` (opt-in) appends a short verbatim preview after each summary line,
+  keeping both markers: `s1 nav  12 links  ~800t  ≈ Site header …  | "Deliver to …"`.
+  The default line is unchanged; only summary-bearing lines gain the `| "…"` tail.
+  Preview width is `observe.combined_preview_chars` (default 60). Costs ~+50-80%
+  outline tokens — for when a section's literal text may answer without `expand`.
 
 ## Expand (`ebrowse expand s2`, `--cursor N`, `--all`)
 

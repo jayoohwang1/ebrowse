@@ -155,6 +155,35 @@ def test_golden_outline(name: str):
     check_golden(f"outline_{name}", render.render_outline(page))
 
 
+def test_outline_preview_appends_text_to_summary():
+    """`outline --preview` (hybrid line): a short verbatim preview is appended
+    after the ≈ summary, keeping both provenance markers. Default is unchanged
+    and sections without a summary are byte-identical between the two modes."""
+    page, _ = build("list")
+    sec = next(s for s in page.sections if not s.cross_origin and (s.heading or s.preview))
+    sec.summary = "Injected test summary"
+
+    default = render.render_outline(page)
+    combined = render.render_outline(page, preview=True, preview_chars=40)
+
+    def line(text: str, sid: str) -> str:
+        return next(ln for ln in text.splitlines() if ln.startswith(sid + " "))
+
+    dline, cline = line(default, sec.sid), line(combined, sec.sid)
+    # default: summary only
+    assert "≈ Injected test summary" in dline and '| "' not in dline
+    # preview: summary first, then a verbatim `|` preview — both markers, in order
+    assert '≈ Injected test summary  | "' in cline
+    assert cline.index("≈") < cline.index("|")
+    # the appended preview honors the char cap (+ quotes/ellipsis overhead)
+    assert len(cline) - len(dline) <= 40 + 6
+
+    # sections that have no summary render identically in both modes
+    for s in page.sections:
+        if s.summary is None:
+            assert line(default, s.sid) == line(combined, s.sid)
+
+
 @pytest.mark.parametrize(
     ("name", "sid", "cursor"),
     [("article", "s2", 0), ("form", "s2", 0), ("list", "s4", 0), ("list", "s4", 20),

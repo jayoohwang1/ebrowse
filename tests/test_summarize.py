@@ -42,6 +42,22 @@ def test_parse_summaries_tolerates_fences_and_junk():
     assert parse_summaries('[{"sid": "s1"}]', valid) == {}
 
 
+def test_parse_summaries_salvages_truncated_array():
+    # Reasoning models often exhaust the token budget mid-array; the closing
+    # `]` and the final row are missing. We must keep the complete rows, not
+    # drop the whole page (the 0/N regression this guards against).
+    valid = {"s1", "s2", "s3"}
+    raw = (
+        '[{"sid": "s1", "summary": "Header nav"}, '
+        '{"sid": "s2", "summary": "Filter form"}, '
+        '{"sid": "s3", "summary": "Product li'  # cut off here, no closing brace/bracket
+    )
+    assert parse_summaries(raw, valid) == {"s1": "Header nav", "s2": "Filter form"}
+    # fenced + truncated together
+    fenced = '```json\n[{"sid": "s1", "summary": "Header nav"}, {"sid": "s2", "summ'
+    assert parse_summaries(fenced, valid) == {"s1": "Header nav"}
+
+
 def test_parse_summaries_sanitizes():
     out = parse_summaries(
         '[{"sid": "s1", "summary": "line\\nwith (@e5) ref and ctrl\\u0007 chars '
@@ -86,6 +102,19 @@ async def test_batch_against_mock_server():
     for sid, summary in out.items():
         assert summary == f"MOCK {sid} summary"
     assert len(mock.requests) == 1  # ONE batched call for the whole page
+
+
+async def test_extra_body_merged_into_request():
+    page = _page("list")
+    extra = {"chat_template_kwargs": {"enable_thinking": False}}
+    with MockSummarizer() as mock:
+        client = SummarizerClient(
+            SummarizerConfig(base_url=mock.base_url, timeout_s=10, extra_body=extra)
+        )
+        await summarize_page(client, page, {}, max_input_tokens=10_000)
+        await client.aclose()
+    assert mock.requests[0]["chat_template_kwargs"] == {"enable_thinking": False}
+    assert mock.requests[0]["temperature"] == 0  # base fields still present
 
 
 async def test_circuit_breaker_opens_after_failures():

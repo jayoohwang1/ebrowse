@@ -74,19 +74,30 @@ def _sanitize(text: str) -> str:
 
 
 def parse_summaries(raw: str, valid_sids: set[str]) -> dict[str, str]:
-    """Parse the model's JSON (tolerating code fences); invalid rows dropped."""
+    """Parse the model's JSON array of {sid, summary} rows.
+
+    Tolerates code fences, a leading preamble, and — critically — a TRUNCATED
+    tail: reasoning-capable models burn a big, near-constant chunk of the token
+    budget thinking before the JSON, so the array is often cut off mid-row when
+    the budget runs out. We salvage every *complete* object rather than failing
+    the whole page (0/N) on one dangling row. Invalid/unknown rows are dropped.
+    """
     text = raw.strip()
     if text.startswith("```"):
         text = re.sub(r"^```[a-z]*\n?|\n?```$", "", text, flags=re.MULTILINE).strip()
-    start, end = text.find("["), text.rfind("]")
-    if start == -1 or end <= start:
-        return {}
-    try:
-        rows = json.loads(text[start : end + 1])
-    except json.JSONDecodeError:
-        return {}
     out: dict[str, str] = {}
-    for row in rows if isinstance(rows, list) else []:
+    dec = json.JSONDecoder()
+    i, n = 0, len(text)
+    while i < n:
+        j = text.find("{", i)
+        if j == -1:
+            break
+        try:
+            row, end = dec.raw_decode(text, j)
+        except json.JSONDecodeError:
+            i = j + 1  # not a complete object here (e.g. truncated tail); keep scanning
+            continue
+        i = end
         if not isinstance(row, dict):
             continue
         sid, summary = row.get("sid"), row.get("summary")
@@ -108,7 +119,12 @@ async def summarize_page(
     if not client.available:
         return {}
     messages = build_messages(page, texts, max_input_tokens)
-    max_out = min(4000, 60 * max(1, len(page.sections)))
+    # Budget = reasoning overhead + ~one line of JSON per section. Reasoning
+    # models spend a large, near-constant chunk thinking before emitting any
+    # JSON (~2k tokens even on a 2-section page); the old flat 60/section budget
+    # was consumed entirely by that, cutting the array to nothing (0/N). Keep a
+    # generous floor; tolerant parsing + the `|` fallback cover any overrun.
+    max_out = min(8000, 2500 + 80 * len(page.sections))
     raw = await client.chat(messages, max_tokens=max_out)
     if raw is None:
         return {}

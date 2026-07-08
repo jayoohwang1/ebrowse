@@ -12,6 +12,7 @@ import tempfile
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 from loguru import logger
 
@@ -38,6 +39,32 @@ GOTO_TIMEOUT_MS = 45_000
 # passes Akamai fronts that reject the default headless shell (see
 # docs/adr/0002-full-chromium-with-plain-ua.md).
 BROWSER_ARGS = ["--disable-blink-features=AutomationControlled"]
+
+CDP_PROBE_TIMEOUT_S = 2.0
+
+
+async def _check_cdp_reachable(url: str) -> None:
+    """Fail fast with a targeted hint when nothing is listening on the CDP
+    endpoint. Playwright's connect_over_cdp otherwise surfaces a generic error
+    that doesn't name the recovery action (per architecture principle 8)."""
+    parsed = urlparse(url)
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port or (443 if parsed.scheme in ("https", "wss") else 80)
+    try:
+        _, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port), timeout=CDP_PROBE_TIMEOUT_S
+        )
+        writer.close()
+        with contextlib.suppress(Exception):
+            await writer.wait_closed()
+    except (OSError, TimeoutError) as e:
+        raise CommandError(
+            f"cannot reach Chrome at {host}:{port} — start Chrome with "
+            f"'--remote-debugging-port={port}', then retry 'ebrowse connect {port}'",
+            ExitCode.USAGE,
+        ) from e
+
+
 USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
@@ -92,6 +119,7 @@ class Session(CompoundMixin, ActionsMixin):
                         "cdp mode configured but no cdp_url — run 'ebrowse connect <port>'",
                         ExitCode.USAGE,
                     )
+                await _check_cdp_reachable(url)
                 self._browser = await self._pw.chromium.connect_over_cdp(url)
                 contexts = self._browser.contexts
                 self._context = contexts[0] if contexts else await self._browser.new_context()
@@ -166,7 +194,9 @@ class Session(CompoundMixin, ActionsMixin):
 
     # -------------------------------------------------------- observation ----
 
-    async def observe(self, wait_summaries: bool = False, no_summaries: bool = False) -> str:
+    async def observe(
+        self, wait_summaries: bool = False, no_summaries: bool = False, preview: bool = False
+    ) -> str:
         """Capture -> build PageMem -> apply/queue summaries -> outline text.
         The one observation path (actions and navigation verbs go through it)."""
         # enforce allowed_domains on the *landed* URL too — link clicks and
@@ -179,7 +209,12 @@ class Session(CompoundMixin, ActionsMixin):
         note = None
         if not no_summaries and self.cfg.summarizer.enabled:
             note = await self._apply_summaries(wait_summaries)
-        return render.render_outline(self.page_mem, note)
+        return render.render_outline(
+            self.page_mem,
+            note,
+            preview=preview,
+            preview_chars=self.cfg.observe.combined_preview_chars,
+        )
 
     # ------------------------------------------------------------ summaries ----
 
@@ -295,12 +330,15 @@ class Session(CompoundMixin, ActionsMixin):
         refresh: bool = False,
         wait_summaries: bool = False,
         no_summaries: bool = False,
+        preview: bool = False,
     ) -> str:
         del refresh  # observation is always fresh; flag reserved for future caching
         await self._ensure_browser()
         if self.page.url in ("about:blank", ""):
             raise CommandError("no page open — run 'ebrowse open <url>' first", ExitCode.USAGE)
-        return await self.observe(wait_summaries=wait_summaries, no_summaries=no_summaries)
+        return await self.observe(
+            wait_summaries=wait_summaries, no_summaries=no_summaries, preview=preview
+        )
 
     async def verb_expand(self, target: str, cursor: int = 0, show_all: bool = False) -> str:
         page_mem = self._require_page_mem()
@@ -483,6 +521,9 @@ class Session(CompoundMixin, ActionsMixin):
 
     async def verb_connect(self, target: str) -> str:
         url = target if "://" in target else f"http://127.0.0.1:{target}"
+        # Probe before tearing down: a dead target must not cost the caller their
+        # current session. (_ensure_browser re-probes, but only after close().)
+        await _check_cdp_reachable(url)
         await self.close()
         self._cdp_url = url
         await self._ensure_browser()

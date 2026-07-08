@@ -9,6 +9,7 @@ EBROWSE_SUMMARIZER_BASE_URL, EBROWSE_BROWSER_HEADLESS=false.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tomllib
@@ -40,6 +41,13 @@ class SummarizerConfig:
     vision: bool = True
     max_input_tokens: int = 100_000
     timeout_s: int = 60
+    # Extra fields merged verbatim into every /chat/completions request body.
+    # This is where model/provider-specific knobs live as *config data* rather
+    # than provider-branching code — e.g. reasoning-off for a llama.cpp/Qwen
+    # sidecar: {"chat_template_kwargs": {"enable_thinking": false}}. Default
+    # empty: never assume a backend supports a given field. See
+    # docs/configuration.md for per-provider recipes.
+    extra_body: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -49,6 +57,9 @@ class ObserveConfig:
     preview_chars: int = 120
     list_page_size: int = 20
     max_sections: int = 60
+    # `outline --preview` only: chars of verbatim text appended after each ≈
+    # summary. Tune the summary-vs-preview token tradeoff here (shorter = leaner).
+    combined_preview_chars: int = 60
 
 
 @dataclass(slots=True)
@@ -95,6 +106,11 @@ def _coerce(raw: str, target_type: type) -> Any:
         return int(raw)
     if target_type is list:
         return [x.strip() for x in raw.split(",") if x.strip()]
+    if target_type is dict:
+        value = json.loads(raw)  # e.g. EBROWSE_SUMMARIZER_EXTRA_BODY='{"a":1}'
+        if not isinstance(value, dict):
+            raise ValueError("expected a JSON object")
+        return value
     return raw
 
 

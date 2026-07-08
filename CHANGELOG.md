@@ -8,6 +8,24 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- `outline --preview` (opt-in): appends a short verbatim text preview after each
+  `≈` summary (`≈ summary  | "preview…"`), keeping both provenance markers, for
+  when a section's literal text may answer without an `expand`. Preview width is
+  `observe.combined_preview_chars` (default 60); costs ~+50% outline tokens on a
+  typical page. Default outline output is unchanged. Also exposed via the MCP
+  `browse_outline` tool.
+- `summarizer.extra_body`: dict merged verbatim into every `/chat/completions`
+  request, so model/provider-specific knobs (e.g. reasoning-off for a
+  llama.cpp/Qwen sidecar via `chat_template_kwargs.enable_thinking = false`)
+  live as config data rather than provider-branching code. Default `{}`;
+  per-provider recipes in docs/configuration.md. On a reasoning sidecar,
+  disabling thinking made a real-page outline ~7x faster (29s → 4s) with full
+  section coverage instead of partial.
+- `ebrowse connect` now probes the CDP endpoint's reachability before use and,
+  when nothing is listening, fails with a targeted hint (`start Chrome with
+  --remote-debugging-port=<port>`) instead of a generic browser-launch error.
+  The probe runs before the existing session is torn down, so a failed
+  re-point no longer costs the caller their current browser.
 - GitHub Actions CI: lint + typecheck + pure tests on every push/PR, plus a
   browser/e2e job with Playwright chromium.
 - pyright type checking (`make typecheck`, basic mode); `ActionsMixin` and
@@ -16,6 +34,10 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Fixed
 
+- Summarizer no longer returns `0/N` on reasoning models and large pages: the
+  output-token budget now has a floor for reasoning overhead, and the JSON
+  parser salvages complete rows from a truncated array instead of dropping the
+  whole page on one dangling row.
 - `security.allowed_domains` is now enforced on every observed URL, so link
   clicks and redirects that leave the allowed set fail with a recovery hint —
   previously only `open <url>` was checked.
