@@ -8,10 +8,16 @@
 # and selected via $PI_PROVIDER/$PI_MODEL or -p/-m (see experiments/README.md).
 set -euo pipefail
 
-PROVIDER="${PI_PROVIDER:-}"
-MODEL="${PI_MODEL:-}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EBROWSE_SKILL="$(cd "$HERE/.." && pwd)/SKILL.md"
+
+# Optional project env: experiments/.env (gitignored; see .env.example) can set
+# PI_PROVIDER/PI_MODEL so bare invocations work without touching your shell
+# profile. CLI -p/-m still override. `set -a` exports so pi/child procs see them.
+[[ -f "$HERE/.env" ]] && { set -a; . "$HERE/.env"; set +a; }
+
+PROVIDER="${PI_PROVIDER:-}"
+MODEL="${PI_MODEL:-}"
 
 TOOL="none"
 TASK=""

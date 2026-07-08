@@ -24,13 +24,15 @@ like the developer role or reasoning-effort — disable those under the provider
 `compat` block if pi errors on them.
 
 Pick the provider/model per run with `-p/--provider` and `-m/--model`, or set
-`$PI_PROVIDER` / `$PI_MODEL` once (e.g. in your shell profile) so bare invocations
-just work.
+`$PI_PROVIDER` / `$PI_MODEL` once so bare invocations just work. The simplest home
+for them is a project env file: `cp experiments/.env.example experiments/.env` and
+fill it in — `run-agent.sh` auto-loads `experiments/.env` (gitignored), and `-p/-m`
+still override it.
 
 ## Prerequisites
 
 1. Your model endpoint is reachable and `pi --list-models <provider>` shows it.
-2. `$PI_PROVIDER` / `$PI_MODEL` are exported (or you pass `-p`/`-m` each run).
+2. `$PI_PROVIDER` / `$PI_MODEL` set — via `experiments/.env`, your shell, or `-p`/`-m`.
 3. `ebrowse --help` and `agent-browser --help` both resolve on PATH.
 
 ## Run a task
