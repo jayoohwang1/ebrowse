@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# run-agent.sh — drive the local Qwen agent (pi harness) on a browsing task,
-# invoking it as a command-line subagent. Each run is saved under runs/ so
-# transcripts and token/step counts can be diffed across tools (ebrowse vs
-# agent-browser) and prompts.
+# run-agent.sh — drive a coding agent (pi harness) on a browsing task, invoking
+# it as a command-line subagent. Each run is saved under runs/ so transcripts
+# and token/step counts can be diffed across tools (ebrowse vs agent-browser)
+# and prompts.
 #
-# Requires: pi on PATH, llama-server up on :5001, provider `qwen-local` in
-# ~/.pi/agent/models.json (see experiments/README.md).
+# Requires: pi on PATH; a pi provider/model configured in ~/.pi/agent/models.json
+# and selected via $PI_PROVIDER/$PI_MODEL or -p/-m (see experiments/README.md).
 set -euo pipefail
 
-PROVIDER="${PI_PROVIDER:-qwen-local}"
-MODEL="${PI_MODEL:-unsloth/Qwen3.6-35B-A3B-MTP}"
+PROVIDER="${PI_PROVIDER:-}"
+MODEL="${PI_MODEL:-}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EBROWSE_SKILL="$(cd "$HERE/.." && pwd)/SKILL.md"
 
@@ -35,8 +35,8 @@ Options:
   -n, --name <name>                        Run label (default: <tool>-<UTC timestamp>)
   -d, --dir <path>                         Working dir the agent runs in (default: fresh runs/<name>/workdir)
   -j, --json                               Also capture the full JSON event stream (tokens, tool calls)
-  -m, --model <id>                         Override model (default: $PI_MODEL / qwen)
-  -p, --provider <name>                    Override provider (default: $PI_PROVIDER / qwen-local)
+  -m, --model <id>                         Model id (default: $PI_MODEL)
+  -p, --provider <name>                    pi provider name (default: $PI_PROVIDER)
   -h, --help
 
 Examples:
@@ -65,6 +65,11 @@ if [[ -n "$TASK_FILE" ]]; then
   TASK="$(cat "$TASK_FILE")"
 fi
 [[ -n "$TASK" ]] || { echo "no task given" >&2; usage; exit 2; }
+[[ -n "$PROVIDER" && -n "$MODEL" ]] || {
+  echo "no provider/model — set \$PI_PROVIDER and \$PI_MODEL or pass -p/-m" \
+       "(see experiments/README.md)" >&2
+  exit 2
+}
 
 # Build the tool preamble so each tool is driven from its own documented guide
 # (fair, consistent instructions across runs).
