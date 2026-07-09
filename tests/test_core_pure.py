@@ -106,6 +106,41 @@ def test_refs_shared_across_pages_for_common_chrome():
         assert form_refs[href] == list_refs[href], href
 
 
+def test_oversized_childless_overlay_kept_backdrop_dropped():
+    # A full-viewport veil with only a text node and a click signal must become
+    # a section (it is the thing blocking every click); a bare decorative
+    # backdrop with no text/signals must still be dropped.
+    from ebrowse.core.snapshot import DomNode
+    from ebrowse.core.split import split_page
+
+    veil = DomNode(
+        tag="div",
+        rect=(0, 0, 1280, 2000),
+        attrs={"id": "veil"},
+        text="We value your privacy — click to dismiss",
+        signals={"ls": 1},
+    )
+    backdrop = DomNode(tag="div", rect=(0, 0, 1280, 2000))
+    main = DomNode(
+        tag="main",
+        rect=(0, 0, 1280, 600),
+        children=[DomNode(tag="p", rect=(0, 0, 600, 40), text="Hello")],
+    )
+    root = DomNode(tag="body", rect=(0, 0, 1280, 2000), children=[main, veil, backdrop])
+    snap = DomSnapshot(
+        url="https://x.test/",
+        title="t",
+        viewport=(1280, 1280),
+        scroll_y=0,
+        doc_height=2000,
+        truncated=False,
+        root=root,
+    )
+    secs = split_page(snap)
+    assert any("value your privacy" in s.node.subtree_text() for s in secs)
+    assert all(n is not backdrop for s in secs for n in s.iter_walk())
+
+
 def test_huge_page_collapses_to_list():
     page, _ = build("huge")
     assert len(page.sections) <= 6

@@ -8,6 +8,14 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Fixed
 
+- **Full-page clickable overlays are no longer invisible to the outline.** The
+  splitter never treated an oversized node as terminal, so a full-viewport
+  overlay with no element children (cookie veil / interstitial wired via
+  `onclick`, holding only a text node) vanished during descent — no section,
+  no ref, and a click it blocked could only report "no exposed ref". Oversized
+  childless nodes are now terminal; the substance gate still drops bare
+  decorative backdrops. Blocked clicks can now name the veil's own ref as the
+  recovery action.
 - **Restyled native controls no longer falsely block clicks.** The click
   pre-check treated any unrelated element at the target's center as a cover, so
   Amazon-style radios/checkboxes (transparent native input + decorative sibling

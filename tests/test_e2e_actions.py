@@ -214,6 +214,24 @@ def test_blocked_click_honest_about_unexposed_cover(server, env):
     assert "partial change" in r.stdout  # the previously-blocked click now lands
 
 
+def test_full_page_veil_exposed_and_named_when_blocking(server, env):
+    # a full-viewport childless clickable overlay must get a ref of its own
+    # (splitter: oversized childless nodes are terminal), so a blocked click
+    # can name it as the recovery action
+    ebrowse(env, "open", server.url("veil_overlay.html"))
+    r = ebrowse(env, "outline")
+    assert "value your privacy" in r.stdout, r.stdout
+    sub = ref_for(env, "s2", r"\[Subscribe")
+    r = ebrowse(env, "click", sub)
+    assert r.returncode == 1
+    m = re.search(r"dismiss or interact with (@e\d+)", r.stderr)
+    assert m, r.stderr
+    assert ebrowse(env, "click", m.group(1)).returncode == 0
+    r = ebrowse(env, "click", sub)
+    assert r.returncode == 0, r.stderr
+    assert "Subscribed!" in r.stdout
+
+
 def test_fancy_radio_clicks_despite_decorative_cover(server, env):
     # Amazon-style restyled radio: transparent native input whose center is
     # covered by a decorative sibling <i> inside the wrapping label. The old
