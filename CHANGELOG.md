@@ -6,7 +6,31 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ## [Unreleased]
 
+### Fixed
+
+- **Restyled native controls no longer falsely block clicks.** The click
+  pre-check treated any unrelated element at the target's center as a cover, so
+  Amazon-style radios/checkboxes (transparent native input + decorative sibling
+  inside a `<label>`) hard-failed with `covered by <i …>` pointing at an
+  unexposed decorative node. A hit inside an associated label is now recognized
+  as the control's legitimate click surface (HTML label activation): the click
+  is routed through the label and the diff notes
+  `clicked via the associated label`. The pre-check is also shadow-DOM-aware now
+  (composed-tree containment instead of `.contains()`).
+- **Refs inside id-less iframes are now actionable.** Frame identity captured
+  for an iframe without `id`/`title` fell back to the frame URL, which locator
+  resolution could never match — refs inside such frames (common third-party
+  embeds) errored on every action. Capture now records the iframe's `src`
+  attribute and resolution matches `iframe[src=…]` as well.
+
 ### Changed
+
+- **Generic covers are arbitrated by Playwright, not the one-point hit test.**
+  Only a cover inside a dialog still fails the click pre-emptively. Any other
+  center-point mismatch (partial overlays, sticky headers, transient layers,
+  odd geometry) runs a short trial click — the same scroll/stability/
+  receives-events rules as the real click, with retries — and only a sustained
+  interception raises `blocked: … covered by …`. See docs/adr/0009.
 
 - **Navigation no longer prints the outline.** `open`/`back`/`forward`/`reload`/
   `tab` and any navigating action now return a terse landing line

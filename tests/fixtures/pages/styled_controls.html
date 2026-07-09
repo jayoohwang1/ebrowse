@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Preferences — Fixture</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    header { background: #146; color: #fff; padding: 12px 24px; }
+    header a { color: #fff; margin-right: 12px; }
+    main { max-width: 560px; margin: 0 auto; padding: 24px; }
+    fieldset { border: 1px solid #ccc; margin-bottom: 16px; }
+
+    /* Amazon-style "fancy" control: the native input is transparent and a
+       decorative sibling <i> is the pointer receiver at the same spot. A naive
+       center-point hit test on the input reports the <i> as a cover. */
+    label.fancy { position: relative; display: block; padding-left: 26px; margin: 8px 0; }
+    label.fancy input { position: absolute; left: 0; top: 1px; width: 16px; height: 16px;
+                        margin: 0; opacity: 0; z-index: 1; }
+    label.fancy i { position: absolute; left: 0; top: 1px; width: 16px; height: 16px;
+                    background: #eee; border: 1px solid #666; border-radius: 50%; z-index: 2; }
+    label.fancy input:checked + i { background: #146; }
+
+    /* external-label variant: <input> + <label for=...> owning the visual box */
+    .newsletter { position: relative; display: block; padding-left: 26px; }
+    .newsletter input { position: absolute; left: 0; top: 1px; width: 16px; height: 16px;
+                        margin: 0; opacity: 0; z-index: 1; }
+    .newsletter label i { position: absolute; left: 0; top: 1px; width: 16px; height: 16px;
+                          background: #eee; border: 1px solid #666; z-index: 2; }
+    .newsletter input:checked ~ label i { background: #146; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/">Fixture Shop</a>
+    <nav aria-label="Main"><a href="/list.html">Products</a> <a href="/help.html">Help</a></nav>
+  </header>
+
+  <main>
+    <h1>Language and currency preferences</h1>
+    <form id="prefs">
+      <fieldset>
+        <legend>Currency</legend>
+        <label class="fancy"><input type="radio" name="currency" value="usd" checked><i></i>
+          <span>$ - USD - US Dollar (Default)</span></label>
+        <label class="fancy"><input type="radio" name="currency" value="eur"><i></i>
+          <span>€ - EUR - Euro</span></label>
+        <label class="fancy"><input type="radio" name="currency" value="krw"><i></i>
+          <span>₩ - KRW - Korean Won</span></label>
+      </fieldset>
+      <span class="newsletter">
+        <input type="checkbox" id="news" name="news">
+        <label for="news"><i></i>Subscribe to the deals newsletter</label>
+      </span>
+      <p id="status">Currency: USD. Newsletter: off.</p>
+    </form>
+  </main>
+
+  <script>
+    function update() {
+      const cur = document.querySelector('input[name=currency]:checked').value.toUpperCase();
+      const news = document.getElementById('news').checked ? 'on' : 'off';
+      document.getElementById('status').textContent =
+        'Currency: ' + cur + '. Newsletter: ' + news + '.';
+    }
+    for (const inp of document.querySelectorAll('#prefs input')) {
+      inp.addEventListener('change', update);
+    }
+  </script>
+</body>
+</html>

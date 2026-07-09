@@ -180,6 +180,27 @@ def test_occluded_click_blocked(server, env):
     assert "Purchase started." in r.stdout
 
 
+def test_fancy_radio_clicks_despite_decorative_cover(server, env):
+    # Amazon-style restyled radio: transparent native input whose center is
+    # covered by a decorative sibling <i> inside the wrapping label. The old
+    # center-point preflight hard-blocked this; label semantics make it valid.
+    ebrowse(env, "open", server.url("styled_controls.html"))
+    eur = ref_for(env, "s2", r"EUR - Euro")
+    r = ebrowse(env, "click", eur)
+    assert r.returncode == 0, r.stderr
+    assert "covered by" not in r.stderr
+    assert re.search(r'checked: "false" → "true"', r.stdout)
+    assert "note: clicked via the associated label" in r.stdout
+
+
+def test_fancy_external_label_checkbox(server, env):
+    # external <label for=...> owns the visual box that covers the input center
+    news = ref_for(env, "s2", r"Subscribe to the deals")
+    r = ebrowse(env, "click", news)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'checked: "false" → "true"', r.stdout)
+
+
 def test_spa_mutation_and_noop(server, env):
     ebrowse(env, "open", server.url("spa.html"))
     inp = ref_for(env, "s2", r"New task title")
@@ -203,6 +224,19 @@ def test_spa_route_swap_shows_sections(server, env):
 
 def test_iframe_form_flow(server, env):
     ebrowse(env, "open", server.url("iframe.html"))
+    card = ref_for(env, "s2", r"Card number")
+    r = ebrowse(env, "fill", card, "4242 4242 4242 4242")
+    assert r.returncode == 0, r.stderr
+    pay = ref_for(env, "s2", r"\[Pay")
+    r = ebrowse(env, "click", pay)
+    assert r.returncode == 0, r.stderr
+    assert "Payment accepted." in r.stdout
+
+
+def test_iframe_without_id_form_flow(server, env):
+    # an iframe with no id/title used to capture refs that locate() could
+    # never resolve (frame identity fell back to the frame URL)
+    ebrowse(env, "open", server.url("iframe_noid.html"))
     card = ref_for(env, "s2", r"Card number")
     r = ebrowse(env, "fill", card, "4242 4242 4242 4242")
     assert r.returncode == 0, r.stderr

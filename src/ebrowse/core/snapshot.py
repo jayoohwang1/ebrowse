@@ -156,7 +156,14 @@ async def capture(page) -> DomSnapshot:
             continue
         if not box or box["width"] < _MIN_FRAME_W or box["height"] < _MIN_FRAME_H:
             continue
-        fid = await handle.get_attribute("id") or await handle.get_attribute("title") or frame.url
+        # fid must be resolvable later by locate._frame_scope (iframe[id|title|src=...]),
+        # so prefer the verbatim src attribute over frame.url for id-less frames
+        fid = (
+            await handle.get_attribute("id")
+            or await handle.get_attribute("title")
+            or await handle.get_attribute("src")
+            or frame.url
+        )
         node = _match_iframe_node(iframe_nodes, fid, frame.url)
         if node is None:
             continue
@@ -180,7 +187,7 @@ def _match_iframe_node(nodes: list[DomNode], fid: str, url: str) -> DomNode | No
         if n.attrs.get("id") == fid or n.attrs.get("ttl") == fid:
             return n
         src = n.attrs.get("src") or ""
-        if src and (url.endswith(src) or src in url):
+        if src and (src == fid or url.endswith(src) or src in url):
             return n
     return None
 

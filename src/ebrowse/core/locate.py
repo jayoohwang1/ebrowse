@@ -19,10 +19,13 @@ def _css_escape(s: str) -> str:
 
 
 def _frame_scope(page, desc: ElementDesc):
-    """Resolve the frame the element lives in (iframe_path from discovery)."""
+    """Resolve the frame the element lives in (iframe_path from discovery).
+    fid is the frame's id, title, or src attribute — whichever capture used
+    (core/snapshot.py) — so try all three."""
     scope = page
     for fid in desc.iframe_path:
-        scope = scope.frame_locator(f'iframe[id="{fid}"], iframe[title="{fid}"]')
+        q = fid.replace("\\", "\\\\").replace('"', '\\"')
+        scope = scope.frame_locator(f'iframe[id="{q}"], iframe[title="{q}"], iframe[src="{q}"]')
     return scope
 
 

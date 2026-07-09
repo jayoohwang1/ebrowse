@@ -27,6 +27,9 @@ from ebrowse.errors import CommandError, ExitCode
 from ebrowse.model import Element, PageMem
 
 _ACTION_TIMEOUT_MS = 8_000
+# Trial-click budget when the one-point hit test found a cover: long enough for
+# transient overlays/animations to clear, short enough to fail fast on a real one.
+_TRIAL_TIMEOUT_MS = 2_000
 
 # Resolves when the DOM has been mutation-quiet for `quiet` ms (or `cap` ms
 # elapsed). Installed per-wait; cheap enough and avoids init-script lifecycle.
@@ -129,10 +132,16 @@ class ActionsMixin:
             return loc.first, desc
         return await resolve(self.page, element.desc), desc
 
-    async def _check_occlusion(self, loc, target: str) -> None:
-        """Pre-empt a click that would land on a covering element (fail before
-        acting). Separately RECORD a modal that blocks the page without covering
-        the target — native `showModal()` (top layer + inert) or an aria-modal
+    async def _check_occlusion(self, loc, target: str) -> dict:
+        """Center-point hit test on the live target. Returns the probe result:
+        {covering, coverDialog, coverInLabel} (any subset). Hard-fails ONLY when
+        the cover sits inside a dialog — that is strong evidence the click can't
+        mean what the agent intended. A generic cover is weak evidence (restyled
+        controls, partial/transient overlays), so it is returned for the caller
+        to arbitrate with a Playwright trial click rather than refused outright.
+
+        Separately RECORDS a modal that blocks the page without covering the
+        target — native `showModal()` (top layer + inert) or an aria-modal
         focus trap, where `::backdrop` is a pseudo-element invisible to the
         geometric hit-test. That can't be pre-empted safely (a false positive
         would block a valid click), so it's surfaced post-hoc only if the click
@@ -149,16 +158,40 @@ class ActionsMixin:
                         + ((n.getAttribute('aria-label') || n.textContent || '')
                             .trim().slice(0, 40) ? ' "' + (n.getAttribute('aria-label')
                             || n.textContent).trim().slice(0, 40) + '"' : '');
+                    // composed-tree containment: .contains() is blind across
+                    // shadow roots, which turns open-shadow components into
+                    // false "covered" verdicts
+                    const within = (anc, n) => {
+                        while (n) {
+                            if (n === anc) return true;
+                            n = n.parentNode || (n instanceof ShadowRoot ? n.host : null);
+                        }
+                        return false;
+                    };
+                    // browser-defined label activation: a hit anywhere inside an
+                    // associated <label> (wrapping or for=) activates the control,
+                    // so decoration there is a click surface, not occlusion
+                    // (restyled radios/checkboxes: input + sibling icon in a label)
+                    const inLabel = (t) => {
+                        const labs = el.labels ? Array.from(el.labels) : [];
+                        const wrap = el.closest ? el.closest('label') : null;
+                        if (wrap && !labs.includes(wrap)) labs.push(wrap);
+                        return labs.some((l) => within(l, t));
+                    };
                     // (1) geometric occlusion at the element's center point
-                    let covering = null, coverDialog = null;
+                    let covering = null, coverDialog = null, coverInLabel = 0;
                     const r = el.getBoundingClientRect();
                     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
                     if (cx >= 0 && cy >= 0 && cx <= innerWidth && cy <= innerHeight) {
                         const t = document.elementFromPoint(cx, cy);
-                        if (t && !el.contains(t) && !t.contains(el)) {
-                            covering = name(t);
-                            const dlg = t.closest('[role=dialog],[role=alertdialog],dialog');
-                            coverDialog = dlg ? name(dlg) : null;
+                        if (t && !within(el, t) && !within(t, el)) {
+                            if (inLabel(t)) {
+                                coverInLabel = 1;
+                            } else {
+                                covering = name(t);
+                                const dlg = t.closest('[role=dialog],[role=alertdialog],dialog');
+                                coverDialog = dlg ? name(dlg) : null;
+                            }
                         }
                     }
                     // (2) a modal blocking the page but NOT over this point.
@@ -175,20 +208,41 @@ class ActionsMixin:
                             }
                         }
                     } catch (e) { /* :modal unsupported on this engine */ }
-                    return {covering, coverDialog, modal};
+                    return {covering, coverDialog, coverInLabel, modal};
                 }"""
             )
         except Exception:
-            return  # pre-check is best-effort; Playwright will still enforce
-        if info and info.get("covering"):
-            what = info.get("coverDialog") or info.get("covering")
+            return {}  # pre-check is best-effort; Playwright will still enforce
+        if not info:
+            return {}
+        if info.get("modal"):
+            self._blocking_modal = info["modal"]
+        if info.get("coverDialog"):
             raise CommandError(
-                f"blocked: {target} is covered by {what} — interact with that first "
-                "(run 'ebrowse outline' to see it)",
+                f"blocked: {target} is covered by {info['coverDialog']} — interact with "
+                "that first (run 'ebrowse outline' to see it)",
                 ExitCode.ACTION_FAILED,
             )
-        if info and info.get("modal"):
-            self._blocking_modal = info["modal"]
+        return info
+
+    async def _click_via_label(self, loc) -> bool:
+        """Click a form control's associated <label> instead of the control
+        itself (browser semantics forward label activation to the control).
+        Used when the control's own click point is covered by decoration inside
+        its label — the label IS the visible click surface. Returns False to
+        fall back to the normal click path."""
+        try:
+            handle = await loc.element_handle(timeout=2000)
+            lab = await handle.evaluate_handle(
+                "(el) => (el.labels && el.labels[0]) || (el.closest && el.closest('label'))"
+            )
+            el = lab.as_element()
+            if el is None:
+                return False
+            await el.click(timeout=_ACTION_TIMEOUT_MS)
+            return True
+        except Exception:
+            return False
 
     def _section_texts(self) -> dict[str, str]:
         return {
@@ -287,7 +341,27 @@ class ActionsMixin:
         async def do() -> None:
             with contextlib.suppress(Exception):
                 await loc.scroll_into_view_if_needed(timeout=2000)
-            await self._check_occlusion(loc, target)
+            info = await self._check_occlusion(loc, target)
+            if info.get("coverInLabel") and not (double or right or new_tab):
+                # the control's click point belongs to decoration inside its
+                # associated label — click the label (standards-defined proxy)
+                if await self._click_via_label(loc):
+                    self._notes.append(
+                        "clicked via the associated label (the control's visible surface)"
+                    )
+                    return
+            elif info.get("covering"):
+                # one-point mismatch is too weak for a hard refusal; let
+                # Playwright's actionability engine (scroll + stability +
+                # receives-events, with retries) arbitrate via a trial click
+                try:
+                    await loc.click(trial=True, timeout=_TRIAL_TIMEOUT_MS)
+                except Exception as e:
+                    raise CommandError(
+                        f"blocked: {target} is covered by {info['covering']} — interact "
+                        "with that first (run 'ebrowse outline' to see it)",
+                        ExitCode.ACTION_FAILED,
+                    ) from e
             kwargs: dict = {"timeout": _ACTION_TIMEOUT_MS}
             if right:
                 kwargs["button"] = "right"

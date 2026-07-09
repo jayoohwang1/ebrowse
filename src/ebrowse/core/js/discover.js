@@ -124,6 +124,10 @@
       if (alt) a.alt = collapse(alt).slice(0, 160);
       const src = el.currentSrc || el.getAttribute("src") || "";
       if (src) a.src = src.slice(0, 300);
+    } else if (tag === "iframe") {
+      // frame identity for stitching + locator resolution when id/title absent
+      const src = el.getAttribute("src");
+      if (src) a.src = src.slice(0, 300);
     }
     return a;
   }
