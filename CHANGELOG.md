@@ -23,6 +23,20 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   embeds) errored on every action. Capture now records the iframe's `src`
   attribute and resolution matches `iframe[src=…]` as well.
 
+### Added
+
+- **Failure-only blocker diagnostics.** When a click is refused (trial-click
+  failure, or Playwright "intercepts pointer events" on any pointer verb), one
+  diagnostic probe (`core/js/diagnose.js`, exposed via
+  `snapshot.probe_blocker`) classifies the blocker and the error names an
+  executable next step: the cover's own exposed ref (`dismiss or interact with
+  @eN (…) first`), an open dialog (`a dialog is open (…); resolve it first` —
+  found even when the hit target is only its anonymous backdrop), or an honest
+  limitation (`has no exposed ref (likely a new overlay)` with
+  `outline`/`press Escape`/`screenshot` suggestions). Also detects
+  disabled-`<fieldset>` inheritance, `pointer-events: none` targets, and inert
+  regions. Zero cost on the happy path — the probe only runs after a failure.
+
 ### Changed
 
 - **Generic covers are arbitrated by Playwright, not the one-point hit test.**

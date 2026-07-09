@@ -172,12 +172,46 @@ def test_occluded_click_blocked(server, env):
     r = ebrowse(env, "click", "#covered-btn")
     assert r.returncode == 1
     assert "covered by" in r.stderr
+    # the cover itself is an anonymous backdrop, but the diagnosis names the
+    # open dialog as the thing to resolve
+    assert "dialog is open" in r.stderr and "cookie consent" in r.stderr.lower()
     # dismiss the modal, then the click goes through
     r = ebrowse(env, "click", "#accept-cookies")
     assert r.returncode == 0
     r = ebrowse(env, "click", "#covered-btn")
     assert r.returncode == 0, r.stderr
     assert "Purchase started." in r.stdout
+
+
+def test_blocked_click_names_exposed_cover_ref(server, env):
+    # the covering promo banner has a clickable signal, so it has a ref of its
+    # own — the blocked error must name it as the executable next step
+    ebrowse(env, "open", server.url("covers.html"))
+    buy_a = ref_for(env, "s2", r"\[Buy plan A")
+    r = ebrowse(env, "click", buy_a)
+    assert r.returncode == 1
+    assert "covered by" in r.stderr
+    m = re.search(r"dismiss or interact with (@e\d+)", r.stderr)
+    assert m, r.stderr
+    # following the recovery action unblocks the original click
+    assert ebrowse(env, "click", m.group(1)).returncode == 0
+    r = ebrowse(env, "click", buy_a)
+    assert r.returncode == 0, r.stderr
+    assert "Purchased plan A." in r.stdout
+
+
+def test_blocked_click_honest_about_unexposed_cover(server, env):
+    # an anonymous overlay with no clickable signal has no ref; the error must
+    # say so instead of pointing at an invisible node, and suggest recovery
+    buy_b = ref_for(env, "s2", r"\[Buy plan B")
+    r = ebrowse(env, "click", buy_b)
+    assert r.returncode == 1
+    assert "no exposed ref" in r.stderr
+    assert "press Escape" in r.stderr
+    assert ebrowse(env, "press", "Escape").returncode == 0
+    r = ebrowse(env, "click", buy_b)
+    assert r.returncode == 0, r.stderr
+    assert "partial change" in r.stdout  # the previously-blocked click now lands
 
 
 def test_fancy_radio_clicks_despite_decorative_cover(server, env):

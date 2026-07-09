@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Covers — Fixture</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    header { background: #416; color: #fff; padding: 12px 24px; }
+    header a { color: #fff; margin-right: 12px; }
+    main { max-width: 560px; margin: 0 auto; padding: 24px; }
+    #promo-banner { background: #fc0; border: 1px solid #a80; padding: 4px;
+                    cursor: pointer; z-index: 10; }
+    #ghost-overlay { background: rgba(200, 200, 200, .4); z-index: 10; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/">Fixture Shop</a>
+    <nav aria-label="Main"><a href="/list.html">Products</a> <a href="/help.html">Help</a></nav>
+  </header>
+
+  <main>
+    <h1>Cover playground</h1>
+    <p>Each button below is covered by a different kind of overlay.</p>
+    <p><button type="button" id="buy-a">Buy plan A</button> — covered by a clickable promo banner</p>
+    <p><button type="button" id="buy-b">Buy plan B</button> — covered by an anonymous overlay
+       (Escape removes it)</p>
+    <p id="result">No purchase yet.</p>
+  </main>
+
+  <!-- has an onclick attribute -> discovery exposes it as a ref -->
+  <div id="promo-banner" onclick="this.remove()">Summer sale! Click to dismiss</div>
+  <!-- no clickable signal at all -> never gets a ref -->
+  <div id="ghost-overlay"></div>
+
+  <script>
+    function coverIt(btnId, coverId) {
+      const b = document.getElementById(btnId).getBoundingClientRect();
+      const c = document.getElementById(coverId);
+      c.style.position = 'absolute';
+      c.style.left = (b.left + scrollX - 6) + 'px';
+      c.style.top = (b.top + scrollY - 6) + 'px';
+      c.style.width = (b.width + 12) + 'px';
+      c.style.height = (b.height + 12) + 'px';
+    }
+    coverIt('buy-a', 'promo-banner');
+    coverIt('buy-b', 'ghost-overlay');
+    document.getElementById('buy-a').addEventListener('click', () => {
+      document.getElementById('result').textContent = 'Purchased plan A.';
+    });
+    document.getElementById('buy-b').addEventListener('click', () => {
+      document.getElementById('result').textContent = 'Purchased plan B.';
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const g = document.getElementById('ghost-overlay');
+        if (g) g.remove();
+      }
+    });
+  </script>
+</body>
+</html>

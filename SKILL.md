@@ -92,8 +92,15 @@ Diff vocabulary:
 - `a native confirm dialog is blocking this tab …` (exit 1) — you tried a page
   verb while a dialog is pending. Resolve it with `ebrowse dialog accept|dismiss`,
   or `ebrowse tab <n>` to switch to an unblocked tab.
-- `blocked: @e42 is covered by <dialog "Cookie consent">` (exit 1) — an overlay
-  intercepts the click. Interact with the covering element first.
+- `blocked: @e42 is covered by …` (exit 1) — an overlay intercepts the click.
+  The message names the best next step it could verify:
+  `— dismiss or interact with @eN (…) first` (the cover is itself exposed: act
+  on that ref); `— a dialog is open (…); resolve it first` (use the dialog's
+  controls — run `ebrowse outline` if you haven't seen it); or
+  `…, which has no exposed ref (likely a new overlay)` (re-run
+  `ebrowse outline`; if nothing new appears, try `ebrowse press Escape` or
+  `ebrowse screenshot` to see what's on top). Follow the named step rather
+  than retrying the same click.
 - `blocked: a modal is open ("…") and is intercepting the click` (exit 1) — a
   modal is blocking the page even though it isn't visually over your target
   (native `showModal()` / focus-trap). Don't retry the same click — resolve or

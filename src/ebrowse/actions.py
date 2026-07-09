@@ -7,6 +7,7 @@ mapped to actionable CommandErrors.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 from dataclasses import dataclass, field
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 from ebrowse.core import render
 from ebrowse.core.diff import diff_pages
 from ebrowse.core.locate import resolve
+from ebrowse.core.snapshot import probe_blocker
 from ebrowse.errors import CommandError, ExitCode
 from ebrowse.model import Element, PageMem
 
@@ -225,6 +227,90 @@ class ActionsMixin:
             )
         return info
 
+    def _ref_for_chain(self, chain: list[dict]) -> Element | None:
+        """Map a live cover's ancestor chain (identifying attrs from diagnose.js)
+        to an exposed element, closest ancestor first. Exact id/testid/role+name
+        matches only — naming the wrong ref is worse than naming none."""
+        if not self.page_mem:
+            return None
+        by_id: dict[str, Element] = {}
+        by_tid: dict[str, Element] = {}
+        by_role_name: dict[tuple[str, str], Element] = {}
+        for sec in self.page_mem.sections:
+            for el in sec.elements:
+                d = el.desc
+                if d.id:
+                    by_id.setdefault(d.id, el)
+                if d.testid:
+                    by_tid.setdefault(d.testid, el)
+                if d.role and d.name:
+                    by_role_name.setdefault((d.role, d.name), el)
+        for node in chain:
+            nid, tid = node.get("id"), node.get("tid")
+            role, nm = node.get("role"), node.get("nm")
+            if nid and nid in by_id:
+                return by_id[nid]
+            if tid and tid in by_tid:
+                return by_tid[tid]
+            if role and nm and (role, nm) in by_role_name:
+                return by_role_name[(role, nm)]
+        return None
+
+    async def _blocked_error(self, loc, target: str) -> CommandError | None:
+        """Failure-only diagnosis of a refused click: one probe_blocker evaluate,
+        mapped to an error that names an executable next step — an exposed ref,
+        an open dialog, or an honest limitation. Returns None when nothing can
+        be classified (caller falls back to its generic message)."""
+        if self._active_dialog() is not None:
+            return None  # renderer is frozen by a native dialog; evaluate would hang
+        try:
+            handle = await loc.element_handle(timeout=2000)
+            info = await asyncio.wait_for(probe_blocker(handle), timeout=3)
+        except Exception:
+            return None
+        cover = info.get("cover")
+        dialog = info.get("coverDialog") or info.get("openDialog")
+        exposed = self._ref_for_chain(info.get("chain") or []) if cover else None
+        if cover and exposed is not None:
+            return CommandError(
+                f"blocked: {target} is covered by {cover} — dismiss or interact with "
+                f"{exposed.ref} ({exposed.desc.short_desc()}) first",
+                ExitCode.ACTION_FAILED,
+            )
+        if cover and dialog:
+            return CommandError(
+                f"blocked: {target} is covered by {cover} — a dialog is open ({dialog}); "
+                "resolve it first (run 'ebrowse outline' to see its controls)",
+                ExitCode.ACTION_FAILED,
+            )
+        if cover:
+            return CommandError(
+                f"blocked: {target} is covered by {cover}, which has no exposed ref "
+                "(likely a new overlay) — run 'ebrowse outline' to re-read the page, or "
+                "try 'ebrowse press Escape' / 'ebrowse screenshot'",
+                ExitCode.ACTION_FAILED,
+            )
+        if info.get("disabledFieldset"):
+            return CommandError(
+                f"blocked: {target} is inside a disabled <fieldset> — the form section "
+                "must be enabled first (look for a control that unlocks it)",
+                ExitCode.ACTION_FAILED,
+            )
+        if info.get("pointerEvents") == "none":
+            return CommandError(
+                f"blocked: {target} has pointer-events: none — it never receives clicks; "
+                "run 'ebrowse expand' on its section to find the visible control instead",
+                ExitCode.ACTION_FAILED,
+            )
+        if info.get("inert") or dialog:
+            what = dialog or "an inert region"
+            return CommandError(
+                f"blocked: {target} is blocked by {what} — resolve or dismiss it first "
+                "(run 'ebrowse outline' to see it)",
+                ExitCode.ACTION_FAILED,
+            )
+        return None
+
     async def _click_via_label(self, loc) -> bool:
         """Click a form control's associated <label> instead of the control
         itself (browser semantics forward label activation to the control).
@@ -303,10 +389,11 @@ class ActionsMixin:
             )
         return render.render_diff(action_line, diff, self.raw_by_sid, self.cfg.observe)
 
-    async def _act(self, action_line: str, fn) -> str:
+    async def _act(self, action_line: str, fn, loc=None, target: str = "") -> str:
         """The action pipeline shared by every atomic verb. Compound verbs
         (compound.py) use _begin_action/_finish_action directly so several
-        steps produce ONE diff."""
+        steps produce ONE diff. When `loc`/`target` are given, a Playwright
+        interception failure is enriched with the blocker diagnosis."""
         await self._ensure_browser()
         begin_state = self._begin_action()
         try:
@@ -328,6 +415,10 @@ class ActionsMixin:
                         "the click — interact with it or dismiss it first",
                         ExitCode.ACTION_FAILED,
                     ) from e
+                if loc is not None and "intercepts pointer events" in str(e):
+                    err = await self._blocked_error(loc, target or action_line)
+                    if err is not None:
+                        raise err from e
                 raise _map_playwright_error(e) from e
         return await self._finish_action(action_line, begin_state)
 
@@ -357,7 +448,8 @@ class ActionsMixin:
                 try:
                     await loc.click(trial=True, timeout=_TRIAL_TIMEOUT_MS)
                 except Exception as e:
-                    raise CommandError(
+                    err = await self._blocked_error(loc, target)
+                    raise err or CommandError(
                         f"blocked: {target} is covered by {info['covering']} — interact "
                         "with that first (run 'ebrowse outline' to see it)",
                         ExitCode.ACTION_FAILED,
@@ -372,7 +464,7 @@ class ActionsMixin:
             await loc.click(**kwargs)
 
         verb = "DBLCLICK" if double else ("RIGHTCLICK" if right else "CLICK")
-        return await self._act(f"{verb} {desc}", do)
+        return await self._act(f"{verb} {desc}", do, loc=loc, target=target)
 
     async def verb_fill(self, target: str, text: str) -> str:
         loc, desc = await self._locator_for(target)
@@ -380,7 +472,7 @@ class ActionsMixin:
         async def do() -> None:
             await loc.fill(text, timeout=_ACTION_TIMEOUT_MS)
 
-        return await self._act(f'FILL {desc} = "{_clip(text)}"', do)
+        return await self._act(f'FILL {desc} = "{_clip(text)}"', do, loc=loc, target=target)
 
     async def verb_type(self, target: str, text: str, enter: bool = False) -> str:
         loc, desc = await self._locator_for(target)
@@ -392,7 +484,7 @@ class ActionsMixin:
                 await loc.press("Enter", timeout=_ACTION_TIMEOUT_MS)
 
         suffix = " +Enter" if enter else ""
-        return await self._act(f'TYPE {desc} "{_clip(text)}"{suffix}', do)
+        return await self._act(f'TYPE {desc} "{_clip(text)}"{suffix}', do, loc=loc, target=target)
 
     async def verb_press(self, keys: str) -> str:
         async def do() -> None:
@@ -406,7 +498,9 @@ class ActionsMixin:
         async def do() -> None:
             await loc.set_checked(checked, timeout=_ACTION_TIMEOUT_MS)
 
-        return await self._act(f"{'CHECK' if checked else 'UNCHECK'} {desc}", do)
+        return await self._act(
+            f"{'CHECK' if checked else 'UNCHECK'} {desc}", do, loc=loc, target=target
+        )
 
     async def verb_select(self, target: str, value: str) -> str:
         element, desc = self._element_for(target)
@@ -421,7 +515,7 @@ class ActionsMixin:
             except Exception:
                 await loc.select_option(value=value, timeout=_ACTION_TIMEOUT_MS)
 
-        return await self._act(f'SELECT {desc} = "{_clip(value)}"', do)
+        return await self._act(f'SELECT {desc} = "{_clip(value)}"', do, loc=loc, target=target)
 
     async def verb_scroll(self, direction: str, pages: int = 1) -> str:
         await self._ensure_browser()
@@ -471,7 +565,7 @@ class ActionsMixin:
         async def do() -> None:
             await loc.set_input_files(files, timeout=_ACTION_TIMEOUT_MS)
 
-        return await self._act(f"UPLOAD {desc} ← {len(files)} file(s)", do)
+        return await self._act(f"UPLOAD {desc} ← {len(files)} file(s)", do, loc=loc, target=target)
 
     async def verb_eval(self, js: str) -> str:
         await self._ensure_browser()

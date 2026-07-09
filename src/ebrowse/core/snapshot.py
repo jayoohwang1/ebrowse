@@ -12,7 +12,9 @@ from pathlib import Path
 from typing import Any
 
 _JS_PATH = Path(__file__).parent / "js" / "discover.js"
+_DIAGNOSE_JS_PATH = Path(__file__).parent / "js" / "diagnose.js"
 _js_cache: str | None = None
+_diagnose_cache: str | None = None
 
 
 def discover_js() -> str:
@@ -22,6 +24,17 @@ def discover_js() -> str:
 
         _js_cache = render_js_template(_JS_PATH.read_text())
     return _js_cache
+
+
+async def probe_blocker(handle) -> dict[str, Any]:
+    """Failure-only diagnostic: classify what is blocking a refused click.
+    One evaluate against the target's element handle, in its own frame
+    (js/diagnose.js). Raises whatever the evaluate raises — callers treat
+    this as best-effort."""
+    global _diagnose_cache
+    if _diagnose_cache is None:
+        _diagnose_cache = _DIAGNOSE_JS_PATH.read_text()
+    return await handle.evaluate(_diagnose_cache)
 
 
 @dataclass(slots=True)
