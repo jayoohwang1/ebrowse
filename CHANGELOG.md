@@ -18,9 +18,11 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 - **Section summaries are now synchronous**, filled during `outline` under a hard
   `summarizer.sync_timeout_s` (default 30s) alongside the visual glance (they run
   concurrently), instead of an async background backfill. No more
-  `backfill running` status; a slow/dead sidecar degrades to deterministic labels
-  with a status note. `outline --wait-summaries` is removed (summaries always
-  wait now); `--no-summaries` stays and `--no-glance` is added. See docs/adr/0008.
+  `backfill running` status; a slow/dead sidecar — or any error in the
+  summarizer/cache stack — degrades to deterministic labels with a status note,
+  so enrichment can never fail an `outline`. `outline --wait-summaries` is
+  removed (summaries always wait now); `--no-summaries` stays and `--no-glance`
+  is added. See docs/adr/0008.
 
 ### Added
 

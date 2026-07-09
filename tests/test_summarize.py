@@ -148,6 +148,56 @@ def _is_image_body(body: dict) -> bool:
     return isinstance(content, list) and any(p.get("type") == "image_url" for p in content)
 
 
+class _BoomCache:
+    """A SummaryCache stand-in whose disk ops fail, to prove enrichment stays
+    non-load-bearing (principle 1) when the cache layer breaks."""
+
+    def __init__(self, *, read_raises: bool = False) -> None:
+        self._read_raises = read_raises
+
+    def get_many(self, hashes):
+        if self._read_raises:
+            raise RuntimeError("cache read boom")
+        return {}
+
+    def put_many(self, mapping):
+        raise RuntimeError("cache write boom")
+
+    def get_screen(self, key):
+        return None
+
+    def put_screen(self, key, gist):
+        raise RuntimeError("cache write boom")
+
+
+async def test_enrichment_survives_cache_failure():
+    """A cache-layer error mid-enrichment must never fail the outline: a write
+    failure degrades to a status note; a read failure is swallowed. Either way
+    _apply_enrichment returns instead of raising (the deterministic outline
+    still renders)."""
+    from ebrowse.config import Config
+    from ebrowse.session import Session
+
+    with MockSummarizer() as mock:
+        # summaries generate fine, but the cache WRITE raises -> caught + degraded
+        cfg = Config()
+        cfg.summarizer = SummarizerConfig(base_url=mock.base_url, vision=False, timeout_s=10)
+        s = Session("t", cfg)
+        s.page_mem = _page("list")
+        s._cache = _BoomCache()  # type: ignore[assignment]
+        note = await s._apply_enrichment(no_summaries=False, no_glance=True)
+        assert note and "summaries" in note  # a degrade note, not an exception
+        assert mock.requests  # it really did reach the sidecar before the cache blew up
+        await s._summarizer.aclose()
+
+        # a cache READ failure is swallowed too (no summarizer call, no raise)
+        s2 = Session("t", cfg)
+        s2.page_mem = _page("list")
+        s2._cache = _BoomCache(read_raises=True)  # type: ignore[assignment]
+        assert await s2._apply_enrichment(no_summaries=False, no_glance=True) is None
+        await s2._summarizer.aclose()
+
+
 async def test_extra_body_merged_into_request():
     page = _page("list")
     extra = {"chat_template_kwargs": {"enable_thinking": False}}

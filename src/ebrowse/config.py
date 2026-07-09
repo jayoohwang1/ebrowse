@@ -46,9 +46,12 @@ class SummarizerConfig:
     glance: bool = True
     max_input_tokens: int = 100_000
     timeout_s: int = 60
-    # Hard per-call deadline for the SYNCHRONOUS outline enrichment (text
-    # summaries + auto glance). On timeout the outline renders deterministically
-    # (never load-bearing). Keep generous enough for a slow local sidecar.
+    # Per-*call* deadline for the SYNCHRONOUS outline enrichment (text summaries
+    # + auto glance). On timeout the outline renders deterministically (never
+    # load-bearing). Note it bounds each sidecar call, not the whole stage: the
+    # summaries path may fire one JSON-only reprompt (see summarize/batch.py), so
+    # its worst-case wall time is ~2× this. Kept well under the daemon verb
+    # ceiling. Keep generous enough for a slow local sidecar.
     sync_timeout_s: int = 30
     # Manual `describe-screen`: patient, agent-initiated visual queries. A high
     # token ceiling lets the agent ask for exhaustive detail; a long timeout

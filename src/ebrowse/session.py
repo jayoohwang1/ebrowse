@@ -286,7 +286,17 @@ class Session(CompoundMixin, ActionsMixin):
         page = self._require_page_mem()
         note = None
         if self.cfg.summarizer.enabled:
-            note = await self._apply_enrichment(no_summaries=no_summaries, no_glance=no_glance)
+            # Enrichment is never load-bearing: the deterministic outline must
+            # render even if the summarizer/cache stack fails. Each stage guards
+            # + logs itself (below); this is the final backstop for anything
+            # unforeseen, so a broken sidecar can never fail an `outline`.
+            try:
+                note = await self._apply_enrichment(no_summaries=no_summaries, no_glance=no_glance)
+            except Exception as e:
+                logger.warning(
+                    f"outline enrichment failed entirely: {type(e).__name__}: {_first_line(e)}"
+                )
+                note = "enrichment unavailable — deterministic labels shown"
         return render.render_outline(
             page,
             note,
@@ -359,11 +369,24 @@ class Session(CompoundMixin, ActionsMixin):
 
         text_pending = False
         if not no_summaries:
-            self._fill_from_cache()
-            text_pending = any(s.summary is None and not s.cross_origin for s in page.sections)
+            try:
+                self._fill_from_cache()
+                text_pending = any(s.summary is None and not s.cross_origin for s in page.sections)
+            except Exception as e:
+                logger.warning(
+                    f"outline enrichment: summary cache read failed: "
+                    f"{type(e).__name__}: {_first_line(e)}"
+                )
         glance_pending = False
         if not no_glance and cfg.glance and cfg.vision:
-            cached = self._summary_cache().get_screen(self._screen_key(page))
+            try:
+                cached = self._summary_cache().get_screen(self._screen_key(page))
+            except Exception as e:
+                logger.warning(
+                    f"outline enrichment: glance cache read failed: "
+                    f"{type(e).__name__}: {_first_line(e)}"
+                )
+                cached = None
             if cached:
                 page.screen_gist = cached
             else:
@@ -372,7 +395,14 @@ class Session(CompoundMixin, ActionsMixin):
         if not text_pending and not glance_pending:
             return None
         if not self._summarizer.available:
-            return "summaries: sidecar unavailable — deterministic labels shown"
+            # Only the kind(s) actually pending are degraded — don't blame
+            # summaries when only the glance needed the (unavailable) sidecar.
+            unavailable = []
+            if text_pending:
+                unavailable.append("summaries: sidecar unavailable — deterministic labels shown")
+            if glance_pending:
+                unavailable.append("glance: sidecar unavailable")
+            return " · ".join(unavailable)
 
         jobs = []
         if text_pending:
@@ -384,22 +414,30 @@ class Session(CompoundMixin, ActionsMixin):
 
     async def _gen_summaries(self, page: PageMem) -> str | None:
         """One synchronous batched summary call; cache + fill results. Returns a
-        status note only if some sections remain unlabeled (slow/incomplete)."""
+        status note only if some sections remain unlabeled (slow/incomplete).
+        Any failure (sidecar or cache write) is caught + logged under this stage
+        and degrades to deterministic labels — never fails the outline."""
         cfg = self.cfg.summarizer
-        parsed = await summarize_page(
-            self._summarizer,
-            page,
-            self._section_texts(),
-            cfg.max_input_tokens,
-            timeout_s=cfg.sync_timeout_s,
-            retry=False,
-        )
-        if parsed:
-            by_sid = {s.sid: s for s in page.sections}
-            self._summary_cache().put_many(
-                {by_sid[sid].content_hash: summary for sid, summary in parsed.items()}
+        try:
+            parsed = await summarize_page(
+                self._summarizer,
+                page,
+                self._section_texts(),
+                cfg.max_input_tokens,
+                timeout_s=cfg.sync_timeout_s,
+                retry=False,
             )
-            self._fill_from_cache()
+            if parsed:
+                by_sid = {s.sid: s for s in page.sections}
+                self._summary_cache().put_many(
+                    {by_sid[sid].content_hash: summary for sid, summary in parsed.items()}
+                )
+                self._fill_from_cache()
+        except Exception as e:
+            logger.warning(
+                f"outline enrichment: summaries stage failed: {type(e).__name__}: {_first_line(e)}"
+            )
+            return "summaries: enrichment failed (deterministic labels shown)"
         pending = sum(1 for s in page.sections if s.summary is None and not s.cross_origin)
         if pending:
             total = sum(1 for s in page.sections if not s.cross_origin)
@@ -408,21 +446,36 @@ class Session(CompoundMixin, ActionsMixin):
 
     async def _gen_glance(self, page: PageMem) -> str | None:
         """Screenshot the viewport and get one VLM visual gist, synchronously.
-        Sets page.screen_gist + caches it. Returns a note only on failure."""
+        Sets page.screen_gist + caches it. Returns a note only on failure. Each
+        stage (screenshot, VLM, cache write) is caught + logged by name so the
+        log points at where it broke; failure degrades to no ◉ line."""
         cfg = self.cfg.summarizer
         try:
             png_b64 = await self._viewport_png_b64()
         except Exception as e:
-            logger.debug(f"glance screenshot failed: {e}")
+            logger.warning(
+                f"outline enrichment: glance screenshot failed: {type(e).__name__}: {_first_line(e)}"
+            )
             return "glance: screenshot failed"
-        gist = await caption_screen(
-            self._summarizer, png_b64, timeout_s=cfg.sync_timeout_s, retry=False
-        )
-        if gist:
-            page.screen_gist = gist
+        try:
+            gist = await caption_screen(
+                self._summarizer, png_b64, timeout_s=cfg.sync_timeout_s, retry=False
+            )
+        except Exception as e:
+            logger.warning(
+                f"outline enrichment: glance VLM call failed: {type(e).__name__}: {_first_line(e)}"
+            )
+            return "glance: sidecar slow or unavailable"
+        if not gist:
+            return "glance: sidecar slow or unavailable"
+        page.screen_gist = gist  # shown this outline even if the cache write below fails
+        try:
             self._summary_cache().put_screen(self._screen_key(page), gist)
-            return None
-        return "glance: sidecar slow or unavailable"
+        except Exception as e:
+            logger.warning(
+                f"outline enrichment: glance cache write failed: {type(e).__name__}: {_first_line(e)}"
+            )
+        return None
 
     def _screen_key(self, page: PageMem) -> str:
         """Cache key for the visual glance. Deterministic from the page's DOM
@@ -512,9 +565,7 @@ class Session(CompoundMixin, ActionsMixin):
         await self._ensure_browser()
         if self.page.url in ("about:blank", ""):
             raise CommandError("no page open — run 'ebrowse open <url>' first", ExitCode.USAGE)
-        return await self.observe(
-            no_summaries=no_summaries, no_glance=no_glance, preview=preview
-        )
+        return await self.observe(no_summaries=no_summaries, no_glance=no_glance, preview=preview)
 
     async def verb_expand(self, target: str, cursor: int = 0, show_all: bool = False) -> str:
         page_mem = self._require_page_mem()
@@ -742,7 +793,9 @@ class Session(CompoundMixin, ActionsMixin):
         self._notes = []
         self.nav_id += 1
         await self._observe_page()
-        return self._with_notes(f"switched to tab {index}: {await self._page_ident()}\n{_OUTLINE_HINT}")
+        return self._with_notes(
+            f"switched to tab {index}: {await self._page_ident()}\n{_OUTLINE_HINT}"
+        )
 
     async def verb_dialog(self, response: str, text: str | None = None) -> str:
         """Resolve or inspect the native dialog blocking the current tab.

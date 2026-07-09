@@ -66,8 +66,10 @@ s5 iframe  (cross-origin: ads.doubleclick.net)
   only what is visible and flags overlays/modals/interstitials the DOM outline
   can't convey. Absent otherwise. `outline --no-glance` suppresses it per call.
 - Summaries + glance are filled **synchronously** before the outline returns
-  (concurrently, under `summarizer.sync_timeout_s`). Cache hits are free; a slow/
-  dead sidecar degrades to deterministic labels + no `◉` line, with a status note
+  (concurrently, under `summarizer.sync_timeout_s` — which bounds each sidecar
+  call; the summaries path may fire one JSON-only reprompt, so its worst case is
+  ~2× that). Cache hits are free; a slow/dead sidecar (or a cache-layer error)
+  degrades to deterministic labels + no `◉` line, with a status note
   (`summaries: 2/4 (sidecar slow or incomplete) · glance: sidecar slow or unavailable`).
   There is no async "backfill running" phase.
 - `~Nt` is the token estimate of expanding that section (`len(rendered)//4`) — the

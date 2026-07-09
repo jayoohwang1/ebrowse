@@ -33,6 +33,7 @@ _LONG_VERB_TIMEOUT_S: dict[str, int] = {"describe-screen": 210}
 def _verb_timeout(verb: str) -> int:
     return _LONG_VERB_TIMEOUT_S.get(verb, _VERB_TIMEOUT_S)
 
+
 # Verbs allowed while a native dialog blocks the current tab: resolve it, or
 # escape to another tab / re-attach / close. Everything else would touch the
 # frozen page and is refused with a recovery hint.

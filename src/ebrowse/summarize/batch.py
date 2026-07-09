@@ -137,7 +137,9 @@ async def summarize_page(
     valid = {s.sid for s in page.sections}
     parsed = parse_summaries(raw, valid)
     if not parsed:
-        # one strict retry: some models chat before the JSON
+        # one strict retry: some models chat before the JSON. This is a second
+        # call under the same `timeout_s`, so the summaries stage can take up to
+        # ~2× that deadline in the worst case (documented on sync_timeout_s).
         raw2 = await client.chat(
             messages + [
                 {"role": "assistant", "content": raw[:500]},

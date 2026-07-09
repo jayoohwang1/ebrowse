@@ -49,9 +49,7 @@ class MockSummarizer:
                     (m["content"] for m in body.get("messages", []) if m["role"] == "user"), ""
                 )
                 if _is_image_request(user):
-                    self._reply(
-                        {"choices": [{"message": {"role": "assistant", "content": _GIST}}]}
-                    )
+                    self._reply({"choices": [{"message": {"role": "assistant", "content": _GIST}}]})
                     return
                 sids = sorted(set(re.findall(r"\b(s\d+) type=", user)), key=lambda s: int(s[1:]))
                 rows = [{"sid": sid, "summary": f"MOCK {sid} summary"} for sid in sids]
