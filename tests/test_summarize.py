@@ -16,7 +16,12 @@ from ebrowse.config import ObserveConfig, SummarizerConfig
 from ebrowse.core.fingerprint import RefRegistry
 from ebrowse.core.pipeline import build_page
 from ebrowse.core.snapshot import DomSnapshot
-from ebrowse.summarize.batch import build_messages, parse_summaries, summarize_page
+from ebrowse.summarize.batch import (
+    build_messages,
+    caption_screen,
+    parse_summaries,
+    summarize_page,
+)
 from ebrowse.summarize.cache import SummaryCache
 from ebrowse.summarize.client import SummarizerClient
 from tests.fixture_server import FixtureServer
@@ -86,6 +91,9 @@ def test_cache_round_trip(tmp_path):
     cache.put_caption("img1", "a red bicycle")
     assert cache.get_caption("img1") == "a red bicycle"
     assert cache.get_caption("img2") is None
+    cache.put_screen("scr1", "a checkout page with a cookie banner")
+    assert cache.get_screen("scr1") == "a checkout page with a cookie banner"
+    assert cache.get_screen("scr2") is None
     cache.close()
 
 
@@ -102,6 +110,42 @@ async def test_batch_against_mock_server():
     for sid, summary in out.items():
         assert summary == f"MOCK {sid} summary"
     assert len(mock.requests) == 1  # ONE batched call for the whole page
+
+
+async def test_caption_screen_uses_default_and_custom_prompt():
+    with MockSummarizer() as mock:
+        client = SummarizerClient(
+            SummarizerConfig(base_url=mock.base_url, timeout_s=10, vision=True)
+        )
+        # default gist (no prompt) — server sees an image request, returns the gist
+        gist = await caption_screen(client, "ZmFrZQ==")
+        assert gist == "MOCK visual gist: a page with no overlays"
+        assert _is_image_body(mock.requests[-1])
+        # a custom prompt rides in the same image message
+        gist2 = await caption_screen(client, "ZmFrZQ==", prompt="what color is the button?")
+        assert gist2
+        texts = [
+            p["text"]
+            for p in mock.requests[-1]["messages"][0]["content"]
+            if p.get("type") == "text"
+        ]
+        assert texts == ["what color is the button?"]
+        await client.aclose()
+
+
+async def test_caption_screen_disabled_when_vision_off():
+    with MockSummarizer() as mock:
+        client = SummarizerClient(
+            SummarizerConfig(base_url=mock.base_url, timeout_s=10, vision=False)
+        )
+        assert await caption_screen(client, "ZmFrZQ==") is None
+        assert not mock.requests  # never hit the server
+        await client.aclose()
+
+
+def _is_image_body(body: dict) -> bool:
+    content = body["messages"][0]["content"]
+    return isinstance(content, list) and any(p.get("type") == "image_url" for p in content)
 
 
 async def test_extra_body_merged_into_request():
@@ -163,16 +207,35 @@ def test_outline_shows_mock_summaries(tmp_path):
             )
 
         try:
+            # navigation lands; it does NOT run the summarizer
             r = run("open", srv.url("article.html"))
             assert r.returncode == 0, r.stderr
-            assert "backfill running" in r.stdout or "≈" in r.stdout
+            assert r.stdout.startswith("opened ")
+            assert "≈" not in r.stdout and "◉" not in r.stdout
 
-            r = run("outline", "--wait-summaries")
+            # the explicit outline synchronously fills ≈ labels AND the ◉ gist,
+            # in one shot (no async "backfill running" phase)
+            r = run("outline")
             assert r.returncode == 0, r.stderr
             assert re.search(r"≈ MOCK s\d+ summary", r.stdout)
+            assert "◉ MOCK visual gist" in r.stdout
             assert "backfill" not in r.stdout
 
+            # opt-outs
             r = run("outline", "--no-summaries")
             assert "≈" not in r.stdout and '| "' in r.stdout
+            assert "◉ MOCK visual gist" in r.stdout  # glance still shown
+            r = run("outline", "--no-glance")
+            assert "◉" not in r.stdout and re.search(r"≈ MOCK s\d+ summary", r.stdout)
+
+            # describe-screen: no prompt → the cached/default gist
+            r = run("describe-screen")
+            assert r.returncode == 0, r.stderr
+            assert r.stdout.strip().startswith("◉ MOCK visual gist")
+
+            # describe-screen with a free-form prompt reaches the VLM
+            r = run("describe-screen", "list every button")
+            assert r.returncode == 0, r.stderr
+            assert r.stdout.strip().startswith("◉ ")
         finally:
             run("daemon", "stop")

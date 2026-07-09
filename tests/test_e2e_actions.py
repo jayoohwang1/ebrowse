@@ -212,14 +212,19 @@ def test_iframe_form_flow(server, env):
     assert "Payment accepted." in r.stdout
 
 
-def test_link_click_is_navigation_with_unchanged_marks(server, env):
+def test_link_click_is_navigation_landing(server, env):
     ebrowse(env, "open", server.url("list.html"))
     ebrowse(env, "open", server.url("form.html"))
     link = ref_for(env, "s1", r"\[Products")
     r = ebrowse(env, "click", link)
     assert r.returncode == 0, r.stderr
+    # a navigating action returns a landing line, not a full outline
     assert "→ navigation" in r.stdout
-    assert "PAGE Espresso Gear" in r.stdout
+    assert "now at" in r.stdout and "list.html" in r.stdout
+    assert "run 'ebrowse outline'" in r.stdout
+    assert "PAGE" not in r.stdout
+    # durable refs stay live post-navigation without an explicit outline
+    assert "Espresso Gear" in ebrowse(env, "outline").stdout
 
 
 def test_scroll_reports_position(server, env):
@@ -239,3 +244,29 @@ def test_stale_ref_errors_cleanly(server, env):
     r = ebrowse(env, "click", "@e99999")
     assert r.returncode == 2
     assert "stale ref" in r.stderr or "outline" in r.stderr
+
+
+def test_native_dialog_expands_and_blocks_outside(server, env):
+    ebrowse(env, "open", server.url("native_modal.html"))
+    # a native <dialog>.showModal() surfaces as a dialog section, expanded inline
+    r = ebrowse(env, "click", "#open-native")
+    assert r.returncode == 0, r.stderr
+    assert "→ dialog" in r.stdout
+    assert "## " in r.stdout and "Close" in r.stdout and "(@e" in r.stdout
+    # the modal's backdrop covers the page → outside click blocked geometrically
+    r = ebrowse(env, "click", "#outside")
+    assert r.returncode == 1
+    assert "blocked" in r.stderr and "dialog" in r.stderr.lower()
+
+
+def test_inert_modal_coalesced_and_names_block(server, env):
+    ebrowse(env, "open", server.url("inert_modal.html"))
+    # an aria-modal div coalesced into the content section is still flagged dialog
+    r = ebrowse(env, "click", "#open")
+    assert r.returncode == 0, r.stderr
+    assert "→ dialog" in r.stdout and "[dialog]" in r.stdout
+    # it blocks the page via inert (no covering element) → Playwright can't click;
+    # the error names the specific modal instead of "an overlay is probably open"
+    r = ebrowse(env, "click", "#outside")
+    assert r.returncode == 1
+    assert "modal is open" in r.stderr and "Trap modal" in r.stderr

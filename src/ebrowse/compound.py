@@ -111,7 +111,7 @@ class CompoundMixin(ActionsMixin):
         except Exception as e:
             raise _map_playwright_error(e) from e
         await self._quiesce()
-        await self.observe(no_summaries=True)
+        await self._observe_page()
         return _revealed_elements(prev, self._require_page_mem())
 
     async def _match_one(self, value: str, revealed: list[Element]) -> Element:
@@ -331,7 +331,7 @@ class CompoundMixin(ActionsMixin):
         await self._quiesce()
 
         # suggestions?
-        await self.observe(no_summaries=True)
+        await self._observe_page()
         revealed = _revealed_elements(begin_state.page, self._require_page_mem())
 
         if pick:
@@ -344,7 +344,7 @@ class CompoundMixin(ActionsMixin):
                 # quiet while the request is in flight — recreation.gov). Wait
                 # briefly, re-observe, and match option-ish elements page-wide.
                 await asyncio.sleep(1.2)
-                await self.observe(no_summaries=True)
+                await self._observe_page()
                 fallback = [
                     e
                     for s in self._require_page_mem().sections

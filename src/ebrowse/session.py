@@ -7,7 +7,9 @@ its asyncio lock, so verb code never races itself.
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
+import hashlib
 import tempfile
 import time
 from dataclasses import dataclass
@@ -32,11 +34,15 @@ from ebrowse.core.snapshot import capture
 from ebrowse.core.split import RawSection
 from ebrowse.errors import CommandError, ExitCode
 from ebrowse.model import PageMem, Section
-from ebrowse.summarize.batch import caption_image, summarize_page
+from ebrowse.summarize.batch import caption_image, caption_screen, summarize_page
 from ebrowse.summarize.cache import SummaryCache
 from ebrowse.summarize.client import SummarizerClient
 
 GOTO_TIMEOUT_MS = 45_000
+
+# Every navigation/landing result ends with this so the agent knows the next
+# move (observation is explicit — navigation no longer dumps a full outline).
+_OUTLINE_HINT = "run 'ebrowse outline' to read the page"
 
 # Kept in sync with ebrowse.dev: full-chromium new headless + a plain Chrome UA
 # passes Akamai fronts that reject the default headless shell (see
@@ -120,14 +126,18 @@ class Session(CompoundMixin, ActionsMixin):
         self.raw_by_sid: dict[str, RawSection] = {}
         self.nav_id = 0
         self._notes: list[str] = []  # dialog/popup events surfaced in the next diff
+        # set by a click's occlusion pre-check when a modal blocks the page WITHOUT
+        # covering the target (native showModal top-layer / aria-modal focus trap);
+        # surfaced as a hint only if that click then registers no change
+        self._blocking_modal: str | None = None
         # native confirm/prompt dialogs awaiting an agent decision, keyed by the
         # page they blocked (a dialog on a background tab must not block the active one)
         self._pending_dialogs: dict[Page, PendingDialog] = {}
-        # summarizer sidecar (never load-bearing)
+        # summarizer sidecar (never load-bearing): outline enrichment (text
+        # summaries + visual glance) runs synchronously with a hard timeout;
+        # a slow/dead sidecar degrades outlines to deterministic labels.
         self._summarizer = SummarizerClient(cfg.summarizer)
         self._cache: SummaryCache | None = None
-        self._backfill_task: asyncio.Task | None = None
-        self._backfill_sig: frozenset[str] = frozenset()
 
     # ------------------------------------------------------------ browser ----
 
@@ -241,8 +251,6 @@ class Session(CompoundMixin, ActionsMixin):
         self.page_mem = None
         self.raw_by_sid = {}
         self._pending_dialogs = {}
-        if self._backfill_task and not self._backfill_task.done():
-            self._backfill_task.cancel()
         with contextlib.suppress(Exception):
             await self._summarizer.aclose()
         if self._cache is not None:
@@ -251,11 +259,11 @@ class Session(CompoundMixin, ActionsMixin):
 
     # -------------------------------------------------------- observation ----
 
-    async def observe(
-        self, wait_summaries: bool = False, no_summaries: bool = False, preview: bool = False
-    ) -> str:
-        """Capture -> build PageMem -> apply/queue summaries -> outline text.
-        The one observation path (actions and navigation verbs go through it)."""
+    async def _observe_page(self) -> None:
+        """Capture -> build PageMem + raw sections. Deterministic, no LLM, no
+        render. The shared rebuild behind navigation, actions, and outline —
+        this is what keeps durable @refs live after a navigation without an
+        explicit outline."""
         # a native confirm/prompt blocks the renderer main thread, so capture()'s
         # evaluate would hang; refuse fast with the recovery action instead
         if (warn := self.dialog_block_warning("outline")) is not None:
@@ -267,15 +275,62 @@ class Session(CompoundMixin, ActionsMixin):
         self.page_mem, self.raw_by_sid = build_page(
             snap, self.registry, self.cfg.observe, nav_id=self.nav_id
         )
+
+    async def observe(
+        self, no_summaries: bool = False, no_glance: bool = False, preview: bool = False
+    ) -> str:
+        """Rebuild + synchronous enrichment (summaries + visual glance) + render
+        the outline. The ONLY path that runs the summarizer — navigation verbs
+        return a landing line and defer this to an explicit `outline`."""
+        await self._observe_page()
+        page = self._require_page_mem()
         note = None
-        if not no_summaries and self.cfg.summarizer.enabled:
-            note = await self._apply_summaries(wait_summaries)
+        if self.cfg.summarizer.enabled:
+            note = await self._apply_enrichment(no_summaries=no_summaries, no_glance=no_glance)
         return render.render_outline(
-            self.page_mem,
+            page,
             note,
             preview=preview,
             preview_chars=self.cfg.observe.combined_preview_chars,
         )
+
+    # -------------------------------------------------------------- landing ----
+
+    async def _page_ident(self) -> str:
+        """`<url>  ·  "<title>"` — the orientation line for navigation results."""
+        title = ""
+        with contextlib.suppress(Exception):
+            title = (await self.page.title()).strip()[:80]
+        ident = self.page.url
+        if title:
+            ident += f'  ·  "{title}"'
+        return ident
+
+    def _with_notes(self, text: str) -> str:
+        """Append surfaced dialog/popup notes (mirrors the diff's note lines)."""
+        return text + "".join(f"\nnote: {n}" for n in self._notes)
+
+    async def _nav_landing(self, action_line: str) -> str:
+        """Landing result for an action that navigated (page_mem already rebuilt
+        by the caller). Mirrors the navigation-verb landing: the outcome arrow is
+        on the FIRST line, compound step lines follow, then orientation + hint."""
+        head, _, steps = action_line.partition("\n")
+        lines = [f"{head} → navigation"]
+        if steps:
+            lines.append(steps)
+        lines.append(f"now at {await self._page_ident()}")
+        lines.append(_OUTLINE_HINT)
+        return self._with_notes("\n".join(lines))
+
+    def _no_baseline_landing(self, action_line: str) -> str:
+        """Result for an action taken (via CSS) before any outline — same page,
+        but no prior observation to diff against."""
+        head, _, steps = action_line.partition("\n")
+        lines = [f"{head} → done"]
+        if steps:
+            lines.append(steps)
+        lines.append(f"(no prior outline to diff — {_OUTLINE_HINT})")
+        return self._with_notes("\n".join(lines))
 
     # ------------------------------------------------------------ summaries ----
 
@@ -293,43 +348,95 @@ class Session(CompoundMixin, ActionsMixin):
             s.summary = cached.get(s.content_hash)
         return len(cached), len(sections)
 
-    async def _apply_summaries(self, wait: bool) -> str | None:
-        """Fill summaries from cache; backfill misses (inline when `wait`).
-        Returns the outline status note, or None when nothing is pending."""
-        page_mem = self._require_page_mem()
-        have, total = self._fill_from_cache()
-        if have == total:
+    async def _apply_enrichment(self, no_summaries: bool, no_glance: bool) -> str | None:
+        """Synchronously fill section summaries and the ◉ visual glance: cache
+        hits are free, misses are generated by the sidecar under a hard timeout
+        (cfg.sync_timeout_s). Text and glance run concurrently. On timeout/
+        failure the outline degrades to deterministic labels (never load-bearing).
+        Returns an outline status note, or None when nothing was pending."""
+        page = self._require_page_mem()
+        cfg = self.cfg.summarizer
+
+        text_pending = False
+        if not no_summaries:
+            self._fill_from_cache()
+            text_pending = any(s.summary is None and not s.cross_origin for s in page.sections)
+        glance_pending = False
+        if not no_glance and cfg.glance and cfg.vision:
+            cached = self._summary_cache().get_screen(self._screen_key(page))
+            if cached:
+                page.screen_gist = cached
+            else:
+                glance_pending = True
+
+        if not text_pending and not glance_pending:
             return None
         if not self._summarizer.available:
-            return "summaries: unavailable (deterministic labels shown)"
-        if wait:
-            await self._backfill(page_mem, self._section_texts())
-            self._fill_from_cache()
-            return None
-        missing = frozenset(
-            s.content_hash for s in page_mem.sections if s.summary is None and not s.cross_origin
-        )
-        already_running = (
-            self._backfill_task and not self._backfill_task.done() and missing <= self._backfill_sig
-        )
-        if not already_running:
-            # snapshot page + texts now: the task runs outside the session lock
-            # and must not race later observations
-            page, texts = page_mem, self._section_texts()
-            self._backfill_sig = missing
-            self._backfill_task = asyncio.create_task(self._backfill(page, texts))
-            self._backfill_task.add_done_callback(_log_task_error)
-        return f"summaries: {have}/{total} cached · backfill running (rerun outline to see them)"
+            return "summaries: sidecar unavailable — deterministic labels shown"
 
-    async def _backfill(self, page: PageMem, texts: dict[str, str]) -> None:
+        jobs = []
+        if text_pending:
+            jobs.append(self._gen_summaries(page))
+        if glance_pending:
+            jobs.append(self._gen_glance(page))
+        notes = [n for n in await asyncio.gather(*jobs) if n]
+        return " · ".join(notes) if notes else None
+
+    async def _gen_summaries(self, page: PageMem) -> str | None:
+        """One synchronous batched summary call; cache + fill results. Returns a
+        status note only if some sections remain unlabeled (slow/incomplete)."""
+        cfg = self.cfg.summarizer
         parsed = await summarize_page(
-            self._summarizer, page, texts, self.cfg.summarizer.max_input_tokens
+            self._summarizer,
+            page,
+            self._section_texts(),
+            cfg.max_input_tokens,
+            timeout_s=cfg.sync_timeout_s,
+            retry=False,
         )
         if parsed:
             by_sid = {s.sid: s for s in page.sections}
             self._summary_cache().put_many(
                 {by_sid[sid].content_hash: summary for sid, summary in parsed.items()}
             )
+            self._fill_from_cache()
+        pending = sum(1 for s in page.sections if s.summary is None and not s.cross_origin)
+        if pending:
+            total = sum(1 for s in page.sections if not s.cross_origin)
+            return f"summaries: {total - pending}/{total} (sidecar slow or incomplete)"
+        return None
+
+    async def _gen_glance(self, page: PageMem) -> str | None:
+        """Screenshot the viewport and get one VLM visual gist, synchronously.
+        Sets page.screen_gist + caches it. Returns a note only on failure."""
+        cfg = self.cfg.summarizer
+        try:
+            png_b64 = await self._viewport_png_b64()
+        except Exception as e:
+            logger.debug(f"glance screenshot failed: {e}")
+            return "glance: screenshot failed"
+        gist = await caption_screen(
+            self._summarizer, png_b64, timeout_s=cfg.sync_timeout_s, retry=False
+        )
+        if gist:
+            page.screen_gist = gist
+            self._summary_cache().put_screen(self._screen_key(page), gist)
+            return None
+        return "glance: sidecar slow or unavailable"
+
+    def _screen_key(self, page: PageMem) -> str:
+        """Cache key for the visual glance. Deterministic from the page's DOM
+        structure so revisiting the same page state is a cache hit (no
+        screenshot, no VLM). Identical structure with different pixels (rare) →
+        at worst a one-revision-stale gist."""
+        sig = "|".join(
+            f"{s.fingerprint}:{s.content_hash}" for s in page.sections if not s.cross_origin
+        )
+        return hashlib.sha1(f"{page.url}\n{sig}".encode()).hexdigest()[:16]
+
+    async def _viewport_png_b64(self) -> str:
+        png = await self.page.screenshot(full_page=False)
+        return base64.b64encode(png).decode()
 
     def _require_page_mem(self) -> PageMem:
         if self.page_mem is None:
@@ -354,6 +461,7 @@ class Session(CompoundMixin, ActionsMixin):
             url = f"https://{url}"
         self._check_url_allowed(url)
         await self._ensure_browser()
+        self._notes = []
         try:
             await self.page.goto(url, wait_until="domcontentloaded", timeout=GOTO_TIMEOUT_MS)
         except Exception as e:
@@ -362,35 +470,42 @@ class Session(CompoundMixin, ActionsMixin):
             ) from e
         await self._settle()
         self.nav_id += 1
-        return await self.observe()
+        await self._observe_page()
+        return self._with_notes(f"opened {await self._page_ident()}\n{_OUTLINE_HINT}")
 
     async def verb_reload(self) -> str:
+        self._notes = []
         await self.page.reload(wait_until="domcontentloaded", timeout=GOTO_TIMEOUT_MS)
         await self._settle()
         self.nav_id += 1
-        return await self.observe()
+        await self._observe_page()
+        return self._with_notes(f"reloaded {await self._page_ident()}\n{_OUTLINE_HINT}")
 
     async def verb_back(self) -> str:
+        self._notes = []
         resp = await self.page.go_back(wait_until="domcontentloaded", timeout=GOTO_TIMEOUT_MS)
         if resp is None:
             raise CommandError("no history to go back to", ExitCode.ACTION_FAILED)
         await self._settle()
         self.nav_id += 1
-        return await self.observe()
+        await self._observe_page()
+        return self._with_notes(f"back to {await self._page_ident()}\n{_OUTLINE_HINT}")
 
     async def verb_forward(self) -> str:
+        self._notes = []
         resp = await self.page.go_forward(wait_until="domcontentloaded", timeout=GOTO_TIMEOUT_MS)
         if resp is None:
             raise CommandError("no history to go forward to", ExitCode.ACTION_FAILED)
         await self._settle()
         self.nav_id += 1
-        return await self.observe()
+        await self._observe_page()
+        return self._with_notes(f"forward to {await self._page_ident()}\n{_OUTLINE_HINT}")
 
     async def verb_outline(
         self,
         refresh: bool = False,
-        wait_summaries: bool = False,
         no_summaries: bool = False,
+        no_glance: bool = False,
         preview: bool = False,
     ) -> str:
         del refresh  # observation is always fresh; flag reserved for future caching
@@ -398,7 +513,7 @@ class Session(CompoundMixin, ActionsMixin):
         if self.page.url in ("about:blank", ""):
             raise CommandError("no page open — run 'ebrowse open <url>' first", ExitCode.USAGE)
         return await self.observe(
-            wait_summaries=wait_summaries, no_summaries=no_summaries, preview=preview
+            no_summaries=no_summaries, no_glance=no_glance, preview=preview
         )
 
     async def verb_expand(self, target: str, cursor: int = 0, show_all: bool = False) -> str:
@@ -536,6 +651,53 @@ class Session(CompoundMixin, ActionsMixin):
         await self.page.screenshot(path=output, full_page=bool(clip) or full, clip=clip)
         return f"saved {output}"
 
+    async def verb_describe(self, prompt: str | None = None, refresh: bool = False) -> str:
+        """Free-form visual query over a screenshot via the local VLM (◉,
+        untrusted). No prompt → the concise gist (shared with the outline's ◉
+        line and cache); a prompt → ask for anything, from a one-line overlay
+        check to exhaustive detail. The routing tier between page text and
+        spending ~2.4k tokens on the pixels — the answer costs the agent only
+        the text, not the image. Works even when the auto ◉ line is disabled."""
+        await self._ensure_browser()
+        cfg = self.cfg.summarizer
+        if not (cfg.enabled and cfg.vision):
+            raise CommandError(
+                "describe-screen needs a vision summarizer — set summarizer.vision=true "
+                "and a multimodal model (see docs/configuration.md)",
+                ExitCode.USAGE,
+            )
+        if self.page.url in ("about:blank", ""):
+            raise CommandError("no page open — run 'ebrowse open <url>' first", ExitCode.USAGE)
+        if not self._summarizer.available:
+            raise CommandError(
+                "summarizer unavailable (recent failures) — retry shortly or run 'ebrowse doctor'",
+                ExitCode.ACTION_FAILED,
+            )
+        # no-prompt gist is cached per screen state and shared with the outline
+        if prompt is None and self.page_mem is not None and not refresh:
+            cached = self._summary_cache().get_screen(self._screen_key(self.page_mem))
+            if cached:
+                return f"◉ {cached}"
+        png_b64 = await self._viewport_png_b64()
+        # a free-form prompt may ask for exhaustive detail → generous ceiling;
+        # the no-prompt gist stays concise (shared with the outline ◉ line)
+        max_tokens = cfg.describe_max_tokens if prompt else 500
+        gist = await caption_screen(
+            self._summarizer,
+            png_b64,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            timeout_s=cfg.describe_timeout_s,
+        )
+        if not gist:
+            raise CommandError(
+                "describe-screen got no response from the summarizer — run 'ebrowse doctor'",
+                ExitCode.ACTION_FAILED,
+            )
+        if prompt is None and self.page_mem is not None:
+            self._summary_cache().put_screen(self._screen_key(self.page_mem), gist)
+        return f"◉ {gist}"
+
     async def verb_get(self, what: str, target: str | None, attr: str | None) -> str:
         if what == "url":
             return self.page.url
@@ -577,8 +739,10 @@ class Session(CompoundMixin, ActionsMixin):
             raise CommandError(f"no tab {index} (have 0..{len(pages) - 1})", ExitCode.USAGE)
         self._page = pages[index]
         await self._page.bring_to_front()
+        self._notes = []
         self.nav_id += 1
-        return await self.observe()
+        await self._observe_page()
+        return self._with_notes(f"switched to tab {index}: {await self._page_ident()}\n{_OUTLINE_HINT}")
 
     async def verb_dialog(self, response: str, text: str | None = None) -> str:
         """Resolve or inspect the native dialog blocking the current tab.
@@ -680,11 +844,3 @@ class Session(CompoundMixin, ActionsMixin):
 
 def _first_line(e: Exception) -> str:
     return str(e).splitlines()[0][:200]
-
-
-def _log_task_error(task: asyncio.Task) -> None:
-    if task.cancelled():
-        return
-    exc = task.exception()
-    if exc:
-        logger.warning(f"summary backfill failed: {type(exc).__name__}: {str(exc)[:150]}")

@@ -28,7 +28,11 @@ The first command autostarts a background daemon that owns the browser; state
 (page, refs, logins) persists between CLI calls.
 
 ```bash
-$ ebrowse open shop.example.com          # navigate; prints the page outline
+$ ebrowse open shop.example.com          # navigate; lands on the page
+opened http://shop.example.com/  ·  "Espresso Gear — Fixture Shop"
+run 'ebrowse outline' to read the page
+
+$ ebrowse outline                        # read the page (table of contents)
 PAGE Espresso Gear — Fixture Shop — http://shop.example.com/
 s1 header  4 links, 1 input, 1 button  ~42t  | "Fixture Shop Products Deals Help Search"
 s2 form    6 inputs, 1 button          ~46t  | "Filters — Bella Breville Gaggia 4★ & up"
@@ -41,14 +45,18 @@ $ ebrowse expand s2                      # one section as markdown with refs
 
 $ ebrowse expand s4 --cursor 20          # long lists paginate
 $ ebrowse screenshot --section s4        # clipped PNG of one section
+$ ebrowse describe-screen "any overlay?" # cheap visual gist from a local VLM
 $ ebrowse get value @e10                 # small getters: text/value/attr/title/url
-$ ebrowse back                           # history nav; prints the new outline
+$ ebrowse back                           # history nav; lands (run outline to read)
 $ ebrowse tabs && ebrowse tab 1          # tab management
 $ ebrowse close                          # close this session's browser
 ```
 
-**Working verbs:** `open/goto, back, forward, reload, outline, expand,
-screenshot, get, tabs, tab, dialog, connect, close, daemon status|stop, doctor`;
+Navigation (`open`/`back`/click-throughs) returns a one-line landing, not the
+page — run `outline` to read it (your `@refs` survive the jump).
+
+**Working verbs:** `open/goto, back, forward, reload, outline, describe-screen,
+expand, screenshot, get, tabs, tab, dialog, connect, close, daemon status|stop, doctor`;
 actions `click, fill, type, press, check, uncheck, select, scroll, upload,
 eval`; compound verbs `fill-form, search` (and `select` handles custom
 dropdowns) that collapse multi-step interactions into one command with one
@@ -93,11 +101,11 @@ hints. Daemon logs: `~/.cache/ebrowse/daemon.log`.
 ## MCP server
 
 `ebrowse mcp` speaks Model Context Protocol over stdio — point any MCP host at
-it (command: `ebrowse`, args: `["mcp"]`). Six tools (`browse_open`,
-`browse_outline`, `browse_expand`, `browse_act`, `browse_query`,
-`browse_screenshot`) return the same outline/diff text as the CLI; screenshots
-come back as images. The MCP process and the CLI share the same daemon, so you
-can mix both against one browser.
+it (command: `ebrowse`, args: `["mcp"]`). Seven tools (`browse_open`,
+`browse_outline`, `browse_describe`, `browse_expand`, `browse_act`,
+`browse_query`, `browse_screenshot`) return the same landing/outline/diff text as
+the CLI; screenshots come back as images. The MCP process and the CLI share the
+same daemon, so you can mix both against one browser.
 
 ## Dev harness (no daemon)
 
@@ -114,14 +122,17 @@ uv run python -m ebrowse.dev <url> capture out.json
 vars (e.g. `EBROWSE_BROWSER_HEADLESS=false`). See
 [docs/configuration.md](docs/configuration.md) for all keys.
 The optional summarizer points at any OpenAI-compatible server (default:
-`http://127.0.0.1:5001/v1`, e.g. a local llama.cpp). When available, outline
-labels upgrade from verbatim page text (`|`) to model-written one-liners (`≈`),
-computed once per page content in a single batched call and cached in sqlite —
-cache hits are instant. Everything works without it; a dead server costs
-nothing after the circuit breaker opens.
+`http://127.0.0.1:5001/v1`, e.g. a local llama.cpp). When available, `outline`
+upgrades section labels from verbatim page text (`|`) to model-written one-liners
+(`≈`) and — with a multimodal model — adds a `◉` visual gist of the screenshot
+(and enables `describe-screen`). Both are filled synchronously when you run
+`outline`, cached in sqlite (cache hits are instant). Everything works without
+it; a dead server costs nothing after the circuit breaker opens.
 
 ```
-$ ebrowse outline --wait-summaries
+$ ebrowse outline
+PAGE Espresso Gear — Fixture Shop — http://shop.example.com/
+◉ A product grid of espresso machines with a filter sidebar. No modals or popups visible.
 s2 form  6 inputs, 1 button  ~46t  ≈ Product filtering form: brand, price, rating
 s4 list  32 items, 32 links  ~1.0kt ≈ Espresso gear products with prices and ratings
 ```

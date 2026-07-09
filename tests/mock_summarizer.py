@@ -1,7 +1,10 @@
 """Mock OpenAI-compatible /chat/completions server for summarizer tests.
 
-Echoes 'MOCK <sid> summary' for every sid mentioned in the user prompt.
-Set fail_times > 0 to return HTTP 500 for the first N requests.
+Echoes 'MOCK <sid> summary' for every sid mentioned in the user prompt. An
+image (vision) request — a user message whose content is a list containing an
+image_url part — instead returns a canned visual gist, so the glance / ◉ and
+describe-screen paths can be exercised without a real VLM. Set fail_times > 0
+to return HTTP 500 for the first N requests.
 """
 
 from __future__ import annotations
@@ -10,6 +13,14 @@ import json
 import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+_GIST = "MOCK visual gist: a page with no overlays"
+
+
+def _is_image_request(content) -> bool:
+    return isinstance(content, list) and any(
+        isinstance(part, dict) and part.get("type") == "image_url" for part in content
+    )
 
 
 class MockSummarizer:
@@ -37,6 +48,11 @@ class MockSummarizer:
                 user = next(
                     (m["content"] for m in body.get("messages", []) if m["role"] == "user"), ""
                 )
+                if _is_image_request(user):
+                    self._reply(
+                        {"choices": [{"message": {"role": "assistant", "content": _GIST}}]}
+                    )
+                    return
                 sids = sorted(set(re.findall(r"\b(s\d+) type=", user)), key=lambda s: int(s[1:]))
                 rows = [{"sid": sid, "summary": f"MOCK {sid} summary"} for sid in sids]
                 self._reply(

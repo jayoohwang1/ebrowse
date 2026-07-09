@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from ebrowse.model import Section
 
 from ebrowse.core import render
-from ebrowse.core.diff import diff_pages, navigation_diff
+from ebrowse.core.diff import diff_pages
 from ebrowse.core.locate import resolve
 from ebrowse.errors import CommandError, ExitCode
 from ebrowse.model import Element, PageMem
@@ -67,13 +67,17 @@ class ActionsMixin:
         page_mem: PageMem | None
         raw_by_sid: dict[str, RawSection]
         _notes: list[str]
+        _blocking_modal: str | None
 
         def _active_dialog(self) -> PendingDialog | None: ...
         @property
         def page(self) -> Page: ...
         async def observe(
-            self, wait_summaries: bool = ..., no_summaries: bool = ..., preview: bool = ...
+            self, no_summaries: bool = ..., no_glance: bool = ..., preview: bool = ...
         ) -> str: ...
+        async def _observe_page(self) -> None: ...
+        async def _nav_landing(self, action_line: str) -> str: ...
+        def _no_baseline_landing(self, action_line: str) -> str: ...
         async def _ensure_browser(self) -> None: ...
         def _require_page_mem(self) -> PageMem: ...
         def _get_section(self, sid: str) -> Section: ...
@@ -126,37 +130,65 @@ class ActionsMixin:
         return await resolve(self.page, element.desc), desc
 
     async def _check_occlusion(self, loc, target: str) -> None:
-        """Fail fast when another element would swallow the click."""
+        """Pre-empt a click that would land on a covering element (fail before
+        acting). Separately RECORD a modal that blocks the page without covering
+        the target — native `showModal()` (top layer + inert) or an aria-modal
+        focus trap, where `::backdrop` is a pseudo-element invisible to the
+        geometric hit-test. That can't be pre-empted safely (a false positive
+        would block a valid click), so it's surfaced post-hoc only if the click
+        then no-ops (see _finish_action). Best-effort; Playwright still enforces."""
         try:
             handle = await loc.element_handle(timeout=2000)
             # handle.evaluate runs in the element's own frame — essential for
             # elements inside iframes, where main-frame elementFromPoint would
             # see only the <iframe> region and falsely report occlusion
-            covering = await handle.evaluate(
+            info = await handle.evaluate(
                 """(el) => {
-                    const r = el.getBoundingClientRect();
-                    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-                    if (cx < 0 || cy < 0 || cx > innerWidth || cy > innerHeight) return null;
-                    const t = document.elementFromPoint(cx, cy);
-                    if (!t || el.contains(t) || t.contains(el)) return null;
-                    const dlg = t.closest('[role=dialog],[role=alertdialog],dialog');
                     const name = (n) => n.tagName.toLowerCase()
                         + (n.id ? '#' + n.id : '')
                         + ((n.getAttribute('aria-label') || n.textContent || '')
                             .trim().slice(0, 40) ? ' "' + (n.getAttribute('aria-label')
                             || n.textContent).trim().slice(0, 40) + '"' : '');
-                    return {covering: name(t), dialog: dlg ? name(dlg) : null};
+                    // (1) geometric occlusion at the element's center point
+                    let covering = null, coverDialog = null;
+                    const r = el.getBoundingClientRect();
+                    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+                    if (cx >= 0 && cy >= 0 && cx <= innerWidth && cy <= innerHeight) {
+                        const t = document.elementFromPoint(cx, cy);
+                        if (t && !el.contains(t) && !t.contains(el)) {
+                            covering = name(t);
+                            const dlg = t.closest('[role=dialog],[role=alertdialog],dialog');
+                            coverDialog = dlg ? name(dlg) : null;
+                        }
+                    }
+                    // (2) a modal blocking the page but NOT over this point.
+                    // Visible candidates only: aria-modal is often left set on
+                    // hidden/closed dialogs (a false-positive trap).
+                    let modal = null;
+                    try {
+                        for (const c of document.querySelectorAll(':modal,[aria-modal="true"]')) {
+                            if (c.contains(el) || c === el) continue;
+                            const cr = c.getBoundingClientRect();
+                            if (cr.width > 0 && cr.height > 0
+                                && getComputedStyle(c).visibility !== 'hidden') {
+                                modal = name(c); break;
+                            }
+                        }
+                    } catch (e) { /* :modal unsupported on this engine */ }
+                    return {covering, coverDialog, modal};
                 }"""
             )
         except Exception:
             return  # pre-check is best-effort; Playwright will still enforce
-        if covering:
-            what = covering.get("dialog") or covering.get("covering")
+        if info and info.get("covering"):
+            what = info.get("coverDialog") or info.get("covering")
             raise CommandError(
                 f"blocked: {target} is covered by {what} — interact with that first "
                 "(run 'ebrowse outline' to see it)",
                 ExitCode.ACTION_FAILED,
             )
+        if info and info.get("modal"):
+            self._blocking_modal = info["modal"]
 
     def _section_texts(self) -> dict[str, str]:
         return {
@@ -168,6 +200,7 @@ class ActionsMixin:
         """Snapshot pre-action state; pairs with _finish_action."""
         prev = self.page_mem
         self._notes = []
+        self._blocking_modal = None
         return ActionSnapshot(
             page=prev,
             texts=self._section_texts() if prev else {},
@@ -194,16 +227,27 @@ class ActionsMixin:
 
         navigated = urldefrag(self.page.url)[0] != begin_state.url
         if navigated:
+            # New page: rebuild page_mem (keeps durable @refs live) but don't dump
+            # a full outline — return a landing line, like the navigation verbs.
             self.nav_id += 1
-        await self.observe()  # rebuilds self.page_mem / raw_by_sid
+            await self._observe_page()
+            return await self._nav_landing(action_line)
+        await self._observe_page()  # rebuilds self.page_mem / raw_by_sid
         new = self._require_page_mem()
-
-        if prev is None or navigated:
-            diff = navigation_diff(prev, new)
-        else:
-            diff = diff_pages(prev, new, begin_state.texts, self._section_texts())
+        if prev is None:
+            # acted (via CSS) before any outline: no baseline to diff against
+            return self._no_baseline_landing(action_line)
+        diff = diff_pages(prev, new, begin_state.texts, self._section_texts())
         diff.notes = list(self._notes)
-        return render.render_diff(action_line, diff)
+        # A modal that blocks the page via the top layer / inert (rather than by
+        # covering the target) lets the click dispatch to an inert element — a
+        # harmless no-op. Name it so the agent doesn't retry the same dead click.
+        if diff.kind == "no_change" and self._blocking_modal:
+            diff.notes.append(
+                f"a modal is open ({self._blocking_modal}) and is likely intercepting the "
+                "click — interact with it or dismiss it before retrying"
+            )
+        return render.render_diff(action_line, diff, self.raw_by_sid, self.cfg.observe)
 
     async def _act(self, action_line: str, fn) -> str:
         """The action pipeline shared by every atomic verb. Compound verbs
@@ -220,6 +264,16 @@ class ActionsMixin:
             # itself can time out (the renderer is frozen). That timeout is
             # expected — report the dialog via _finish_action, not a failure.
             if self._active_dialog() is None:
+                # A modal that blocks the page without covering the target (native
+                # showModal / aria-modal+inert) makes Playwright time out rather
+                # than click. The occlusion pre-check recorded which modal it is —
+                # name it so the agent resolves it instead of retrying the dead click.
+                if self._blocking_modal is not None:
+                    raise CommandError(
+                        f"blocked: a modal is open ({self._blocking_modal}) and is intercepting "
+                        "the click — interact with it or dismiss it first",
+                        ExitCode.ACTION_FAILED,
+                    ) from e
                 raise _map_playwright_error(e) from e
         return await self._finish_action(action_line, begin_state)
 

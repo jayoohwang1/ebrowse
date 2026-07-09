@@ -23,6 +23,15 @@ from ebrowse.daemon.protocol import CommandError, ExitCode, Request, Response
 from ebrowse.session import Session
 
 _VERB_TIMEOUT_S = 120  # hard ceiling per command; goto has its own 45s budget
+# describe-screen is a patient, agent-initiated visual query that can generate
+# thousands of tokens on modest local hardware — a longer ceiling than the
+# page-touching verbs (whose 120s cap guards against a hung page). Must exceed
+# summarizer.describe_timeout_s; the CLI/MCP transport timeout exceeds this.
+_LONG_VERB_TIMEOUT_S: dict[str, int] = {"describe-screen": 210}
+
+
+def _verb_timeout(verb: str) -> int:
+    return _LONG_VERB_TIMEOUT_S.get(verb, _VERB_TIMEOUT_S)
 
 # Verbs allowed while a native dialog blocks the current tab: resolve it, or
 # escape to another tab / re-attach / close. Everything else would touch the
@@ -138,10 +147,11 @@ class Daemon:
             session = Session(req.session, load_config())
             self.sessions[req.session] = session
 
+        verb_timeout = _verb_timeout(req.verb)
         try:
             async with session.lock:
                 output = await asyncio.wait_for(
-                    self._run_verb(session, req.verb, req.args), timeout=_VERB_TIMEOUT_S
+                    self._run_verb(session, req.verb, req.args), timeout=verb_timeout
                 )
             return Response(id=req.id, ok=True, output=output)
         except CommandError as e:
@@ -150,7 +160,7 @@ class Daemon:
             return Response(
                 id=req.id,
                 ok=False,
-                error=f"'{req.verb}' timed out after {_VERB_TIMEOUT_S}s — the page may be "
+                error=f"'{req.verb}' timed out after {verb_timeout}s — the page may be "
                 "stuck loading; try 'ebrowse reload' or 'ebrowse close'",
                 exit_code=ExitCode.ACTION_FAILED,
             )
@@ -183,9 +193,13 @@ class Daemon:
         if verb == "outline":
             return await session.verb_outline(
                 refresh=args.get("refresh", False),
-                wait_summaries=args.get("wait_summaries", False),
                 no_summaries=args.get("no_summaries", False),
+                no_glance=args.get("no_glance", False),
                 preview=args.get("preview", False),
+            )
+        if verb == "describe-screen":
+            return await session.verb_describe(
+                prompt=args.get("prompt"), refresh=args.get("refresh", False)
             )
         if verb == "expand":
             return await session.verb_expand(

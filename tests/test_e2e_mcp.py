@@ -83,11 +83,13 @@ def test_mcp_stdio_flow(tmp_path):
     replies = {m["id"]: m for m in map(json.loads, proc.stdout.splitlines()) if "id" in m}
     assert replies[1]["result"]["serverInfo"]["name"] == "ebrowse"
     tool_names = {t["name"] for t in replies[2]["result"]["tools"]}
-    assert {"browse_open", "browse_act", "browse_query", "browse_screenshot"} <= tool_names
+    assert {"browse_open", "browse_act", "browse_describe", "browse_screenshot"} <= tool_names
 
     open_res = replies[3]["result"]
     assert not open_res["isError"]
-    assert open_res["content"][0]["text"].startswith("PAGE Dropdowns")
+    # browse_open lands (URL + title + hint); the page is read via browse_outline
+    assert open_res["content"][0]["text"].startswith("opened ")
+    assert "dropdown.html" in open_res["content"][0]["text"]
 
     act_res = replies[4]["result"]
     assert not act_res["isError"], act_res

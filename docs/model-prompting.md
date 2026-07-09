@@ -93,3 +93,32 @@ screenshot, so the main agent can decide whether the pixels are worth ingesting.
   > photos, colors, charts, spatial layout, and any prominent banner/popup/modal
   > actually visible right now. Describe ONLY what you can literally see; never
   > guess at elements that are typical but not shown.
+
+### 2026-07-08 — Visual gist shipped: synchronous `◉` + `describe-screen`
+
+Follow-up to the prompt study above — the feature was built (ADR 0008). Re-tested
+the shipped prompt on live pages (Best Buy, Trader Joe's, example.com) with the
+same local stack (Qwen3.6-35B, thinking off, viewport 1280-wide).
+
+- **Measured (viewport screenshot ~1,617 image tokens in):** gist out **14–33
+  tok**, the shipped anti-speculation default **66–121 tok**, an overlay-only
+  prompt **3–7 tok**. Latency ~2–3s. First synchronous `outline` ≈ a few seconds
+  (text batch + glance concurrent); cached revisit **0.07s** (no VLM call).
+- **Findings on real pages:**
+  - No drift observed with the hard "only what is visible" clause. Trader Joe's
+    correctly surfaced *both* a hero overlay and a cookie banner; the overlay-only
+    prompt returned just `cookie banner`.
+  - **Headline case:** Best Buy served a country-selection interstitial
+    (Canada/US, no products). The DOM outline looked like a sparse picker with no
+    hint it's a wall; the gist said so in one line. This "the outline is lying to
+    you" signal is the strongest justification for default-on.
+  - example.com gist: *"…centered heading 'Example Domain'…a 'Learn more' link; no
+    overlays, modals, popups, or interstitials are present."* — grounded, flags
+    the empty-overlay state, ~35 tok.
+- **Shipped prompt** (`summarize/batch.py:_GLANCE_PROMPT`) leans on "1-2
+  sentences", overlay/modal/interstitial flagging, and the anti-speculation
+  clause. Output ceiling 500 tok (headroom; concise prompt emits ~1-2 sentences).
+  `describe-screen` custom prompts use a 4096-tok ceiling for exhaustive detail.
+- **Token-economy note:** the `◉` *output* is the one visual cost the MAIN agent
+  pays (per outline); the ~1.6k image tokens are sidecar-side. So the default
+  stays terse; verbosity is opt-in via `describe-screen`.

@@ -113,9 +113,15 @@ async def summarize_page(
     page: PageMem,
     texts: dict[str, str],
     max_input_tokens: int,
+    timeout_s: float | None = None,
+    retry: bool = True,
 ) -> dict[str, str]:
     """Returns sid -> summary for as many sections as the model labeled.
-    Empty dict on any failure (callers fall back to deterministic labels)."""
+    Empty dict on any failure (callers fall back to deterministic labels).
+
+    `timeout_s`/`retry` are forwarded to the client: the synchronous outline
+    path passes a tight deadline and retry=False so a slow sidecar degrades
+    the outline to deterministic labels instead of stalling it."""
     if not client.available:
         return {}
     messages = build_messages(page, texts, max_input_tokens)
@@ -125,7 +131,7 @@ async def summarize_page(
     # was consumed entirely by that, cutting the array to nothing (0/N). Keep a
     # generous floor; tolerant parsing + the `|` fallback cover any overrun.
     max_out = min(8000, 2500 + 80 * len(page.sections))
-    raw = await client.chat(messages, max_tokens=max_out)
+    raw = await client.chat(messages, max_tokens=max_out, retry=retry, timeout_s=timeout_s)
     if raw is None:
         return {}
     valid = {s.sid for s in page.sections}
@@ -137,7 +143,7 @@ async def summarize_page(
                 {"role": "assistant", "content": raw[:500]},
                 {"role": "user", "content": "Reply with ONLY the JSON array, nothing else."},
             ],
-            max_tokens=max_out,
+            max_tokens=max_out, retry=retry, timeout_s=timeout_s,
         )  # fmt: skip
         if raw2:
             parsed = parse_summaries(raw2, valid)
@@ -176,3 +182,60 @@ async def caption_image(client: SummarizerClient, png_b64: str) -> str | None:
         return None
     clean = re.sub(r"\s+", " ", raw).strip().strip('"')
     return clean[:100] or None
+
+
+# The default gist prompt is deliberately anti-speculative: live testing showed
+# VLMs drift into "typical" page furniture (cookie banners, popups) that isn't
+# actually on screen. The hard "only what is visible" constraint measurably cut
+# that drift. Overlay/interstitial flagging is the highest-value signal — it
+# catches states the DOM outline can't convey (a login wall, a country picker).
+_GLANCE_PROMPT = (
+    "You give a browsing agent a quick visual read of the current screen so it can "
+    "decide whether to look at the screenshot itself. In 1-2 sentences, describe ONLY "
+    "what is actually visible: the main visual content and layout, and any overlay, "
+    "modal, popup, cookie banner, or interstitial covering the page. If nothing covers "
+    "the main content, say so. Do not guess or mention typical elements that are not "
+    "visible. No preamble, no quotes."
+)
+# Ceiling for the auto ◉ outline line. NOT a target — the concise prompt above
+# emits ~1-2 sentences; this is headroom for experimenting with prompt detail.
+# Whatever it emits is the one visual cost paid by the MAIN agent (per outline),
+# so the shipped prompt stays terse. The manual verb uses its own larger ceiling.
+_GLANCE_MAX_TOKENS = 500
+
+
+async def caption_screen(
+    client: SummarizerClient,
+    png_b64: str,
+    prompt: str | None = None,
+    max_tokens: int = _GLANCE_MAX_TOKENS,
+    timeout_s: float | None = None,
+    retry: bool = True,
+) -> str | None:
+    """One VLM visual gist of a full screenshot (base64 png). None on
+    failure/disabled. `prompt=None` uses the anti-speculative default gist;
+    a caller-supplied prompt is a free-form visual query (`describe-screen`)."""
+    if not client.available or not client.cfg.vision:
+        return None
+    raw = await client.chat(
+        [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt or _GLANCE_PROMPT},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{png_b64}"},
+                    },
+                ],
+            }
+        ],
+        max_tokens=max_tokens,
+        timeout_s=timeout_s,
+        retry=retry,
+    )
+    if not raw:
+        return None
+    clean = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", " ", raw)  # strip control chars
+    clean = re.sub(r"\s*\n\s*", " ", clean).strip().strip('"').strip()
+    return clean or None

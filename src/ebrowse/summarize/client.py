@@ -43,9 +43,18 @@ class SummarizerClient:
         return self._client
 
     async def chat(
-        self, messages: list[dict[str, Any]], max_tokens: int = 2000, retry: bool = True
+        self,
+        messages: list[dict[str, Any]],
+        max_tokens: int = 2000,
+        retry: bool = True,
+        timeout_s: float | None = None,
     ) -> str | None:
-        """One chat completion; None on failure (after breaker bookkeeping)."""
+        """One chat completion; None on failure (after breaker bookkeeping).
+
+        `timeout_s` overrides the client-wide timeout for this request only —
+        callers on the synchronous outline hot path pass a tight deadline so a
+        slow/hung sidecar can't stall an observation (it degrades to
+        deterministic labels). A genuine timeout counts toward the breaker."""
         if not self.available:
             return None
         try:
@@ -58,7 +67,8 @@ class SummarizerClient:
             # Provider-specific knobs (e.g. reasoning-off) live in config, not
             # code; merged last so an operator can override any default above.
             body.update(self.cfg.extra_body)
-            resp = await self._http().post("/chat/completions", json=body)
+            timeout = self.cfg.timeout_s if timeout_s is None else timeout_s
+            resp = await self._http().post("/chat/completions", json=body, timeout=timeout)
             resp.raise_for_status()
             content = resp.json()["choices"][0]["message"]["content"]
             self._failures = 0
@@ -66,7 +76,9 @@ class SummarizerClient:
         except Exception as e:
             logger.warning(f"summarizer call failed: {type(e).__name__}: {str(e)[:150]}")
             if retry:
-                return await self.chat(messages, max_tokens=max_tokens, retry=False)
+                return await self.chat(
+                    messages, max_tokens=max_tokens, retry=False, timeout_s=timeout_s
+                )
             self._failures += 1
             if self._failures >= _BREAKER_FAILURES:
                 self._disabled_until = time.monotonic() + _BREAKER_COOLDOWN_S
