@@ -39,8 +39,25 @@ class SummarizerConfig:
     model: str = "default"
     api_key: str = ""
     vision: bool = True
+    # Auto ◉ visual-gist line on the outline (a VLM one-liner of the screenshot,
+    # a routing signal between page text and a full screenshot). Effective only
+    # when `enabled` + `vision` + the model is reachable; degrades to no line
+    # otherwise. Set false to suppress it while keeping `describe-screen`.
+    glance: bool = True
     max_input_tokens: int = 100_000
     timeout_s: int = 60
+    # Per-*call* deadline for the SYNCHRONOUS outline enrichment (text summaries
+    # + auto glance). On timeout the outline renders deterministically (never
+    # load-bearing). Note it bounds each sidecar call, not the whole stage: the
+    # summaries path may fire one JSON-only reprompt (see summarize/batch.py), so
+    # its worst-case wall time is ~2× this. Kept well under the daemon verb
+    # ceiling. Keep generous enough for a slow local sidecar.
+    sync_timeout_s: int = 30
+    # Manual `describe-screen`: patient, agent-initiated visual queries. A high
+    # token ceiling lets the agent ask for exhaustive detail; a long timeout
+    # covers the resulting slow generation on modest local hardware.
+    describe_max_tokens: int = 4096
+    describe_timeout_s: int = 180
     # Extra fields merged verbatim into every /chat/completions request body.
     # This is where model/provider-specific knobs live as *config data* rather
     # than provider-branching code — e.g. reasoning-off for a llama.cpp/Qwen

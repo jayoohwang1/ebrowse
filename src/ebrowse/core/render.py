@@ -3,7 +3,8 @@
 Format changes require updating tests/golden/ and docs/output-contracts.md in
 the same commit.
 Provenance markers: '≈' = LLM summary (model-paraphrased page content, untrusted),
-'|' = deterministic label (verbatim page text, quoted).
+'|' = deterministic label (verbatim page text, quoted), '◉' = VLM visual gist of
+the screenshot (untrusted routing signal, even weaker than ≈ — never act on it).
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from ebrowse.config import ObserveConfig
 from ebrowse.core.label import deterministic_label
 from ebrowse.core.snapshot import DomNode
 from ebrowse.core.split import RawSection
-from ebrowse.model import Diff, Element, PageMem, Section
+from ebrowse.model import Diff, Element, PageMem, Section, SectionDiff
 
 _HEADING_LEVEL = {"h1": 2, "h2": 3, "h3": 3, "h4": 4, "h5": 4, "h6": 4}
 _BLOCK_TAGS = {"p", "li", "tr", "blockquote", "pre", "dt", "dd", "figcaption"}
@@ -36,6 +37,8 @@ def render_outline(
     preview_chars: int = 60,
 ) -> str:
     lines = [f"PAGE {page.title} — {page.url}" if page.title else f"PAGE {page.url}"]
+    if page.screen_gist:
+        lines.append(f"◉ {page.screen_gist}")
     for s in page.sections:
         lines.append(outline_line(s, preview=preview, preview_chars=preview_chars))
     if summaries_note:
@@ -305,13 +308,25 @@ def element_inline(e: Element) -> str:
 
 
 _MAX_DIFF_ELEMENTS = 12
+# A dialog that appears is almost always the agent's forced next interaction
+# (occlusion pre-checks block clicks elsewhere), so we expand its content inline
+# in the diff — deterministic DOM, higher-trust than any visual gist, and it
+# saves a round trip. Over the cap, a compact form keeps every control + a
+# truncated text preview (see _compact_dialog) rather than dropping to one line.
+_DIALOG_EXPAND_MAX_TOKENS = 4000
+_DIALOG_COMPACT_TEXT_BUDGET = 800  # chars of prose kept when a dialog is over the cap
 
 
-def render_diff(action_line: str, diff: Diff, observe: ObserveConfig | None = None) -> str:
+def render_diff(
+    action_line: str,
+    diff: Diff,
+    raws: dict[str, RawSection] | None = None,
+    observe: ObserveConfig | None = None,
+) -> str:
     """Action-result rendering. `action_line` is 'CLICK @e42 (button "…")'.
     Compound verbs pass multi-line action_lines (header + step lines); the
-    outcome arrow always goes on the FIRST line."""
-    del observe  # reserved for future pagination of huge diffs
+    outcome arrow always goes on the FIRST line. `raws` (current page's raw
+    sections) lets an appeared dialog be expanded inline."""
     head, _, steps = action_line.partition("\n")
     out: list[str] = []
 
@@ -337,13 +352,26 @@ def render_diff(action_line: str, diff: Diff, observe: ObserveConfig | None = No
             "no-op, or its effect is outside the DOM. Check `ebrowse outline` or screenshot.)"
         )
     else:
-        label = "partial change" if diff.kind == "partial" else "dialog"
-        out.append(f"{head} → {label}")
+        # A dialog can appear as its own section (diff.kind == "dialog") OR
+        # coalesced into a content section — its new controls sit under a
+        # role=dialog subtree the splitter didn't break out. Detect the latter so
+        # the outcome AND the changed line both say "dialog": either way it's the
+        # forced next interaction, and the coalesced form is otherwise invisible.
+        dialog_sids = {
+            sd.sid
+            for sd in diff.sections
+            if sd.kind == "changed" and sd.added and _added_in_dialog(sd, raws)
+        }
+        is_dialog = diff.kind == "dialog" or bool(dialog_sids)
+        out.append(f"{head} → {'dialog' if is_dialog else 'partial change'}")
         if steps:
             out.append(steps)
         for sd in diff.sections:
             if sd.kind == "appeared" and sd.section:
                 out.append(f"{outline_line(sd.section)}  [appeared]")
+                expanded = _expand_appeared_dialog(sd.section, raws, observe)
+                if expanded:
+                    out.append(expanded)
             elif sd.kind == "disappeared":
                 desc = ""
                 if sd.section:
@@ -357,7 +385,8 @@ def render_diff(action_line: str, diff: Diff, observe: ObserveConfig | None = No
                         if len(sd.added) > _MAX_DIFF_ELEMENTS
                         else ""
                     )
-                    out.append(f"+ {sd.sid}: {shown}{more}")
+                    tag = " [dialog]" if sd.sid in dialog_sids else ""
+                    out.append(f"+ {sd.sid}{tag}: {shown}{more}")
                 if sd.removed:
                     names = ", ".join(d.short_desc() for d in sd.removed[:6])
                     out.append(f"- {sd.sid}: {len(sd.removed)} element(s) removed ({names})")
@@ -371,6 +400,77 @@ def render_diff(action_line: str, diff: Diff, observe: ObserveConfig | None = No
     for note in diff.notes:
         out.append(f"note: {note}")
     return "\n".join(out)
+
+
+def _expand_appeared_dialog(
+    section: Section,
+    raws: dict[str, RawSection] | None,
+    observe: ObserveConfig | None,
+) -> str | None:
+    """Markdown for an appeared dialog section, rendered inline in the diff, or
+    None for a non-dialog / no-raw section. Under the token cap: the full expand
+    markdown. Over it: a compact form (all controls kept, prose truncated) — a
+    modal is the forced next step, so keep it actionable rather than one-lining it."""
+    if section.type != "dialog" or raws is None:
+        return None
+    raw = raws.get(section.sid)
+    if raw is None:
+        return None
+    md = render_section_markdown(section, raw, observe or ObserveConfig())
+    if section.token_estimate <= _DIALOG_EXPAND_MAX_TOKENS:
+        return md
+    return _compact_dialog(section, md)
+
+
+def _compact_dialog(section: Section, md: str) -> str:
+    """Trim an oversized dialog's expand markdown: keep every line carrying a
+    control/image `@ref` (the actionable part) verbatim, truncate prose to a
+    budget, and point at `expand` for the rest."""
+    lines = md.split("\n")
+    kept = [lines[0]]  # "## sid dialog — heading"
+    budget = _DIALOG_COMPACT_TEXT_BUDGET
+    truncated = False
+    for line in lines[1:]:
+        if "(@" in line:  # a control/image ref — always keep it actionable
+            kept.append(line)
+        elif budget > 0:
+            taken = line[:budget]
+            if len(line) > len(taken):
+                truncated = True
+            kept.append(taken + ("…" if len(line) > len(taken) else ""))
+            budget -= len(taken)
+        else:
+            truncated = True
+    if truncated:
+        kept.append(f"… (large dialog — text truncated; `expand {section.sid}` for the rest)")
+    return "\n".join(kept)
+
+
+def _added_in_dialog(sd: SectionDiff, raws: dict[str, RawSection] | None) -> bool:
+    """True when a changed section's newly-added elements sit under a role=dialog
+    subtree — i.e. a modal appeared but was coalesced into this content section
+    rather than split out as its own `dialog` section."""
+    if raws is None or not sd.added:
+        return False
+    raw = raws.get(sd.sid)
+    if raw is None:
+        return False
+    return bool({e.ref for e in sd.added} & _dialog_scoped_refs(raw))
+
+
+def _dialog_scoped_refs(raw: RawSection) -> set[str]:
+    refs: set[str] = set()
+
+    def walk(node: DomNode, under: bool) -> None:
+        under = under or node.tag == "dialog" or node.attrs.get("role") in ("dialog", "alertdialog")
+        if under and node.ref:
+            refs.add(node.ref)
+        for child in node.children:
+            walk(child, under)
+
+    for top in raw.all_nodes():
+        walk(top, False)
+    return refs
 
 
 def render_dialog_pending(action_line: str, dtype: str, message: str, default_value: str) -> str:

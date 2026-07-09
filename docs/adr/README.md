@@ -17,3 +17,4 @@ ADRs 0001–0006 were backfilled from the v1 implementation log (see git history
 | [0005](0005-mcp-server-without-sdk.md) | Hand-rolled MCP server, no SDK dependency |
 | [0006](0006-image-refs-not-durable.md) | @i image refs are page-scoped, captions expand-time only |
 | [0007](0007-agent-resolves-native-dialogs.md) | Agent resolves native confirm/prompt dialogs (`dialog` verb) |
+| [0008](0008-explicit-outline-and-synchronous-visual-glance.md) | Explicit outline + synchronous visual glance (`◉`, `describe-screen`) |

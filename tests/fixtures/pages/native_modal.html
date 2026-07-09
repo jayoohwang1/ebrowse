@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Native Modal — Fixture</title>
+  <style>body { font-family: sans-serif; margin: 24px; }</style>
+</head>
+<body>
+  <main>
+    <h1>Native modal test</h1>
+    <p>Exercises a native &lt;dialog&gt; opened with showModal() — it blocks the
+       page via the top layer + inert, with no covering DOM element.</p>
+    <button type="button" id="open-native">Open native modal</button>
+    <button type="button" id="outside">Outside action</button>
+    <p id="result">idle</p>
+  </main>
+
+  <dialog id="native" aria-label="Native modal">
+    <p>I am a native modal.</p>
+    <button type="button" id="close-native">Close</button>
+  </dialog>
+
+  <script>
+    const result = document.getElementById('result');
+    const dlg = document.getElementById('native');
+    document.getElementById('open-native').addEventListener('click', () => dlg.showModal());
+    document.getElementById('close-native').addEventListener('click', () => dlg.close());
+    document.getElementById('outside').addEventListener('click', () => {
+      result.textContent = 'outside clicked';
+    });
+  </script>
+</body>
+</html>

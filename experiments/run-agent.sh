@@ -25,6 +25,7 @@ TASK_FILE=""
 NAME=""
 JSON=0
 WORKDIR=""
+WORKTREE=0
 
 usage() {
   sed -n '2,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -41,12 +42,16 @@ Options:
   -n, --name <name>                        Run label (default: <tool>-<UTC timestamp>)
   -d, --dir <path>                         Working dir the agent runs in (default: fresh runs/<name>/workdir)
   -j, --json                               Also capture the full JSON event stream (tokens, tool calls)
+  -w, --worktree                           Point `ebrowse` at THIS checkout's venv (test uncommitted
+                                           worktree code), not the globally-installed tool. Stops any
+                                           running daemon first so it restarts on the local code.
   -m, --model <id>                         Model id (default: $PI_MODEL)
   -p, --provider <name>                    pi provider name (default: $PI_PROVIDER)
   -h, --help
 
 Examples:
   run-agent.sh -t ebrowse "Go to example.com and report the page title."
+  run-agent.sh -t ebrowse -w -f tasks/example.txt -j -n wt-run   # test worktree code
   run-agent.sh -t agent-browser -f tasks/find-product.txt -j -n ab-run1
 EOF
 }
@@ -58,6 +63,7 @@ while [[ $# -gt 0 ]]; do
     -n|--name)     NAME="$2"; shift 2 ;;
     -d|--dir)      WORKDIR="$2"; shift 2 ;;
     -j|--json)     JSON=1; shift ;;
+    -w|--worktree) WORKTREE=1; shift ;;
     -m|--model)    MODEL="$2"; shift 2 ;;
     -p|--provider) PROVIDER="$2"; shift 2 ;;
     -h|--help)     usage; exit 0 ;;
@@ -118,6 +124,24 @@ $TASK"
   echo "utc:       $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "$RUN_DIR/meta.txt"
 printf '%s\n' "$PROMPT" > "$RUN_DIR/prompt.txt"
+
+# -w/--worktree: shim `ebrowse` to THIS checkout's venv so the agent drives the
+# uncommitted worktree code instead of the globally-installed tool. The daemon
+# autostarts from the same interpreter (sys.executable), so it too runs local
+# code — but only if any stale daemon is stopped first (it owns the socket).
+if [[ "$WORKTREE" -eq 1 ]]; then
+  ROOT="$(cd "$HERE/.." && pwd)"
+  VENV_PY="$ROOT/.venv/bin/python"
+  [[ -x "$VENV_PY" ]] || { echo "no venv at $VENV_PY — run 'uv sync' in $ROOT first" >&2; exit 1; }
+  [[ "$TOOL" == "ebrowse" ]] || echo ">> note: -w shims ebrowse but --tool is '$TOOL'" >&2
+  SHIM_DIR="$RUN_DIR/bin"
+  mkdir -p "$SHIM_DIR"
+  printf '#!/usr/bin/env bash\nexec "%s" -m ebrowse.cli.main "$@"\n' "$VENV_PY" > "$SHIM_DIR/ebrowse"
+  chmod +x "$SHIM_DIR/ebrowse"
+  export PATH="$SHIM_DIR:$PATH"
+  ebrowse daemon stop >/dev/null 2>&1 || true   # free the socket; agent restarts it on local code
+  echo ">> worktree: ebrowse -> $VENV_PY (daemon restarts on local code)" >&2
+fi
 
 echo ">> run: $NAME  (tool=$TOOL, model=$MODEL)" >&2
 echo ">> dir: $RUN_DIR" >&2

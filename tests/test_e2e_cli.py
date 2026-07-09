@@ -62,9 +62,16 @@ def ebrowse(env, *args: str, timeout: int = 90) -> subprocess.CompletedProcess:
     )
 
 
-def test_open_returns_outline(server, env):
+def test_open_returns_landing_then_outline_reads_page(server, env):
+    # navigation returns a terse landing line (URL + title + hint), NOT the page
     r = ebrowse(env, "open", server.url("list.html"))
     assert r.returncode == 0, r.stderr
+    assert r.stdout.startswith("opened ")
+    assert "list.html" in r.stdout
+    assert "run 'ebrowse outline'" in r.stdout
+    assert "PAGE" not in r.stdout and "s4 list" not in r.stdout
+    # the explicit outline reads the sectioned page
+    r = ebrowse(env, "outline")
     assert r.stdout.startswith("PAGE Espresso Gear")
     assert "s4 list" in r.stdout and "32 items" in r.stdout
 
@@ -105,12 +112,14 @@ def test_screenshot_section(server, env, tmp_path):
     assert out.is_file() and out.stat().st_size > 5000
 
 
-def test_navigation_updates_outline(server, env):
+def test_navigation_lands_then_outline(server, env):
     r = ebrowse(env, "open", server.url("form.html"))
-    assert "Create Account" in r.stdout
+    assert r.stdout.startswith("opened ") and "form.html" in r.stdout
+    assert "Create Account" in ebrowse(env, "outline").stdout
     r = ebrowse(env, "back")
     assert r.returncode == 0, r.stderr
-    assert "Espresso Gear" in r.stdout
+    assert r.stdout.startswith("back to ") and "list.html" in r.stdout
+    assert "Espresso Gear" in ebrowse(env, "outline").stdout
 
 
 def test_refs_stable_across_navigation(server, env):

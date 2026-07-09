@@ -248,6 +248,10 @@ class PageMem:
     sections: list[Section]
     captured_at: float
     nav_id: int  # increments on navigation; scopes sids
+    # VLM one-line visual gist of the screenshot (◉ in the outline). Untrusted
+    # routing signal, never load-bearing; None when no vision sidecar. Populated
+    # by the summarizer, cached per screen_key. Provenance: model-generated.
+    screen_gist: str | None = None
 
     def section(self, sid: str) -> Section | None:
         for s in self.sections:
@@ -269,6 +273,7 @@ class PageMem:
             "sections": [s.to_dict() for s in self.sections],
             "captured_at": self.captured_at,
             "nav_id": self.nav_id,
+            "screen_gist": self.screen_gist,
         }
 
     @classmethod
@@ -279,6 +284,7 @@ class PageMem:
             sections=[Section.from_dict(s) for s in d.get("sections", [])],
             captured_at=d.get("captured_at", 0.0),
             nav_id=d.get("nav_id", 0),
+            screen_gist=d.get("screen_gist"),
         )
 
 

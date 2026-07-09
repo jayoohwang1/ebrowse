@@ -11,9 +11,10 @@ import argparse
 import sys
 
 OPERATING_LOOP = """\
-loop: open URL -> outline (skim sections) -> expand <sid> (read one section)
-      -> act on @refs (click/fill/...) -> read the returned diff
-      -> re-outline only after navigation or when confused"""
+loop: open URL (lands, prints title) -> outline (skim sections)
+      -> expand <sid> (read one section) -> act on @refs -> read the diff
+      -> after a navigation, outline again to read the new page
+open/back/click-through print a landing line, not the page; outline reads it."""
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -44,7 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     v.add_argument("url")
 
-    verb("back", "history back; prints diff/outline")
+    verb("back", "history back; lands (run outline to read)")
     verb("forward", "history forward")
     verb("reload", "reload current page")
 
@@ -76,13 +77,26 @@ def build_parser() -> argparse.ArgumentParser:
     # --- Observation ---
     v = verb("outline", "sectioned page overview (the default way to look at a page)")
     v.add_argument("--refresh", action="store_true", help="force re-observation")
-    v.add_argument("--wait-summaries", action="store_true", help="block until LLM labels ready")
-    v.add_argument("--no-summaries", action="store_true", help="deterministic labels only")
+    v.add_argument("--no-summaries", action="store_true", help="skip LLM section labels")
+    v.add_argument("--no-glance", action="store_true", help="skip the ◉ visual gist line")
     v.add_argument(
         "--preview",
         action="store_true",
         help="append a short verbatim text preview after each ≈ summary",
     )
+
+    v = verb(
+        "describe-screen",
+        "ask the local VLM about the current screenshot (◉, untrusted). "
+        'ex: ebrowse describe-screen | ebrowse describe-screen "what color is the Buy button?"',
+    )
+    v.add_argument(
+        "prompt",
+        nargs="?",
+        default=None,
+        help="visual question (omit for a concise gist of the screen)",
+    )
+    v.add_argument("--refresh", action="store_true", help="ignore the cached gist")
 
     v = verb("expand", "full content of one section as markdown with @refs. ex: ebrowse expand s3")
     v.add_argument("target", help="section id (s3) or element ref (@e5)")

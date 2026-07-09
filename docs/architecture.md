@@ -43,7 +43,7 @@ observation, one round trip per micro-interaction, and session amnesia.
 └────────────┘  text    │        ├─ browser: Playwright launch (persistent ctx) │ CDP      │
 ┌────────────┐          │        ├─ observation state: PageMem, RefRegistry, raw sections  │
 │ ebrowse mcp├─────────▶│        ├─ actions.py / compound.py: act → quiesce → diff         │
-│ (stdio MCP)│          │        └─ summarize/: batched labels, captions (async backfill)  │
+│ (stdio MCP)│          │        └─ summarize/: sync section labels + visual glance, captions│
 └────────────┘          │  core/ (pure): discover.js → DomSnapshot → split/label/          │
                         │                fingerprint/diff/render                           │
                         └──────────────────────────────────────────────────────────────────┘
@@ -57,21 +57,28 @@ observation, one round trip per micro-interaction, and session amnesia.
 - **Session** (`session.py` + `actions.py` + `compound.py`): one browser context + one
   active page + observation state; verb implementations.
 - **core/**: pure functions — the only code that understands page *structure*.
-- **summarize/**: optional client for an OpenAI-compatible endpoint. Never on the
-  critical path; circuit breaker on failures.
-- **MCP server** (`mcp.py`): stdio JSON-RPC, six tools, thin client to the same daemon
+- **summarize/**: optional client for an OpenAI-compatible endpoint. Runs only on the
+  `outline` verb (section labels + `◉` visual glance), synchronously but under a hard
+  timeout with a circuit breaker — never load-bearing: on failure the outline is
+  deterministic. Navigation and actions never call it. See [ADR 0008](adr/0008-explicit-outline-and-synchronous-visual-glance.md).
+- **MCP server** (`mcp.py`): stdio JSON-RPC, seven tools, thin client to the same daemon
   (CLI and MCP share browser state). See [ADR 0005](adr/0005-mcp-server-without-sdk.md).
 
 ## Observation flow (the heart of the tool)
 
 ```
-ebrowse outline
+ebrowse open <url>                      # navigation: land, don't render the page
+  → goto + settle → _observe_page()      # rebuild PageMem (durable refs) — NO summarizer
+  → landing line ("opened <url> · title — run 'ebrowse outline'")
+
+ebrowse outline                         # the only verb that reads + summarizes
   → page.evaluate(discover.js)          # ONE round trip: full DOM walk in-page
   → DomSnapshot (JSON tree)             # nodes: tag/attrs/text/bbox/clickable signals
   → split(DomSnapshot) → [RawSection]   # WebChallenger DividePage adaptation
   → extract elements, assign refs (RefRegistry), fingerprint, label
+  → (sync, if summarizer enabled) summarize.batch + caption_screen → sqlite cache
+                                        # text labels + ◉ glance, concurrent, timeout-bounded
   → render_outline(PageMem) → stdout
-  → (background) summarize.batch(page) → sqlite cache   # if summarizer enabled
 ```
 
 ```
@@ -128,7 +135,7 @@ scripts/smoke_real_sites.py  # manual real-site outline quality check
 | Cross-origin iframes invisible | Surfaced in the outline so the agent knows to screenshot. CDP route is future work. |
 | Closed shadow DOM | Out of scope; open shadow roots are walked. |
 | CDP-attach with a human using the browser | Commands serialized per session; diffs make external changes visible rather than corrupting state. |
-| Summary injection (page text → model → label) | Provenance markers (`≈` vs `|`), length clamp, refs stripped from model output; structure is never model-controlled. |
+| Summary injection (page text/pixels → model → label) | Provenance markers (`≈` text summary, `◉` visual gist, `|` verbatim), length clamp, refs stripped from model output; structure is never model-controlled. |
 
 ## Provenance
 

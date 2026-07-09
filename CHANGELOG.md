@@ -6,8 +6,57 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ## [Unreleased]
 
+### Changed
+
+- **Navigation no longer prints the outline.** `open`/`back`/`forward`/`reload`/
+  `tab` and any navigating action now return a terse landing line
+  (`opened <url> · "title"` / `… → navigation … now at <url>`) plus a
+  `run 'ebrowse outline'` hint — reading the page is an explicit `outline`. This
+  keeps the (now LLM-heavy) outline opt-in, lets the page settle before it's read,
+  and matches sibling tools. Durable `@refs` stay live across the jump, so acting
+  on known chrome without re-outlining still works. See docs/adr/0008.
+- **Section summaries are now synchronous**, filled during `outline` under a hard
+  `summarizer.sync_timeout_s` (default 30s) alongside the visual glance (they run
+  concurrently), instead of an async background backfill. No more
+  `backfill running` status; a slow/dead sidecar — or any error in the
+  summarizer/cache stack — degrades to deterministic labels with a status note,
+  so enrichment can never fail an `outline`. `outline --wait-summaries` is
+  removed (summaries always wait now); `--no-summaries` stays and `--no-glance`
+  is added. See docs/adr/0008.
+
 ### Added
 
+- **Named modal in blocked-click errors.** A modal that blocks the page without
+  geometrically covering the target (native `showModal()` top-layer/`inert`, or an
+  `aria-modal` focus trap) can't be pre-empted safely, but the click's occlusion
+  pre-check now *records* the open modal (visible `:modal` / `[aria-modal="true"]`
+  not containing the target). When the click then fails or no-ops, the message
+  names it — `blocked: a modal is open ("…") and is intercepting the click` — so
+  an agent stops retrying a dead click. False-positive-free: it only enriches an
+  already-failed/no-changed click, never blocks a valid one.
+- **`describe-screen [prompt]`** verb: a free-form visual query answered by the
+  local vision model over a viewport screenshot, returning TEXT only (`◉`,
+  untrusted). No prompt → a concise gist (shared with the outline's `◉` line and
+  its cache); a prompt → any visual question, from "is there an overlay?" to
+  "transcribe every price" to "describe every detail", bounded by
+  `summarizer.describe_max_tokens` (default 4096). The cheap routing tier between
+  page text and a full `screenshot`. Exposed as the MCP `browse_describe` tool.
+  Config: `summarizer.describe_max_tokens`, `summarizer.describe_timeout_s`.
+- **`◉` visual-gist line on the outline** (default on when a vision sidecar is
+  configured + reachable, `summarizer.glance = true`): one VLM line under the
+  `PAGE` header describing what's visible and flagging overlays/modals/
+  interstitials the DOM outline can't convey. Untrusted routing signal, cached
+  per page state (`screens` table) so revisits are instant. `outline --no-glance`
+  or `summarizer.glance = false` suppresses it. New provenance marker `◉`. See
+  docs/adr/0008.
+- Appeared in-page **`dialog` sections are expanded inline in the action diff**
+  (full `expand` markdown with `@refs`) — a modal is the forced next interaction,
+  and it's deterministic DOM, not a guess. Over ~4000t the expansion is compacted
+  (all controls kept, prose truncated, `expand sN` for the rest) rather than
+  dropped. A modal the splitter **coalesced into a content section** is detected
+  from its dialog-scoped added controls: the outcome is reported as `→ dialog`
+  and the line tagged `+ sN [dialog]: …`, so it carries the same signal as a
+  standalone dialog.
 - `dialog` verb (`dialog accept [text]` / `dialog dismiss` / `dialog status`) to
   resolve or inspect a native `confirm`/`prompt` blocking the page. Exposed via the
   MCP `browse_act` tool (`verb=dialog`, `response=accept|dismiss|status`). See

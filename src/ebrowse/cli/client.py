@@ -71,10 +71,12 @@ def _build_request(args: argparse.Namespace) -> Request | None:
     elif verb == "outline":
         a = {
             "refresh": args.refresh,
-            "wait_summaries": args.wait_summaries,
             "no_summaries": args.no_summaries,
+            "no_glance": args.no_glance,
             "preview": args.preview,
         }
+    elif verb == "describe-screen":
+        a = {"prompt": args.prompt, "refresh": args.refresh}
     elif verb == "expand":
         a = {"target": args.target, "cursor": args.cursor, "all": args.all}
     elif verb == "screenshot":
@@ -163,7 +165,10 @@ def run_command(args: argparse.Namespace) -> int:
         print("daemon: not running")
         return 0
 
-    timeout_s = (args.timeout / 1000) if args.timeout else 130.0
+    # describe-screen may legitimately run for minutes (large VLM generations);
+    # its socket timeout must exceed the daemon's longer per-verb ceiling.
+    default_timeout = 230.0 if req.verb == "describe-screen" else 130.0
+    timeout_s = (args.timeout / 1000) if args.timeout else default_timeout
     try:
         resp = _send(req, timeout_s)
     except TimeoutError:

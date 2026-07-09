@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Inert Modal — Fixture</title></head>
+<body>
+  <main id="page">
+    <h1>Inert-background modal test</h1>
+    <button type="button" id="open">Open modal</button>
+    <button type="button" id="outside">Outside action</button>
+    <p id="result">idle</p>
+  </main>
+  <div id="modal" role="dialog" aria-modal="true" aria-label="Trap modal"
+       style="display:none; position:fixed; top:10%; left:60%; background:#fff; border:2px solid #333; padding:16px;">
+    <p>Focus-trap modal, no backdrop.</p>
+    <button type="button" id="close">Close</button>
+  </div>
+  <script>
+    const modal=document.getElementById('modal'), page=document.getElementById('page');
+    document.getElementById('open').onclick=()=>{ modal.style.display='block'; page.inert=true; };
+    document.getElementById('close').onclick=()=>{ modal.style.display='none'; page.inert=false; };
+    document.getElementById('outside').onclick=()=>{ document.getElementById('result').textContent='outside clicked'; };
+  </script>
+</body></html>

@@ -30,6 +30,12 @@ class SummaryCache:
             "  caption TEXT NOT NULL,"
             "  created_at REAL NOT NULL)"
         )
+        self._db.execute(
+            "CREATE TABLE IF NOT EXISTS screens ("
+            "  screen_key TEXT PRIMARY KEY,"
+            "  gist TEXT NOT NULL,"
+            "  created_at REAL NOT NULL)"
+        )
         self._db.commit()
 
     def get_many(self, hashes: list[str]) -> dict[str, str]:
@@ -63,6 +69,19 @@ class SummaryCache:
         )
         self._db.commit()
         self._maybe_prune("captions")
+
+    def get_screen(self, screen_key: str) -> str | None:
+        row = self._db.execute(
+            "SELECT gist FROM screens WHERE screen_key = ?", (screen_key,)
+        ).fetchone()
+        return row[0] if row else None
+
+    def put_screen(self, screen_key: str, gist: str) -> None:
+        self._db.execute(
+            "INSERT OR REPLACE INTO screens VALUES (?, ?, ?)", (screen_key, gist, time.time())
+        )
+        self._db.commit()
+        self._maybe_prune("screens")
 
     def _maybe_prune(self, table: str) -> None:
         (n,) = self._db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()  # noqa: S608

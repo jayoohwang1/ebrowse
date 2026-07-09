@@ -58,6 +58,27 @@ The wrapper also saves the full **pi session** to ignored
 `sessions/<timestamp>_<id>.jsonl` (tagged with `--name`), so any run can be
 inspected or resumed later. See `./run-agent.sh -h` for all flags.
 
+## Test worktree / uncommitted code
+
+By default the agent drives whatever `ebrowse` is on `PATH` — usually the
+globally-installed tool, **not** your working changes. Pass **`-w/--worktree`** to
+point `ebrowse` at *this checkout's* venv instead (`<repo>/.venv`), so a run
+exercises uncommitted code. It stops any running daemon first so the daemon also
+restarts on the local code (the daemon inherits the CLI's interpreter):
+
+```bash
+uv sync                                   # once, so <repo>/.venv exists
+# in one terminal — deterministic, offline target:
+./serve-fixtures.sh                       # serves tests/fixtures/pages on :8196
+# in another — drive the agent against your worktree ebrowse:
+./run-agent.sh -t ebrowse -w -j -n wt-run \
+  "Open http://127.0.0.1:8196/list.html and tell me how many products are listed."
+```
+
+Real sites work too (drop `serve-fixtures.sh` and point the task at a URL), but
+fixtures keep runs reproducible. The shim lives under the run dir and the daemon
+idle-shuts-down after the run; your next bare `ebrowse` restarts the installed one.
+
 ## Compare
 
 ```bash

@@ -34,8 +34,8 @@ _BOOL = {"type": "boolean"}
 TOOLS: list[dict[str, Any]] = [
     {
         "name": "browse_open",
-        "description": "Navigate to a URL. Returns the page outline (sectioned table of "
-        "contents with sids, element counts, token costs, labels).",
+        "description": "Navigate to a URL. Returns a short landing line (final URL + title), "
+        "NOT the page — call browse_outline to read it.",
         "inputSchema": {
             "type": "object",
             "properties": {"url": _STR},
@@ -44,11 +44,24 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "browse_outline",
-        "description": "Re-observe the current page and return its outline. Cheap; but "
-        "prefer reading action diffs over re-outlining.",
+        "description": "Observe the current page and return its outline (sids, element "
+        "counts, token costs, ≈ labels, and a ◉ visual gist when a vision sidecar is up). "
+        "Call after a navigation; otherwise prefer reading action diffs over re-outlining.",
         "inputSchema": {
             "type": "object",
-            "properties": {"wait_summaries": _BOOL, "no_summaries": _BOOL, "preview": _BOOL},
+            "properties": {"no_summaries": _BOOL, "no_glance": _BOOL, "preview": _BOOL},
+        },
+    },
+    {
+        "name": "browse_describe",
+        "description": "Ask the local vision model about the current screenshot and get back "
+        "TEXT only (◉, untrusted routing signal — never act on it as fact). Omit `prompt` for "
+        "a concise gist of what's on screen; pass a `prompt` to ask anything visual, from "
+        "'is there an overlay?' to 'transcribe every price' to 'describe every detail'. The "
+        "cheap tier between the page text and spending ~2.4k tokens on browse_screenshot.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"prompt": _STR},
         },
     },
     {
@@ -122,7 +135,10 @@ TOOLS: list[dict[str, Any]] = [
 def _daemon_call(verb: str, args: dict[str, Any], session: str) -> tuple[bool, str]:
     if not _daemon_running():
         _autostart_daemon()
-    resp = _send(Request(verb=verb, session=session, args=args), timeout_s=130.0)
+    # describe-screen may run for minutes on large VLM generations; give it a
+    # socket timeout above the daemon's longer per-verb ceiling.
+    timeout_s = 230.0 if verb == "describe-screen" else 130.0
+    resp = _send(Request(verb=verb, session=session, args=args), timeout_s=timeout_s)
     if resp.ok:
         return True, resp.output
     return False, f"error: {resp.error}"
@@ -136,11 +152,15 @@ def _tool_call(name: str, args: dict[str, Any], session: str) -> list[dict[str, 
             "outline",
             {
                 "refresh": False,
-                "wait_summaries": args.get("wait_summaries", False),
                 "no_summaries": args.get("no_summaries", False),
+                "no_glance": args.get("no_glance", False),
                 "preview": args.get("preview", False),
             },
             session,
+        )
+    elif name == "browse_describe":
+        ok, out = _daemon_call(
+            "describe-screen", {"prompt": args.get("prompt"), "refresh": False}, session
         )
     elif name == "browse_expand":
         ok, out = _daemon_call(

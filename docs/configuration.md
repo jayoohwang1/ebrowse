@@ -24,9 +24,13 @@ enabled = true                  # degrades to deterministic labels if unreachabl
 base_url = "http://127.0.0.1:5001/v1"   # any OpenAI-compatible server
 model = "default"               # llama.cpp ignores; set for multi-model servers
 api_key = ""
-vision = true                   # image captions on expand (needs a multimodal model)
+vision = true                   # image captions on expand + visual glance (needs a multimodal model)
+glance = true                   # auto ◉ visual-gist line on the outline (needs vision + reachable model)
 max_input_tokens = 100000       # input budget per page summarization call
-timeout_s = 60
+timeout_s = 60                  # client-wide default; describe-screen overrides it
+sync_timeout_s = 30             # hard deadline for the synchronous outline enrichment (summaries + glance)
+describe_max_tokens = 4096      # ceiling for a manual `describe-screen` answer
+describe_timeout_s = 180        # `describe-screen` deadline (patient; long detailed answers)
 # extra_body: merged verbatim into every /chat/completions request. Model/
 # provider knobs live here as config, not code (see below). Default: {}.
 [summarizer.extra_body]
@@ -51,20 +55,37 @@ allowed_domains = []            # empty = all; subdomains of listed domains allo
 | `~/.cache/ebrowse/daemon.log` | daemon log (rotated, 5 MB × 2) |
 | `~/.cache/ebrowse/daemon.pid` | daemon pidfile |
 | `~/.cache/ebrowse/profiles/<session>/` | persistent browser profiles (logins survive restarts) |
-| `~/.cache/ebrowse/summaries.db` | sqlite summary + caption cache (pruned past 50k rows) |
+| `~/.cache/ebrowse/summaries.db` | sqlite summary + caption + screen-gist cache (pruned past 50k rows) |
 
 ## Summarizer behavior
 
-- **One batched call per page**: per-section digests in, strict JSON
+- **Synchronous, on the `outline` verb only.** `outline` fills both the `≈`
+  section summaries and the `◉` visual glance before it returns, under a hard
+  `sync_timeout_s` deadline (text + glance run concurrently). Navigation and
+  actions never run the summarizer — they return a landing line / diff, so the
+  sidecar's latency is paid only when the agent explicitly reads the page.
+- **One batched call per page** for text: per-section digests in, strict JSON
   `{sid: one-line summary}` out. Results are cached by section `content_hash`, so
   changed content is structurally a cache miss — there is no separate invalidation.
-- Backfill runs as a background task outside the session lock; backfilled summaries
-  appear on the *next* outline (emitted output is never mutated).
-- Circuit breaker: 3 consecutive failures disable the summarizer for 10 minutes
-  (outline shows `summaries: unavailable`). A dead server costs nothing after the
-  breaker opens.
-- Injection hygiene: model output is length-clamped (140 chars), control-stripped,
-  and `(@eN)` tokens are removed; the `≈` provenance marker is added by the renderer.
+- **Visual glance (`◉`)**: one VLM call on a viewport screenshot, cached by a
+  key derived from the page's DOM structure (`screens` table), so revisiting the
+  same page state is an instant cache hit (no screenshot, no VLM). Set
+  `glance = false` to drop the auto line while keeping `describe-screen`.
+  Cost note: glance sends a ~1.6k-token image per newly-seen page. That is free
+  on a local sidecar (the intended setup) but real money against a *paid*
+  multimodal API — set `glance = false` there, or point `base_url` at a local model.
+- **Never load-bearing.** On timeout/failure the outline renders deterministic
+  labels and no `◉` line (a status note says so). A genuine timeout counts toward
+  the circuit breaker: 3 consecutive failures disable the summarizer for 10
+  minutes; a dead/slow server costs nothing after the breaker opens.
+- **`describe-screen`** is the patient, agent-initiated path: a free-form visual
+  query with its own generous `describe_max_tokens` / `describe_timeout_s`
+  (bounded above by the daemon's per-verb ceiling and the client transport
+  timeout — raise those in tandem if you push `describe_timeout_s` past ~200s).
+- Injection hygiene: text summaries are length-clamped (140 chars),
+  control-stripped, and `(@eN)` tokens removed; visual gists are control-stripped
+  and newline-collapsed. The `≈` / `◉` provenance markers are added by the
+  renderer — model output only ever fills label text, never structure.
 
 ### Provider-specific knobs (`extra_body`)
 

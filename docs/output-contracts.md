@@ -43,23 +43,40 @@ rules that are not visible from the field list:
 
 ## Outline (`ebrowse outline`)
 
+`outline` is the ONLY verb that reads the page and runs the summarizer.
+Navigation (`open`/`back`/click-through) returns a landing line, not the page
+(see *Navigation result* below) — the agent calls `outline` to read it.
+
 ```
 PAGE Amazon.com : sony headphones — https://www.amazon.com/s?k=sony+headphones
+◉ Search-results grid of black over-ear headphones; filter sidebar left. No modals or popups visible.
 s1 nav     12 links, 2 inputs   ~800t  ≈ Site header: search box, account menu, cart
 s2 form    18 inputs            ~450t  ≈ Filter sidebar: brand, price, rating checkboxes
 s3 list    24 items, 48 links   ~6.2kt | "Search results — Sony WH-1000XM5 $348 …"
 s5 iframe  (cross-origin: ads.doubleclick.net)
-summaries: 3/4 cached · backfill running (rerun outline to see them)
 ```
 
 - One line per section: `sid type  <counts>  ~<tokens>  <label>`.
-- Label provenance: `≈` = LLM summary (model-paraphrased page content, untrusted);
-  `|` = deterministic (heading + preview, verbatim page text, quoted).
+- Label provenance: `≈` = LLM section summary (model-paraphrased page content,
+  untrusted); `|` = deterministic (heading + preview, verbatim page text, quoted);
+  `◉` = VLM visual gist of the screenshot (untrusted, even weaker than `≈` — a
+  routing signal for "is it worth a screenshot?", never data to act on).
+- `◉` is an optional single line right under the `PAGE` header (when a vision
+  sidecar is configured + reachable, `summarizer.glance = true`). It describes
+  only what is visible and flags overlays/modals/interstitials the DOM outline
+  can't convey. Absent otherwise. `outline --no-glance` suppresses it per call.
+- Summaries + glance are filled **synchronously** before the outline returns
+  (concurrently, under `summarizer.sync_timeout_s` — which bounds each sidecar
+  call; the summaries path may fire one JSON-only reprompt, so its worst case is
+  ~2× that). Cache hits are free; a slow/dead sidecar (or a cache-layer error)
+  degrades to deterministic labels + no `◉` line, with a status note
+  (`summaries: 2/4 (sidecar slow or incomplete) · glance: sidecar slow or unavailable`).
+  There is no async "backfill running" phase.
 - `~Nt` is the token estimate of expanding that section (`len(rendered)//4`) — the
   outline renderer and expand renderer are coupled on purpose so the estimate is
   exactly what `expand` would cost.
 - Cross-origin iframes are listed but not entered.
-- Final status line only when the summarizer is enabled and not fully cached.
+- `--no-summaries` skips the `≈` labels; `--no-glance` skips the `◉` line.
 - `--preview` (opt-in) appends a short verbatim preview after each summary line,
   keeping both markers: `s1 nav  12 links  ~800t  ≈ Site header …  | "Deliver to …"`.
   The default line is unchanged; only summary-bearing lines gain the `| "…"` tail.
@@ -88,26 +105,65 @@ accessibility tree.
   `… 104 more items — expand s3 --cursor 20`. Tables render as markdown tables with
   a `#` index column; row indices are stable so `--cursor` composes with `query`.
 
+## Navigation result (`open`, `back`, `forward`, `reload`, `tab`, navigating actions)
+
+Navigation does NOT dump the page. It returns a terse landing line naming the
+next action; the agent runs `outline` to read the page. This keeps observation
+(and the synchronous summarizer) opt-in, and lets the page finish loading before
+it's read. Durable `@refs` stay live across the navigation (the page is rebuilt
+internally), so an agent can act on a known persistent-chrome ref without
+re-outlining.
+
+```
+opened https://example.com/login  ·  "Sign in — Example"
+run 'ebrowse outline' to read the page
+```
+
+- Verb prefix is `opened` / `reloaded` / `back to` / `forward to` / `switched to
+  tab N:`. A navigating **action** keeps its `VERB target → navigation` header,
+  then `now at <url>  ·  "<title>"` and the same hint.
+- Surfaced `note:` lines (new-tab adoption, auto-accepted native `alert`) follow.
+
 ## Action result (every action verb)
 
 ```
 CLICK @e42 (button "Add to Cart") → partial change
 s7 dialog  3 links, 1 button  ~200t  | "Added to cart — Sprite Stasis Ball"  [appeared]
+## s7 dialog — Added to cart
+Sprite Stasis Ball added. [View cart (@e51)](→ /cart) [Checkout (@e52)](→ /checkout)
 ~ @e12 value: "0" → "1"
 ```
 
 - First line: `VERB target (resolved description) → outcome` where outcome ∈
   `navigation | partial change | dialog | no change detected`.
-- `navigation` prints the full new outline; sections fingerprint-matched to the
-  previous page are marked `(unchanged)`.
-- `partial change` prints only the diff, ordered appeared → disappeared → changed:
-  `+ sid: [added elements with refs]`, `- sid: N element(s) removed (names)`,
-  `~ @ref field: "old" → "new"`, `~ sid: new text: "status/validation message"`.
+- `navigation` returns the landing line above (not a full outline).
+- `partial change` / `dialog` prints only the diff, ordered appeared →
+  disappeared → changed: `+ sid: [added elements with refs]`,
+  `- sid: N element(s) removed (names)`, `~ @ref field: "old" → "new"`,
+  `~ sid: new text: "status/validation message"`.
+- An **appeared `dialog` section is expanded inline** (its full `expand`
+  markdown, with `@refs`) right below its `[appeared]` line — a modal is almost
+  always the forced next interaction, and this is deterministic DOM, not a guess.
+  Over ~4000t the expansion is compacted rather than dropped: every interactive
+  control is kept with its `@ref`, prose is truncated, and a
+  `… (large dialog … expand sN for the rest)` line points at the full text.
+- A modal that the splitter **coalesced into a content section** (rather than
+  splitting out) shows as a changed section whose added controls sit under a
+  `role=dialog` subtree. The renderer detects this: the outcome is reported as
+  `→ dialog` (not `→ partial change`) and the line is tagged
+  `+ s1 [dialog]: [Accept (@e6)], [Reject (@e7)]`, so a coalesced dialog carries
+  the same signal as a standalone one.
 - `no change detected` carries the honest caveat (may be a real no-op, or the effect
   is outside the DOM / slower than the settle window).
 - Notes always surface: `note: native alert auto-accepted: "…"`, new-tab adoption.
 - Occluded clicks fail *before* acting:
   `blocked: @e42 is covered by <dialog "Cookie consent"> — interact with that first` (exit 1).
+  A modal that blocks the page *without* covering the target (native `showModal()`
+  / `aria-modal` + `inert`, where there's no hit-testable overlay) can't be
+  pre-empted safely, so the click is attempted; when it fails, the error names the
+  culprit: `blocked: a modal is open (dialog "…") and is intercepting the click —
+  interact with it or dismiss it first` (exit 1). If instead such a click merely
+  no-ops, the same modal is named in a `note:` on the `no change detected` result.
 
 ### Native dialog opened (blocking)
 
@@ -156,6 +212,25 @@ QUERY s4 filter="Cold Brew" — matched 2 of 24 items
   matched against each item's *plain text*, never the rendered markdown.
 - Item indices are the original list positions (consistent with `expand --cursor`).
 - Unknown `--cols` exit 2 listing the real column names.
+
+## Describe-screen (`ebrowse describe-screen [prompt]`)
+
+A free-form visual query answered by the local VLM over a viewport screenshot —
+the routing tier between the page text and a full `screenshot` (which costs the
+main agent ~2.4k image tokens; this costs only the returned text). Output is one
+`◉`-prefixed line/block, untrusted (never act on it as fact).
+
+```
+◉ Two black over-ear headphones in product photos; orange search bar; yellow "Add to cart" buttons. No modals visible.
+```
+
+- No `prompt` → the concise default gist (the same text as the outline `◉` line,
+  sharing its per-page cache — so it's instant if the outline already ran).
+- With a `prompt` → any visual question, from "is there an overlay?" to
+  "transcribe every price" to "describe every detail"; answer length is bounded
+  by `summarizer.describe_max_tokens`. Custom-prompt answers are not cached.
+- `--refresh` ignores the cached gist. Requires `summarizer.vision`; a clear
+  error names the fix when vision isn't configured or the sidecar is down.
 
 ## Errors and exit codes
 

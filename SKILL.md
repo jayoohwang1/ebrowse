@@ -13,15 +13,22 @@ you ask.
 ## The operating loop
 
 ```
-1. ebrowse open <url>            → prints the page OUTLINE (a table of contents)
-2. ebrowse expand <sid>          → read ONE section as markdown with @refs
-3. ebrowse click/fill/... @ref   → act; read the returned DIFF
-4. repeat 2–3. Re-outline only after confusion — navigation prints it for you.
+1. ebrowse open <url>            → LANDS on the page (prints final url + title)
+2. ebrowse outline               → the page OUTLINE (a table of contents)
+3. ebrowse expand <sid>          → read ONE section as markdown with @refs
+4. ebrowse click/fill/... @ref   → act; read the returned DIFF
+5. repeat 3–4. After a navigation, run `outline` again to read the new page.
 ```
 
-Example outline line:
+`open`, `back`, and click-throughs return a one-line landing (url + title), NOT
+the page — run `outline` to read it. This keeps the (LLM-backed) outline opt-in
+and lets the page finish loading first. Your `@refs` still work across the jump.
+
+Example outline:
 
 ```
+PAGE Espresso Gear — https://shop.example/search?q=grinder
+◉ Product grid of coffee grinders; filter sidebar on the left. No modals or popups visible.
 s2 form  6 inputs, 1 button  ~46t  ≈ Product filter form: brand, price, rating
 │  │     │                   │     └ label. ≈ = model-written, | = verbatim page text
 │  │     │                   └ token cost of expanding this section
@@ -30,8 +37,11 @@ s2 form  6 inputs, 1 button  ~46t  ≈ Product filter form: brand, price, rating
 └ section id — use with expand/screenshot/scroll
 ```
 
-Trust `≈` labels as hints only — they are model-paraphrased page content. The
-expanded markdown and element states are ground truth from the DOM.
+Trust markers are hints only, never ground truth: `≈` = model-paraphrased text,
+`◉` = the local vision model's read of the *screenshot* (even weaker — a routing
+signal for "is it worth looking at the pixels?", e.g. it flags an overlay or
+interstitial the text can't show). The expanded markdown and element states are
+the DOM truth. The `◉` line appears only when a vision sidecar is running.
 
 ## Refs (@eN) — durable element handles
 
@@ -53,12 +63,18 @@ CLICK @e4 (button "Sort by: Relevance") → partial change
 ```
 
 Diff vocabulary:
-- `→ navigation` — you're on a new page; the fresh outline follows immediately
-  (sections marked `(unchanged)` are the same chrome as the previous page).
+- `→ navigation` — the action moved you to a new page; you get a landing line
+  (`now at <url> · "title"`), not the page. Run `outline` to read it. Your
+  durable `@refs` still resolve, so you can act on known chrome without it.
 - `→ partial change` — same page; `+` added elements (with ready-to-use refs),
   `-` removed, `~` state/text changes. `~ s2: new text: "Account created!"`
   quotes what a status message/validation error now says.
-- `→ dialog` — an in-page DOM modal appeared; deal with it first.
+- `→ dialog` — an in-page DOM dialog appeared. If it's its own section, its full
+  content is expanded right there in the diff; if it was folded into a section,
+  its controls show as `+ sN [dialog]: [Accept (@e6)] …`. Interact with its
+  controls as the dialog requires (accept / close / fill / submit — not always a
+  simple accept). If it's modal, clicks elsewhere are blocked (`covered by …`)
+  until you resolve it, so handle it first.
 - `→ dialog opened (blocking)` — your action opened a native `confirm`/`prompt`
   that now blocks the whole page. Nothing else works until you resolve it:
   `ebrowse dialog accept` (or `dialog accept "text"` to answer a prompt) /
@@ -74,12 +90,17 @@ Diff vocabulary:
   or `ebrowse tab <n>` to switch to an unblocked tab.
 - `blocked: @e42 is covered by <dialog "Cookie consent">` (exit 1) — an overlay
   intercepts the click. Interact with the covering element first.
+- `blocked: a modal is open ("…") and is intercepting the click` (exit 1) — a
+  modal is blocking the page even though it isn't visually over your target
+  (native `showModal()` / focus-trap). Don't retry the same click — resolve or
+  dismiss the named modal first.
 
 ## Verbs
 
 ```
-open <url>            navigate (alias goto); back / forward / reload
-outline [--wait-summaries|--no-summaries|--refresh]
+open <url>            navigate (alias goto); back / forward / reload  → landing line
+outline [--no-summaries|--no-glance|--refresh]   read the page (table of contents)
+describe-screen [prompt]                   ask the local vision model about the screen
 expand <sid|@ref> [--cursor N] [--all]     lists/tables paginate; follow the
                                            "… N more items — expand s4 --cursor 20" hint
 click <t> [--double|--right|--new-tab]     t = @ref or CSS selector
@@ -119,14 +140,19 @@ at suggestions first.
 button-style dropdowns too — it opens them, matches the revealed option text,
 and clicks it. No-match errors list every revealed option.
 
-**Long lists/tables:** `ebrowse query s4 --filter "under.*100|\$[0-9]?[0-9]\."`
-shows only matching rows (with refs, ready to click); `--cols "name,price"`
-projects table columns. For sequential reading, `expand` pages with `--cursor`.
-Never `--all` blindly — the outline row shows item count and token cost.
+**Long lists/tables:** `expand` shows a 20-item page — page through it with
+`--cursor N` (follow the "… N more — expand s4 --cursor 20" hint), or `--all` for
+everything (rarely; the outline row shows item count and token cost). To *filter*
+or *cap* rows instead, use `query`: `ebrowse query s4 --filter "under.*100"
+--limit 5` (regex over row text), `--cols "name,price"` projects table columns.
+The flags don't cross: `--filter/--cols/--limit` are `query`-only; `expand` takes
+only `--cursor/--all`. To see just the first item, `expand s4` already shows it.
 
-**Cookie banners / modals:** they appear as `dialog` sections or as the
-covering element in a blocked-click error. Expand, click the accept/close
-button, continue.
+**Cookie banners / modals:** an appearing dialog shows in the action diff with
+its controls' `@refs` ready — a substantial one as its own `dialog` section
+expanded inline, a coalesced one tagged `+ sN [dialog]: [Accept (@e6)] …`. Do
+whatever the dialog needs (accept, close, fill, submit) — not always a plain
+accept. A modal blocks other clicks (`covered by …`) until you resolve it.
 
 **Native dialogs (`confirm`/`prompt`):** an action that pops one returns
 `→ dialog opened (blocking)` and freezes the page. Decide, then run
@@ -142,9 +168,18 @@ real Chrome instead — start it with `--remote-debugging-port=9222`, then
 get VLM captions `![≈caption](@i3)` when the sidecar is up. See one with
 `ebrowse screenshot --ref @i3`. `@i` refs are per-observation (not durable).
 
-**When lost:** `ebrowse outline` (cheap), or `ebrowse screenshot` and look.
-`ebrowse doctor` diagnoses environment problems; daemon log:
-`~/.cache/ebrowse/daemon.log`.
+**Seeing without a screenshot (`describe-screen`):** ask the local vision model
+about the current screen and get back text, not a 2.4k-token image. No argument →
+a concise gist (same as the outline `◉` line). With a question → anything visual:
+`ebrowse describe-screen "is there a cookie banner or overlay covering the page?"`,
+`describe-screen "what color is the selected size?"`, `describe-screen "transcribe
+the prices in the grid"`. It's the cheap middle tier between the page text and
+`screenshot`. Untrusted (a model's read of pixels) — use it to decide whether to
+look, not as data to act on.
+
+**When lost:** `ebrowse outline` (cheap), `ebrowse describe-screen` (cheap visual
+gist), or `ebrowse screenshot` and look yourself. `ebrowse doctor` diagnoses
+environment problems; daemon log: `~/.cache/ebrowse/daemon.log`.
 
 ## What NOT to do
 

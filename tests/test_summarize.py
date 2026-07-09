@@ -16,7 +16,12 @@ from ebrowse.config import ObserveConfig, SummarizerConfig
 from ebrowse.core.fingerprint import RefRegistry
 from ebrowse.core.pipeline import build_page
 from ebrowse.core.snapshot import DomSnapshot
-from ebrowse.summarize.batch import build_messages, parse_summaries, summarize_page
+from ebrowse.summarize.batch import (
+    build_messages,
+    caption_screen,
+    parse_summaries,
+    summarize_page,
+)
 from ebrowse.summarize.cache import SummaryCache
 from ebrowse.summarize.client import SummarizerClient
 from tests.fixture_server import FixtureServer
@@ -86,6 +91,9 @@ def test_cache_round_trip(tmp_path):
     cache.put_caption("img1", "a red bicycle")
     assert cache.get_caption("img1") == "a red bicycle"
     assert cache.get_caption("img2") is None
+    cache.put_screen("scr1", "a checkout page with a cookie banner")
+    assert cache.get_screen("scr1") == "a checkout page with a cookie banner"
+    assert cache.get_screen("scr2") is None
     cache.close()
 
 
@@ -102,6 +110,92 @@ async def test_batch_against_mock_server():
     for sid, summary in out.items():
         assert summary == f"MOCK {sid} summary"
     assert len(mock.requests) == 1  # ONE batched call for the whole page
+
+
+async def test_caption_screen_uses_default_and_custom_prompt():
+    with MockSummarizer() as mock:
+        client = SummarizerClient(
+            SummarizerConfig(base_url=mock.base_url, timeout_s=10, vision=True)
+        )
+        # default gist (no prompt) — server sees an image request, returns the gist
+        gist = await caption_screen(client, "ZmFrZQ==")
+        assert gist == "MOCK visual gist: a page with no overlays"
+        assert _is_image_body(mock.requests[-1])
+        # a custom prompt rides in the same image message
+        gist2 = await caption_screen(client, "ZmFrZQ==", prompt="what color is the button?")
+        assert gist2
+        texts = [
+            p["text"]
+            for p in mock.requests[-1]["messages"][0]["content"]
+            if p.get("type") == "text"
+        ]
+        assert texts == ["what color is the button?"]
+        await client.aclose()
+
+
+async def test_caption_screen_disabled_when_vision_off():
+    with MockSummarizer() as mock:
+        client = SummarizerClient(
+            SummarizerConfig(base_url=mock.base_url, timeout_s=10, vision=False)
+        )
+        assert await caption_screen(client, "ZmFrZQ==") is None
+        assert not mock.requests  # never hit the server
+        await client.aclose()
+
+
+def _is_image_body(body: dict) -> bool:
+    content = body["messages"][0]["content"]
+    return isinstance(content, list) and any(p.get("type") == "image_url" for p in content)
+
+
+class _BoomCache:
+    """A SummaryCache stand-in whose disk ops fail, to prove enrichment stays
+    non-load-bearing (principle 1) when the cache layer breaks."""
+
+    def __init__(self, *, read_raises: bool = False) -> None:
+        self._read_raises = read_raises
+
+    def get_many(self, hashes):
+        if self._read_raises:
+            raise RuntimeError("cache read boom")
+        return {}
+
+    def put_many(self, mapping):
+        raise RuntimeError("cache write boom")
+
+    def get_screen(self, key):
+        return None
+
+    def put_screen(self, key, gist):
+        raise RuntimeError("cache write boom")
+
+
+async def test_enrichment_survives_cache_failure():
+    """A cache-layer error mid-enrichment must never fail the outline: a write
+    failure degrades to a status note; a read failure is swallowed. Either way
+    _apply_enrichment returns instead of raising (the deterministic outline
+    still renders)."""
+    from ebrowse.config import Config
+    from ebrowse.session import Session
+
+    with MockSummarizer() as mock:
+        # summaries generate fine, but the cache WRITE raises -> caught + degraded
+        cfg = Config()
+        cfg.summarizer = SummarizerConfig(base_url=mock.base_url, vision=False, timeout_s=10)
+        s = Session("t", cfg)
+        s.page_mem = _page("list")
+        s._cache = _BoomCache()  # type: ignore[assignment]
+        note = await s._apply_enrichment(no_summaries=False, no_glance=True)
+        assert note and "summaries" in note  # a degrade note, not an exception
+        assert mock.requests  # it really did reach the sidecar before the cache blew up
+        await s._summarizer.aclose()
+
+        # a cache READ failure is swallowed too (no summarizer call, no raise)
+        s2 = Session("t", cfg)
+        s2.page_mem = _page("list")
+        s2._cache = _BoomCache(read_raises=True)  # type: ignore[assignment]
+        assert await s2._apply_enrichment(no_summaries=False, no_glance=True) is None
+        await s2._summarizer.aclose()
 
 
 async def test_extra_body_merged_into_request():
@@ -163,16 +257,35 @@ def test_outline_shows_mock_summaries(tmp_path):
             )
 
         try:
+            # navigation lands; it does NOT run the summarizer
             r = run("open", srv.url("article.html"))
             assert r.returncode == 0, r.stderr
-            assert "backfill running" in r.stdout or "≈" in r.stdout
+            assert r.stdout.startswith("opened ")
+            assert "≈" not in r.stdout and "◉" not in r.stdout
 
-            r = run("outline", "--wait-summaries")
+            # the explicit outline synchronously fills ≈ labels AND the ◉ gist,
+            # in one shot (no async "backfill running" phase)
+            r = run("outline")
             assert r.returncode == 0, r.stderr
             assert re.search(r"≈ MOCK s\d+ summary", r.stdout)
+            assert "◉ MOCK visual gist" in r.stdout
             assert "backfill" not in r.stdout
 
+            # opt-outs
             r = run("outline", "--no-summaries")
             assert "≈" not in r.stdout and '| "' in r.stdout
+            assert "◉ MOCK visual gist" in r.stdout  # glance still shown
+            r = run("outline", "--no-glance")
+            assert "◉" not in r.stdout and re.search(r"≈ MOCK s\d+ summary", r.stdout)
+
+            # describe-screen: no prompt → the cached/default gist
+            r = run("describe-screen")
+            assert r.returncode == 0, r.stderr
+            assert r.stdout.strip().startswith("◉ MOCK visual gist")
+
+            # describe-screen with a free-form prompt reaches the VLM
+            r = run("describe-screen", "list every button")
+            assert r.returncode == 0, r.stderr
+            assert r.stdout.strip().startswith("◉ ")
         finally:
             run("daemon", "stop")
