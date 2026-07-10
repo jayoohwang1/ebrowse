@@ -264,6 +264,18 @@ def test_golden_expand(name: str, sid: str, cursor: int):
 # ------------------------------------------------------------------ units ----
 
 
+def test_disabled_controls_still_clickable_class():
+    # disabled controls keep refs (agents must see the grayed-out submit);
+    # weak-evidence candidates stay gated on enabled
+    from ebrowse.core.clickable import candidate_evidence, is_clickable
+    from ebrowse.core.snapshot import DomNode
+
+    btn = DomNode(tag="button", rect=(0, 0, 100, 30), attrs={"dis": 1}, signals={"tg": 1})
+    assert is_clickable(btn)
+    div = DomNode(tag="div", rect=(0, 0, 100, 30), attrs={"dis": 1}, signals={"el": 1})
+    assert candidate_evidence(div) is None
+
+
 def test_candidate_evidence_ladder():
     from ebrowse.core.clickable import candidate_evidence
     from ebrowse.core.snapshot import DomNode

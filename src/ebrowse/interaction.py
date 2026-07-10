@@ -64,6 +64,20 @@ class InteractionMixin:
         equivalents of a plain click only — never of modified clicks)."""
         with contextlib.suppress(Exception):
             await loc.scroll_into_view_if_needed(timeout=2000)
+        # disabled controls get refs (the agent must SEE the grayed-out submit),
+        # but acting on one would burn the full Playwright timeout — refuse fast
+        # with the state named. is_disabled covers native, aria-disabled, and
+        # fieldset inheritance.
+        disabled = False
+        with contextlib.suppress(Exception):
+            disabled = await loc.is_disabled(timeout=1000)
+        if disabled:
+            raise CommandError(
+                f"blocked: {target} is disabled — the page must enable it first "
+                "(complete required fields or prior steps), then retry; the diff of "
+                "your next action will show it as enabled",
+                ExitCode.ACTION_FAILED,
+            )
         info = await self._check_occlusion(loc, target)  # raises on dialog cover
         if info.get("coverInLabel") and plain:
             return InteractionPlan(route="label")

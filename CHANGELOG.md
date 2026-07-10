@@ -33,6 +33,16 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- **Disabled controls are visible, marked, and fast-refused.** Previously a
+  disabled control got no ref at all — a grayed-out submit was invisible in
+  expand, so an agent couldn't reason about enabling it. Disabled controls
+  (own attribute, `aria-disabled`, or fieldset-inherited via `:disabled`) now
+  keep their refs with a `disabled` marker; acting on one fails fast naming
+  the state instead of burning the 8s Playwright timeout, and the
+  `disabled: "true" → "false"` transition shows in the diff when another
+  action unlocks them. Elements under `[inert]` are marked ` inert` in
+  expand. Weak-evidence candidates remain gated on enabled. Fixture:
+  `disabled_states.html`.
 - **Outcome evidence beyond the DOM diff.** Tracked element state now includes
   `pressed` (`aria-pressed`), `selected` (`aria-selected`), and `checked` from
   `aria-checked` on role checkbox/radio/switch widgets (rendered with the same

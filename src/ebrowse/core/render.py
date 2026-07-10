@@ -177,14 +177,16 @@ def _element_md(node: DomNode) -> str:
     if tag in ("input", "textarea") or a.get("con"):
         typ = a.get("typ", "text")
         label = a.get("nm") or a.get("ph") or typ
+        dis = " disabled" if a.get("dis") else ""
         if typ in ("checkbox", "radio"):
             mark = "x" if a.get("chk") else " "
-            return f"[{mark}] {label} ({ref})"
+            return f"[{mark}] {label} ({ref}){dis}"
         if typ in ("submit", "button", "reset"):
-            return f"[{a.get('val') or label} ({ref})]"
+            return f"[{a.get('val') or label} ({ref}){dis}]"
         val = a.get("val", "")
         shown = f'"{_clip(val, 60)}"' if val else "empty"
         req = ", required" if a.get("req") else ""
+        req += ", disabled" if a.get("dis") else ""
         return f"[{label} ({ref}: {shown}{req})]"
     # buttons and everything else clickable
     text = a.get("nm") or node.subtree_text(cap=120) or a.get("ttl") or tag
@@ -195,6 +197,10 @@ def _element_md(node: DomNode) -> str:
         state += " pressed"
     if a.get("asel"):
         state += " selected"
+    if a.get("dis"):
+        state += " disabled"
+    if a.get("inr"):
+        state += " inert"
     if "chk" in a:  # ARIA checkbox/radio/switch: same marks as native inputs
         mark = "x" if a.get("chk") else " "
         return f"[{mark}] {_clip(text, 80)} ({ref}){state}"

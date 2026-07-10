@@ -51,6 +51,10 @@ the DOM truth. The `◉` line appears only when a vision sidecar is running.
   site's header search box keeps its ref on every page. Act without re-reading.
 - If a ref stops resolving you get `stale ref @e12 … — run 'ebrowse outline'`
   (exit 2). Just re-outline and re-expand; never guess refs.
+- `disabled` / `inert` after a ref — `[Place order (@e9) disabled]` — means the
+  control exists but can't be used yet: something must enable it first (fill a
+  required field, close a modal). Clicking it fails fast telling you so; when
+  another action enables it, the diff shows `~ @e9 disabled: "true" → "false"`.
 - A `?` inside the ref parens — `[Save changes (@e4 ?)]` — marks a **candidate**:
   a custom widget discovered from weak evidence (a real JS listener, `tabindex`,
   or ARIA state) rather than proven control semantics. Click it like any ref,

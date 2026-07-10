@@ -529,12 +529,43 @@ def test_native_dialog_expands_and_blocks_outside(server, env):
     assert "blocked" in r.stderr and "dialog" in r.stderr.lower()
 
 
+def test_disabled_controls_exposed_and_fast_refused(server, env):
+    # disabled controls (own attr AND fieldset-inherited) get refs and a
+    # 'disabled' marker; acting on one fails fast naming the state; the diff
+    # shows the disabled → enabled transition when the page unlocks them
+    ebrowse(env, "open", server.url("disabled_states.html"))
+    out = ebrowse(env, "outline").stdout
+    sids = re.findall(r"^(s\d+) ", out, re.M)
+    expanded = "".join(ebrowse(env, "expand", s, "--all").stdout for s in sids)
+    assert re.search(r"\[Save address \(@e\d+\) disabled\]", expanded), expanded
+    assert re.search(r"\[Place order \(@e\d+\) disabled\]", expanded), expanded
+    order = ref_anywhere(env, r"Place order")
+    r = ebrowse(env, "click", order)
+    assert r.returncode == 1
+    assert "is disabled" in r.stderr and "enable it first" in r.stderr
+    tos = ref_anywhere(env, r"I agree to the terms")
+    r = ebrowse(env, "check", tos)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'disabled: "true" → "false"', r.stdout), r.stdout
+    r = ebrowse(env, "click", order)
+    assert r.returncode == 0, r.stderr
+    assert "Order placed!" in r.stdout
+    # fieldset unlock enables all inherited-disabled controls at once
+    unlock = ref_anywhere(env, r"Ship to a different")
+    r = ebrowse(env, "check", unlock)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'disabled: "true" → "false"', r.stdout), r.stdout
+
+
 def test_inert_modal_coalesced_and_names_block(server, env):
     ebrowse(env, "open", server.url("inert_modal.html"))
     # an aria-modal div coalesced into the content section is still flagged dialog
     r = ebrowse(env, "click", "#open")
     assert r.returncode == 0, r.stderr
     assert "→ dialog" in r.stdout and "[dialog]" in r.stdout
+    # background elements under [inert] carry the marker in expand
+    out = ebrowse(env, "expand", "s1", "--all").stdout
+    assert re.search(r"\[Outside action \(@e\d+\) inert\]", out), out
     # it blocks the page via inert (no covering element) → Playwright can't click;
     # the error names the specific modal instead of "an overlay is probably open"
     r = ebrowse(env, "click", "#outside")

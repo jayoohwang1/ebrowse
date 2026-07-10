@@ -124,7 +124,12 @@
       const ac = el.getAttribute("aria-checked");
       if (ac !== null) a.chk = ac === "true" ? 1 : 0;
     }
-    if (el.disabled === true || el.getAttribute("aria-disabled") === "true") a.dis = 1;
+    // :disabled matches inherited fieldset disabling too, unlike el.disabled
+    let dis = el.getAttribute("aria-disabled") === "true";
+    if (!dis) {
+      try { dis = el.matches(":disabled"); } catch (e) { dis = el.disabled === true; }
+    }
+    if (dis) a.dis = 1;
 
     if (tag === "input" || tag === "textarea") {
       a.typ = tag === "textarea" ? "textarea" : (el.getAttribute("type") || "text").toLowerCase();
@@ -213,7 +218,15 @@
       }
       if (hasPointerListener(el)) k.el = 1;
     }
-    if (Object.keys(k).length) node.k = k;
+    if (Object.keys(k).length) {
+      node.k = k;
+      // effective-state annotation for interactive nodes only: an element
+      // under [inert] renders normally but can never be interacted with
+      if (el.closest("[inert]")) {
+        if (!node.a) node.a = a;
+        a.inr = 1;
+      }
+    }
 
     // own text (direct text-node children only)
     let own = "";

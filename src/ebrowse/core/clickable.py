@@ -152,12 +152,13 @@ _STRONG_SIGNALS = ("tg", "rl", "ls", "cp")
 
 
 def is_clickable(node: DomNode) -> bool:
-    """Final predicate over in-page signals. Gate: rendered + enabled.
+    """Final predicate over in-page signals. Gate: rendered.
     Only STRONG signals qualify — weak candidate signals (el/tb/as) are
-    handled by candidate_evidence() and never drive default behavior."""
+    handled by candidate_evidence() and never drive default behavior.
+    DISABLED controls are still clickable-class (they get refs): an agent
+    must be able to see a grayed-out submit to reason about enabling it —
+    the action layer refuses fast with the disabled state named."""
     if not any(node.signals.get(s) for s in _STRONG_SIGNALS):
-        return False
-    if node.attrs.get("dis"):
         return False
     return node.bbox_area() > 0
 
