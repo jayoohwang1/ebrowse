@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Nested Scroll Results</title>
+  <style>
+    body { margin: 0; font: 16px/1.4 sans-serif; }
+    header, main { max-width: 720px; margin: auto; padding: 16px; }
+    header { background: #eee; }
+    #results { height: 300px; overflow-y: auto; border: 1px solid #999; }
+    .row { box-sizing: border-box; min-height: 48px; padding: 12px; border-bottom: 1px solid #ddd; }
+    #clear-btn { margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <header>Search</header>
+  <main>
+    <h1>Search results</h1>
+    <p id="status">Showing 20 results.</p>
+    <div id="results"></div>
+    <button id="clear-btn">Clear results</button>
+  </main>
+  <script>
+    const results = document.querySelector('#results');
+    const status = document.querySelector('#status');
+    let count = 0;
+    let ended = false;
+
+    function addRows(amount) {
+      const fragment = document.createDocumentFragment();
+      const target = Math.min(count + amount, 50);
+      while (count < target) {
+        count += 1;
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.textContent = `Result item ${count} — description text`;
+        fragment.append(row);
+      }
+      results.append(fragment);
+      status.textContent = `Showing ${count} results.`;
+      if (count === 50 && !ended) {
+        ended = true;
+        const marker = document.createElement('div');
+        marker.className = 'row';
+        marker.id = 'end-marker';
+        marker.textContent = 'End of results';
+        results.append(marker);
+      }
+    }
+
+    addRows(20);
+    results.addEventListener('scroll', () => {
+      if (results.scrollTop + results.clientHeight >= results.scrollHeight - 60 && count < 50) {
+        addRows(10);
+      }
+    });
+    document.querySelector('#clear-btn').addEventListener('click', () => {
+      results.replaceChildren();
+      count = 0;
+      ended = false;
+      status.textContent = 'Cleared.';
+    });
+  </script>
+</body>
+</html>

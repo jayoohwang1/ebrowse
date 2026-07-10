@@ -226,7 +226,11 @@ def _act(args: dict[str, Any], session: str) -> tuple[bool, str]:
     elif verb == "select":
         payload = {"target": args.get("target"), "value": args.get("value", "")}
     elif verb == "scroll":
-        payload = {"direction": args.get("direction", "down"), "pages": args.get("pages", 1)}
+        payload = {
+            "direction": args.get("direction", "down"),
+            "pages": args.get("pages", 1),
+            "inner": args.get("inner"),
+        }
     elif verb == "upload":
         payload = {"target": args.get("target"), "files": args.get("files", [])}
     elif verb == "eval":

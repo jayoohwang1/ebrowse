@@ -145,8 +145,18 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("target")
     v.add_argument("value")
 
-    v = verb("scroll", "scroll page or to a target. ex: ebrowse scroll down | ebrowse scroll s4")
+    v = verb(
+        "scroll",
+        "scroll page, to a target, or INSIDE a panel. ex: ebrowse scroll down | "
+        "ebrowse scroll s4 | ebrowse scroll s4 down",
+    )
     v.add_argument("direction", help="down | up | <sid> | @ref")
+    v.add_argument(
+        "inner",
+        nargs="?",
+        choices=["down", "up"],
+        help="scroll INSIDE the container at/above the target",
+    )
     v.add_argument("--pages", type=int, default=1, help="viewport-heights to scroll")
 
     v = verb("upload", "set files on a file input. ex: ebrowse upload @e9 ./cv.pdf")

@@ -117,7 +117,7 @@ def _build_request(args: argparse.Namespace) -> Request | None:
     elif verb == "select":
         a = {"target": args.target, "value": args.value}
     elif verb == "scroll":
-        a = {"direction": args.direction, "pages": args.pages}
+        a = {"direction": args.direction, "pages": args.pages, "inner": args.inner}
     elif verb == "upload":
         a = {"target": args.target, "files": [str(Path(f).resolve()) for f in args.files]}
     elif verb == "eval":

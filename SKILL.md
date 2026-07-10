@@ -135,7 +135,12 @@ fill <t> <text>       clear + type          type <t> <text> [--enter]
 press <keys>          e.g. Enter, Control+a, Escape
 check/uncheck <t>     select <t> <label>    native <select> AND custom dropdowns
                                             (opens, matches option text, clicks)
-scroll down|up [--pages N] | scroll <sid|@ref>
+scroll down|up [--pages N] | scroll <sid|@ref>          window / bring into view
+scroll <sid|@ref> down|up [--pages N]    scroll INSIDE the panel at/above the
+                                         target (virtualized lists, modal bodies);
+                                         expand marks such panels: "(inner
+                                         scrollable panel: … 'ebrowse scroll s3
+                                         down' scrolls it)"
 diagnose <t>          read-only: would a click land? names the blocker + recovery
 upload <t> <files>    eval <js>             get text|value|attr|html|title|url [t]
 fill-form <sid> --data '{"Field": "value", "Agree": true}'   many fields, one diff

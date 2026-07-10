@@ -33,6 +33,16 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- **Nested scrolling.** `scroll <sid|@ref> down|up [--pages N]` scrolls INSIDE
+  the scroll container at/above the target (nearest composed ancestor with
+  real overflow), reporting `container div#results scroll y=600/660` with
+  at-the-bottom/top edges — the route to virtualized lists, lazy-loading
+  panels, and modal bodies that window scrolling can't reach (newly mounted
+  rows show in the action diff). Discovery flags real scroll containers
+  (`scr` = [scrollTop, max]) and expand headers announce them:
+  `(inner scrollable panel: y=0 of 1104px — 'ebrowse scroll s3 down' scrolls
+  it)`. A target with no scrollable ancestor is refused with the window-scroll
+  alternative named. Fixture: `nested_scroll.html`.
 - **Disabled controls are visible, marked, and fast-refused.** Previously a
   disabled control got no ref at all — a grayed-out submit was invisible in
   expand, so an agent couldn't reason about enabling it. Disabled controls

@@ -100,6 +100,12 @@ accessibility tree.
 - Inputs: `[label (@ref: "value")]` / `empty`, `, required` when set; checkboxes
   `[x]`/`[ ]`; native selects `[label (@ref) ▾ "US" of 24 options]` (options inlined
   when ≤ 15).
+- **Inner scroll containers**: when a section holds a real scroll container
+  (overflow auto/scroll with hidden content), the expand header carries
+  `(inner scrollable panel: y=0 of 1104px — 'ebrowse scroll s3 down' scrolls
+  it)`. `scroll <sid|@ref> down|up` scrolls inside that container and reports
+  `container div#results scroll y=600/660` (` — at the bottom/top` at the
+  edges); newly mounted lazy/virtualized rows show in the action diff.
 - **Effective state**: disabled controls keep their refs and are marked —
   `[Place order (@e9) disabled]`, `[Street (@e4: empty, disabled)]` — including
   fieldset-inherited disabling; elements under `[inert]` are marked ` inert`.

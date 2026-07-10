@@ -188,6 +188,14 @@
 
     const node = { t: tag, r };
     const a = curatedAttrs(el, tag);
+    // real inner scroll container (body/html scroll via the window instead):
+    // scr = [scrollTop, maxScrollTop] so outlines can say "more below the fold"
+    if (tag !== "body" && tag !== "html") {
+      const oy = style.overflowY;
+      if ((oy === "auto" || oy === "scroll") && el.scrollHeight > el.clientHeight + 4) {
+        a.scr = [Math.round(el.scrollTop), Math.round(el.scrollHeight - el.clientHeight)];
+      }
+    }
     if (Object.keys(a).length) node.a = a;
 
     // clickable signals (strong tier: tg/rl/ls/cp)

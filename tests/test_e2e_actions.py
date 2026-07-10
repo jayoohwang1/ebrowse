@@ -497,6 +497,35 @@ def test_link_click_is_navigation_landing(server, env):
     assert "Espresso Gear" in ebrowse(env, "outline").stdout
 
 
+def test_nested_scroll_lazy_loading_panel(server, env):
+    # an inner scroll container is annotated in expand, and 'scroll <sid> down'
+    # scrolls INSIDE it — mounting virtualized/lazy content the window scroll
+    # could never reach
+    ebrowse(env, "open", server.url("nested_scroll.html"))
+    sids = re.findall(r"^(s\d+) ", ebrowse(env, "outline").stdout, re.M)
+    expanded = "".join(ebrowse(env, "expand", s, "--all").stdout for s in sids)
+    m = re.search(r"inner scrollable panel: y=0 of \d+px — 'ebrowse scroll (s\d+) down'", expanded)
+    assert m, expanded
+    sid = m.group(1)
+    r = ebrowse(env, "scroll", sid, "down", "--pages", "2")
+    assert r.returncode == 0, r.stderr
+    assert "container div#results scroll y=" in r.stdout, r.stdout
+    assert "Result item 21" in r.stdout  # lazy-loaded rows mounted; diff caught them
+    # scroll until the lazy list is exhausted; the end marker mounts
+    for _ in range(5):
+        r = ebrowse(env, "scroll", sid, "down", "--pages", "5")
+        assert r.returncode == 0, r.stderr
+    assert "End of results" in ebrowse(env, "expand", sid, "--all").stdout
+    r = ebrowse(env, "scroll", sid, "up", "--pages", "50")
+    assert r.returncode == 0, r.stderr
+    assert "at the top" in r.stdout
+    # a target with no scrollable ancestor is refused honestly
+    clear = ref_anywhere(env, r"Clear results")
+    r = ebrowse(env, "scroll", clear, "down")
+    assert r.returncode == 2
+    assert "no scrollable container" in r.stderr
+
+
 def test_scroll_reports_position(server, env):
     ebrowse(env, "open", server.url("huge.html"))
     r = ebrowse(env, "scroll", "down", "--pages", "2")

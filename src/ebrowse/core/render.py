@@ -84,6 +84,20 @@ def render_section_markdown(
     if section.cross_origin:
         return f"{head}\n(cross-origin iframe: {section.preview} — content not accessible; try `screenshot --section {section.sid}`)"
 
+    # an inner scroll container hides content below its fold — say so, and how
+    # to reach it (the largest such container speaks for the section)
+    scr_best: tuple[int, list] | None = None
+    for n in raw.iter_walk():
+        v = n.attrs.get("scr")
+        if v and (scr_best is None or n.bbox_area() > scr_best[0]):
+            scr_best = (n.bbox_area(), v)
+    if scr_best:
+        top, mx = scr_best[1][0], scr_best[1][1]
+        head += (
+            f"\n(inner scrollable panel: y={top} of {mx}px — "
+            f"'ebrowse scroll {section.sid} down' scrolls it)"
+        )
+
     if section.type in ("list", "table") and _items_of(raw):
         body = _render_items(section, raw, observe, cursor, show_all)
     else:

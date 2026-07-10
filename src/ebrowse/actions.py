@@ -436,10 +436,14 @@ class ActionsMixin(InteractionMixin):
 
         return await self._act(f'SELECT {desc} = "{_clip(value)}"', do, loc=loc, target=target)
 
-    async def verb_scroll(self, direction: str, pages: int = 1) -> str:
+    async def verb_scroll(self, direction: str, pages: int = 1, inner: str | None = None) -> str:
         await self._ensure_browser()
         vh = (self.cfg.browser.viewport + [1280, 1280])[1]
 
+        if direction not in ("down", "up") and inner in ("down", "up"):
+            # nested scrolling: scroll INSIDE the scrollable container at/above
+            # the target (inner panels, virtualized lists, modal bodies)
+            return await self._scroll_container(direction, inner, pages)
         if direction in ("down", "up"):
             dy = vh * pages * (1 if direction == "down" else -1)
 
@@ -467,6 +471,85 @@ class ActionsMixin(InteractionMixin):
         visible = self._sections_in_view(pos, vh)
         loc_line = f"scroll position y={pos}" + (f" — viewport over {visible}" if visible else "")
         return f"{result}\n{loc_line}"
+
+    # Shared by the @ref and section entry points below: find the nearest real
+    # scroll container (self or composed ancestor; body/html scroll via the
+    # window) and scroll it by clientHeight * signed pages, deterministically.
+    _SCROLL_CONTAINER_HELPERS = """
+        const scrollable = (n) => {
+            if (!n || n === document.body || n === document.documentElement) return false;
+            const s = getComputedStyle(n);
+            return (s.overflowY === 'auto' || s.overflowY === 'scroll')
+                && n.scrollHeight > n.clientHeight + 4;
+        };
+        const up = (n) => n.parentElement
+            || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
+        const doScroll = (start, pagesSigned) => {
+            let c = start;
+            while (c && !scrollable(c)) c = up(c);
+            if (!c) return null;
+            const before = Math.round(c.scrollTop);
+            c.scrollTop = before + c.clientHeight * pagesSigned;
+            const after = Math.round(c.scrollTop);
+            const max = Math.round(c.scrollHeight - c.clientHeight);
+            return {name: c.tagName.toLowerCase() + (c.id ? '#' + c.id : ''),
+                    before, after, max};
+        };
+    """
+
+    async def _scroll_container(self, target: str, inner: str, pages: int) -> str:
+        signed = pages * (1 if inner == "down" else -1)
+        result_box: list = []
+
+        if target.startswith("@"):
+            loc, desc = await self._locator_for(target)
+
+            async def do() -> None:
+                handle = await loc.element_handle(timeout=2000)
+                js = "(el, [p]) => {" + self._SCROLL_CONTAINER_HELPERS + "return doScroll(el, p);}"
+                result_box.append(await handle.evaluate(js, [signed]))
+        else:
+            section = self._get_section(target)
+            bbox, desc = section.bbox, target
+
+            async def do() -> None:
+                # resolve the section to a live container geometrically
+                # (sections have no locators): hit-test several points in its
+                # box until one sits inside a scroll container
+                js = (
+                    "([x, y, h, p]) => {"
+                    + self._SCROLL_CONTAINER_HELPERS
+                    + """
+                    if (y < scrollY || y > scrollY + innerHeight) {
+                        window.scrollTo(0, Math.max(0, y - innerHeight / 3));
+                    }
+                    const cx = Math.min(Math.max(0, x - scrollX), innerWidth - 1);
+                    for (const f of [0.5, 0.33, 0.66, 0.15, 0.85]) {
+                        const cy = Math.min(Math.max(0, y + h * f - scrollY), innerHeight - 1);
+                        const r = doScroll(document.elementFromPoint(cx, cy), p);
+                        if (r) return r;
+                    }
+                    return null;}"""
+                )
+                args = [bbox.x + bbox.width / 2, bbox.y, bbox.height, signed]
+                result_box.append(await self.page.evaluate(js, args))
+
+        line = f"SCROLL {desc} {inner} {pages} page(s) (inner container)"
+        result = await self._act(line, do)
+        info = result_box[0] if result_box else None
+        if info is None:
+            raise CommandError(
+                f"no scrollable container at or above {desc} — for the page itself use "
+                f"'ebrowse scroll {inner}'",
+                ExitCode.USAGE,
+            )
+        edge = ""
+        if inner == "down" and info["after"] >= info["max"]:
+            edge = " — at the bottom"
+        elif inner == "up" and info["after"] <= 0:
+            edge = " — at the top"
+        pos = f"container {info['name']} scroll y={info['after']}/{info['max']}{edge}"
+        return f"{result}\n{pos}"
 
     def _sections_in_view(self, scroll_y: int, vh: int) -> str:
         if not self.page_mem:
