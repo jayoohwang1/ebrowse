@@ -566,6 +566,8 @@ def test_nested_scroll_lazy_loading_panel(server, env):
     assert r.returncode == 0, r.stderr
     assert "container div#results scroll y=" in r.stdout, r.stdout
     assert "Result item 21" in r.stdout  # lazy-loaded rows mounted; diff caught them
+    # the status tick must survive the bulk insertion and be quoted first (#11)
+    assert "Showing 30 results." in r.stdout, r.stdout
     # scroll until the lazy list is exhausted; the end marker mounts
     for _ in range(5):
         r = ebrowse(env, "scroll", sid, "down", "--pages", "5")

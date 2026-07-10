@@ -77,7 +77,11 @@ Diff vocabulary:
   durable `@refs` still resolve, so you can act on known chrome without it.
 - `→ partial change` — same page; `+` added elements (with ready-to-use refs),
   `-` removed, `~` state/text changes. `~ s2: new text: "Account created!"`
-  quotes what a status message/validation error now says.
+  quotes what a status message/validation error now says — short status-like
+  fragments are quoted first, bulk insertions are capped and elided as
+  `start … end`. Sections you have `expand`ed on the current page get a much
+  larger quote budget, so expand a section you're watching to see its text
+  changes near-verbatim in later diffs.
 - `→ dialog` — an in-page DOM dialog appeared. If it's its own section, its full
   content is expanded right there in the diff; if it was folded into a section,
   its controls show as `+ sN [dialog]: [Accept (@e6)] …`. Interact with its

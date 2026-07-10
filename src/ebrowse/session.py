@@ -131,6 +131,11 @@ class Session(CompoundMixin, ActionsMixin):
         # surfaced as a hint only if that click then registers no change
         self._blocking_modal: str | None = None
         self.nav_events = 0  # main-frame navigations (same-URL reload detection)
+        # sections the agent expanded, fingerprint -> nav_id at expand time; the
+        # diff quotes far more new text for these (it is actively reading them).
+        # Keyed by fingerprint (stable across re-observations, unlike sids) and
+        # self-expiring on navigation via the nav_id check in _expanded_now().
+        self._expanded_fps: dict[str, int] = {}
         # native confirm/prompt dialogs awaiting an agent decision, keyed by the
         # page they blocked (a dialog on a background tab must not block the active one)
         self._pending_dialogs: dict[Page, PendingDialog] = {}
@@ -591,10 +596,17 @@ class Session(CompoundMixin, ActionsMixin):
                 )
             sid = found[0].sid
         section = self._get_section(sid)
+        self._expanded_fps[section.fingerprint] = self.nav_id
         await self._caption_section_images(sid)
         return render.render_section_markdown(
             section, self.raw_by_sid[sid], self.cfg.observe, cursor=cursor, show_all=show_all
         )
+
+    def _expanded_now(self) -> set[str]:
+        """Fingerprints of sections expanded on the CURRENT page (entries from
+        before the last navigation don't count — same-fingerprint chrome on the
+        next page shouldn't inherit the verbose diff budget)."""
+        return {fp for fp, nid in self._expanded_fps.items() if nid == self.nav_id}
 
     _MAX_CAPTIONS_PER_EXPAND = 4
 

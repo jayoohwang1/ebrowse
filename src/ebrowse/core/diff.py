@@ -15,23 +15,89 @@ from ebrowse.model import Diff, Element, PageMem, Section, SectionDiff
 
 _TRACKED_STATE = ("value", "checked", "expanded", "disabled", "pressed", "selected")
 
+# Added-text quoting budgets, in characters (~4 chars/token). The default keeps
+# diffs lean; sections the agent has *expanded* this page get a much larger
+# budget via diff_pages(expanded_fps=...) — it is actively reading them, so
+# verbose diffs there are worth the spend (issue #11).
+TEXT_BUDGET = 500
+EXPANDED_TEXT_BUDGET = 8000
+# Fragments at or under this length rank as "status-sized" (status messages,
+# validation errors, result counts) and are quoted before bulk insertions.
+_SHORT_FRAGMENT = 100
+_MAX_FRAGMENTS = 5
 
-def added_text(old: str, new: str, max_len: int = 160) -> str:
+
+def _elide(frag: str, cap: int) -> str:
+    """Fit one fragment into `cap` chars. An over-long fragment quotes its
+    start AND end joined by an ellipsis — bulk insertions often carry the
+    summary line at one end, so a bare prefix would lose it."""
+    if len(frag) <= cap:
+        return frag
+    words = frag.split()
+    half = max(1, (cap - 3) // 2)  # 3 = len(" … ")
+    head: list[str] = []
+    used = -1
+    for w in words:
+        if head and used + 1 + len(w) > half:
+            break
+        head.append(w)
+        used += 1 + len(w)
+    rest = words[len(head) :]
+    if not rest:  # a single word longer than the cap
+        return frag[: cap - 1] + "…"
+    tail: list[str] = []
+    used = -1
+    for w in reversed(rest):
+        if tail and used + 1 + len(w) > half:
+            break
+        tail.append(w)
+        used += 1 + len(w)
+    out = " ".join(head) + " … " + " ".join(reversed(tail))
+    return out if len(out) <= cap else out[: cap - 1] + "…"
+
+
+def added_text(old: str, new: str, max_len: int = TEXT_BUDGET) -> str:
     """Text present in `new` but not `old` — what a status message / validation
     error / result count 'said' after an action. Word-level diff so an appended
-    sentence is quoted alone, not the whole surrounding section."""
+    sentence is quoted alone, not the whole surrounding section.
+
+    Quoting rules (deterministic; this output is golden-tested):
+    - a replaced fragment carries one unchanged word of context per side — a
+      "20" → "30" result-count tick quotes as "Showing 30 results.", not a
+      bare "30" (which the noise filter would drop);
+    - fragments ≤ 100 chars are quoted before longer ones (status messages beat
+      bulk content), document order within each tier;
+    - each fragment is capped at max_len // min(n_fragments, 3) chars (floor
+      120) so one long insertion cannot crowd out the others — a lone fragment
+      may use the whole budget;
+    - an over-cap fragment is elided as "start … end", not a bare prefix;
+    - up to 5 fragments, joined by " … ", within `max_len` total."""
     old_words, new_words = old.split(), new.split()
     sm = difflib.SequenceMatcher(a=old_words, b=new_words, autojunk=False)
-    fresh = [
-        " ".join(new_words[j1:j2])
-        for tag, _i1, _i2, j1, j2 in sm.get_opcodes()
-        if tag in ("insert", "replace") and j2 > j1
-    ]
+    fresh: list[str] = []
+    for tag, _i1, _i2, j1, j2 in sm.get_opcodes():
+        if tag not in ("insert", "replace") or j2 <= j1:
+            continue
+        lo, hi = j1, j2
+        if tag == "replace":  # replaced words need neighbors to mean anything
+            lo, hi = max(0, j1 - 1), min(len(new_words), j2 + 1)
+        fresh.append(" ".join(new_words[lo:hi]))
     fresh = [f for f in fresh if len(f) > 3]
     if not fresh:
         return ""
-    out = " … ".join(fresh[:3])
-    return out if len(out) <= max_len else out[: max_len - 1] + "…"
+    ranked = [f for f in fresh if len(f) <= _SHORT_FRAGMENT]
+    ranked += [f for f in fresh if len(f) > _SHORT_FRAGMENT]
+    frag_cap = max(120, max_len // min(len(ranked), 3))
+    quotes: list[str] = []
+    used = 0
+    for frag in ranked[:_MAX_FRAGMENTS]:
+        room = max_len - used - (3 if quotes else 0)
+        if quotes and room < 24:  # not worth quoting a sliver
+            break
+        q = _elide(frag, min(frag_cap, room))
+        used += len(q) + (3 if quotes else 0)
+        quotes.append(q)
+    return " … ".join(quotes)
 
 
 def _pair_sections(
@@ -55,7 +121,11 @@ def _pair_sections(
 
 
 def _element_delta(
-    prev: Section, new: Section, prev_text: str = "", new_text: str = ""
+    prev: Section,
+    new: Section,
+    prev_text: str = "",
+    new_text: str = "",
+    text_budget: int = TEXT_BUDGET,
 ) -> SectionDiff | None:
     prev_by_key: dict[tuple, list[Element]] = {}
     for e in prev.elements:
@@ -84,7 +154,7 @@ def _element_delta(
         added=added,
         removed=removed,
         state_changes=state_changes,
-        text_added=added_text(prev_text, new_text) if text_changed else "",
+        text_added=added_text(prev_text, new_text, text_budget) if text_changed else "",
     )
 
 
@@ -101,14 +171,18 @@ def diff_pages(
     new: PageMem,
     prev_texts: dict[str, str] | None = None,
     new_texts: dict[str, str] | None = None,
+    expanded_fps: set[str] | None = None,
 ) -> Diff:
     """Same-page diff. Caller has already ruled out navigation.
 
     prev_texts/new_texts: optional sid -> subtree text maps, used to quote
-    newly appeared text (status messages, validation errors) in the diff."""
+    newly appeared text (status messages, validation errors) in the diff.
+    expanded_fps: fingerprints of sections the agent has expanded on this page —
+    their text diffs get EXPANDED_TEXT_BUDGET instead of TEXT_BUDGET."""
     pairs, appeared, disappeared = _pair_sections(prev, new)
     prev_texts = prev_texts or {}
     new_texts = new_texts or {}
+    expanded_fps = expanded_fps or set()
 
     sections: list[SectionDiff] = []
     for s in appeared:
@@ -116,7 +190,10 @@ def diff_pages(
     for s in disappeared:
         sections.append(SectionDiff(sid=s.sid, kind="disappeared", section=s))
     for old, cur in pairs:
-        delta = _element_delta(old, cur, prev_texts.get(old.sid, ""), new_texts.get(cur.sid, ""))
+        budget = EXPANDED_TEXT_BUDGET if cur.fingerprint in expanded_fps else TEXT_BUDGET
+        delta = _element_delta(
+            old, cur, prev_texts.get(old.sid, ""), new_texts.get(cur.sid, ""), budget
+        )
         if delta:
             sections.append(delta)
 

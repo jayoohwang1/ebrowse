@@ -159,6 +159,18 @@ Sprite Stasis Ball added. [View cart (@e51)](→ /cart) [Checkout (@e52)](→ /c
   disappeared → changed: `+ sid: [added elements with refs]`,
   `- sid: N element(s) removed (names)`, `~ @ref field: "old" → "new"`,
   `~ sid: new text: "status/validation message"`.
+- **`new text` quoting rules** (deterministic; word-level diff of the section's
+  text): a replaced fragment carries one unchanged word of context per side
+  (a `20` → `30` count tick quotes as `Showing 30 results.`, not a bare `30`);
+  fragments ≤ 100 chars — status messages, validation errors, result
+  counts — are quoted *before* longer bulk insertions, document order within
+  each tier; each fragment is capped at `budget // min(n_fragments, 3)` chars
+  (floor 120) so bulk can't crowd out the rest, and an over-cap fragment is
+  elided as `start … end` (summary info often sits at an end of a bulk
+  insertion), never a bare prefix; up to 5 fragments joined by ` … ` within a
+  500-char budget. A section the agent has **`expand`ed on the current page**
+  gets an 8000-char budget instead — it is actively reading that section, so
+  its text diffs are quoted near-verbatim until the next navigation.
 - An **appeared `dialog` section is expanded inline** (its full `expand`
   markdown, with `@refs`) right below its `[appeared]` line — a modal is almost
   always the forced next interaction, and this is deterministic DOM, not a guess.
