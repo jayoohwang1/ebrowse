@@ -138,6 +138,9 @@ def build_parser() -> argparse.ArgumentParser:
     v = verb("uncheck", "uncheck a checkbox")
     v.add_argument("target")
 
+    v = verb("diagnose", "read-only actionability report: why a click would/wouldn't land")
+    v.add_argument("target")
+
     v = verb("select", 'native <select> option by visible text. ex: ebrowse select @e7 "Canada"')
     v.add_argument("target")
     v.add_argument("value")

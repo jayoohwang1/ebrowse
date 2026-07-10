@@ -22,7 +22,7 @@ from ebrowse.cli.client import _autostart_daemon, _daemon_running, _send
 from ebrowse.daemon.protocol import Request
 
 _ACT_VERBS = [
-    "click", "fill", "type", "press", "check", "uncheck", "select",
+    "click", "fill", "type", "press", "check", "uncheck", "diagnose", "select",
     "scroll", "upload", "eval", "back", "forward", "reload",
     "fill-form", "search", "tabs", "tab", "dialog", "close",
 ]  # fmt: skip
@@ -221,7 +221,7 @@ def _act(args: dict[str, Any], session: str) -> tuple[bool, str]:
             payload["enter"] = args.get("enter", False)
     elif verb == "press":
         payload = {"keys": args.get("keys", "Enter")}
-    elif verb in ("check", "uncheck"):
+    elif verb in ("check", "uncheck", "diagnose"):
         payload = {"target": args.get("target")}
     elif verb == "select":
         payload = {"target": args.get("target"), "value": args.get("value", "")}

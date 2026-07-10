@@ -45,6 +45,7 @@
     chain: [],
     coverDialog: null,
     openDialog: null,
+    coverInLabel: 0,
     inert: !!el.closest("[inert]"),
     disabledFieldset: !!(el.matches && el.matches("fieldset:disabled *")),
     pointerEvents: getComputedStyle(el).pointerEvents,
@@ -55,6 +56,7 @@
     cy = r.top + r.height / 2;
   if (cx >= 0 && cy >= 0 && cx <= innerWidth && cy <= innerHeight) {
     const t = document.elementFromPoint(cx, cy);
+    if (t && !within(el, t) && !within(t, el) && inLabel(t)) out.coverInLabel = 1;
     if (t && !within(el, t) && !within(t, el) && !inLabel(t)) {
       out.cover = name(t);
       const dlg = t.closest("dialog,[role=dialog],[role=alertdialog]");

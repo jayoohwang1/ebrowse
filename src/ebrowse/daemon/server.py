@@ -242,6 +242,8 @@ class Daemon:
             return await session.verb_set_checked(args["target"], True)
         if verb == "uncheck":
             return await session.verb_set_checked(args["target"], False)
+        if verb == "diagnose":
+            return await session.verb_diagnose(args["target"])
         if verb == "select":
             return await session.verb_select(args["target"], args["value"])
         if verb == "scroll":

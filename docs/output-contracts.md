@@ -219,6 +219,23 @@ QUERY s4 filter="Cold Brew" — matched 2 of 24 items
 - Item indices are the original list positions (consistent with `expand --cursor`).
 - Unknown `--cols` exit 2 listing the real column names.
 
+## Diagnose (`ebrowse diagnose <target>`)
+
+Read-only actionability report: a Playwright trial click (no dispatch; may
+scroll the target into view) plus the blocker-diagnosis classification.
+
+```
+DIAGNOSE @e5 (span "Buy plan A")
+actionability: BLOCKED — blocked: @e5 is covered by div#promo-banner "Summer
+sale! …" — dismiss or interact with @e7 (div "Summer sale! …") first
+```
+
+- Line 2 is `actionability: PASS — …` or `actionability: BLOCKED — <the same
+  message a blocked click would raise>`. A hit on label decoration reports PASS
+  (actions route via the associated label).
+- Optional `state:` line lists effective-state facts (disabled `<fieldset>`,
+  `pointer-events: none`, inert region, an open dialog elsewhere).
+
 ## Describe-screen (`ebrowse describe-screen [prompt]`)
 
 A free-form visual query answered by the local VLM over a viewport screenshot —

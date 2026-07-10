@@ -33,6 +33,21 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- **`diagnose <target>` verb** — read-only actionability report: Playwright
+  trial-click verdict (`actionability: PASS/BLOCKED`) plus the blocker
+  classification and recovery step from the failure-diagnosis machinery,
+  without dispatching anything (the trial may scroll the target into view).
+  Label-decoration hits report PASS since actions route via the label.
+  Exposed on CLI, daemon, and MCP.
+- **Keyboard-activation fallback for blocked clicks.** When a plain click on
+  a natively focusable control (link, button, summary, checkbox/radio) is
+  pointer-blocked by a NON-modal cover, the click completes as trusted
+  focus + Enter/Space — what a keyboard user does when an overlay doesn't
+  trap focus. Fails closed: never used when a dialog/aria-modal/inert
+  context is detected, and the focus must verifiably land on the target
+  (traps refuse it). Disclosed in the diff:
+  `note: pointer route blocked by …; activated via keyboard`. Custom widgets
+  (cursor-pointer divs) are never keyboard-guessed.
 - **Candidate discovery: weak-evidence custom widgets get expand-only refs.**
   Elements with no strong clickable signal but real interactivity evidence — a
   live pointer listener (found via one CDP `getEventListeners` sweep, chromium

@@ -200,6 +200,37 @@ def test_blocked_click_names_exposed_cover_ref(server, env):
     assert "Purchased plan A." in r.stdout
 
 
+def test_diagnose_reports_blocker_and_pass(server, env):
+    # read-only diagnosis: blocked target names the cover's ref without acting
+    ebrowse(env, "open", server.url("covers.html"))  # fresh covers
+    buy_a = ref_for(env, "s2", r"\[Buy plan A")
+    r = ebrowse(env, "diagnose", buy_a)
+    assert r.returncode == 0, r.stderr
+    assert "actionability: BLOCKED" in r.stdout
+    assert re.search(r"dismiss or interact with @e\d+", r.stdout)
+    # nothing was clicked: the promo banner is still there
+    r = ebrowse(env, "diagnose", buy_a)
+    assert "actionability: BLOCKED" in r.stdout
+    # an uncovered control diagnoses as PASS
+    nav = ref_for(env, "s1", r"\[Products")
+    r = ebrowse(env, "diagnose", nav)
+    assert r.returncode == 0, r.stderr
+    assert "actionability: PASS" in r.stdout
+
+
+def test_keyboard_fallback_on_covered_native_button(server, env):
+    # a native button under an anonymous non-modal cover: the pointer route is
+    # blocked, so the click falls back to trusted focus + Enter (what a
+    # keyboard user would do), disclosed in the diff notes
+    ebrowse(env, "open", server.url("covers.html"))
+    buy_c = ref_for(env, "s2", r"\[Buy plan C")
+    r = ebrowse(env, "click", buy_c)
+    assert r.returncode == 0, r.stderr
+    assert "Purchased plan C." in r.stdout
+    assert "note: pointer route blocked" in r.stdout
+    assert "activated via keyboard" in r.stdout
+
+
 def test_blocked_click_honest_about_unexposed_cover(server, env):
     # an anonymous overlay with no clickable signal has no ref; the error must
     # say so instead of pointing at an invisible node, and suggest recovery
@@ -235,22 +266,46 @@ def test_candidate_widgets_discovered_and_clickable(server, env):
     assert "Manage alerts" in r.stdout
 
 
-def test_full_page_veil_exposed_and_named_when_blocking(server, env):
+def test_full_page_veil_exposed_and_keyboard_fallback(server, env):
     # a full-viewport childless clickable overlay must get a ref of its own
-    # (splitter: oversized childless nodes are terminal), so a blocked click
-    # can name it as the recovery action
+    # (splitter: oversized childless nodes are terminal). The covered target
+    # is a native button and the veil is not a modal (no dialog/inert/trap),
+    # so the click completes via the keyboard fallback; diagnose still names
+    # the veil's ref as the pointer-route blocker
     ebrowse(env, "open", server.url("veil_overlay.html"))
     r = ebrowse(env, "outline")
     assert "value your privacy" in r.stdout, r.stdout
     sub = ref_for(env, "s2", r"\[Subscribe")
-    r = ebrowse(env, "click", sub)
-    assert r.returncode == 1
-    m = re.search(r"dismiss or interact with (@e\d+)", r.stderr)
-    assert m, r.stderr
-    assert ebrowse(env, "click", m.group(1)).returncode == 0
+    r = ebrowse(env, "diagnose", sub)
+    assert "actionability: BLOCKED" in r.stdout
+    m = re.search(r"dismiss or interact with (@e\d+)", r.stdout)
+    assert m, r.stdout
     r = ebrowse(env, "click", sub)
     assert r.returncode == 0, r.stderr
     assert "Subscribed!" in r.stdout
+    assert "activated via keyboard" in r.stdout
+    # the veil is still up (keyboard didn't click through it); its own ref works
+    r = ebrowse(env, "click", m.group(1))
+    assert r.returncode == 0, r.stderr
+    assert "disappeared" in r.stdout or "removed" in r.stdout
+
+
+def test_diagnose_label_decoration_and_modal_cover(server, env):
+    # label decoration over a fancy control is PASS (label activation), and a
+    # dialog-guarded target must NOT be keyboard-activated — it stays blocked
+    ebrowse(env, "open", server.url("dialogs.html"))
+    ebrowse(env, "click", "#modal-btn")
+    r = ebrowse(env, "click", "#covered-btn")  # native button under modal backdrop
+    assert r.returncode == 1
+    assert "dialog is open" in r.stderr
+    assert "activated via keyboard" not in r.stdout + r.stderr
+    ebrowse(env, "click", "#accept-cookies")
+    ebrowse(env, "open", server.url("styled_controls.html"))
+    news = ref_for(env, "s2", r"Subscribe to the deals")
+    r = ebrowse(env, "diagnose", news)
+    assert r.returncode == 0, r.stderr
+    assert "actionability: PASS" in r.stdout
+    assert "label" in r.stdout
 
 
 def test_fancy_radio_clicks_despite_decorative_cover(server, env):

@@ -92,6 +92,12 @@ Diff vocabulary:
   radios/checkboxes), so `click`/`check`/`uncheck` was routed through the
   label — the browser-defined equivalent. The action succeeded normally
   (`check`/`uncheck` verify the resulting state); nothing to do.
+- `note: pointer route blocked by …; activated via keyboard` — a non-modal
+  overlay covers a native control, so the click completed as trusted
+  focus + Enter/Space (what a keyboard user does; never used when a
+  dialog/inert modal guards the target). The action succeeded — but the
+  overlay is still on screen; deal with it if it also covers what you need
+  next.
 - `note: native alert auto-accepted: "…"` — `alert`/`beforeunload` carry no
   decision, so they're accepted automatically and reported; you never dismiss them.
   `confirm`/`prompt` are yours to decide (see `→ dialog opened` above).
@@ -126,6 +132,7 @@ press <keys>          e.g. Enter, Control+a, Escape
 check/uncheck <t>     select <t> <label>    native <select> AND custom dropdowns
                                             (opens, matches option text, clicks)
 scroll down|up [--pages N] | scroll <sid|@ref>
+diagnose <t>          read-only: would a click land? names the blocker + recovery
 upload <t> <files>    eval <js>             get text|value|attr|html|title|url [t]
 fill-form <sid> --data '{"Field": "value", "Agree": true}'   many fields, one diff
 search <query> [--in @ref] [--pick <text>] [--no-submit]     find box, type, submit

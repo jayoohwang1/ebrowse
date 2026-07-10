@@ -256,25 +256,36 @@ class ActionsMixin:
                 return by_role_name[(role, nm)]
         return None
 
-    async def _blocked_error(self, loc, target: str) -> CommandError | None:
-        """Failure-only diagnosis of a refused click: one probe_blocker evaluate,
-        mapped to an error that names an executable next step — an exposed ref,
-        an open dialog, or an honest limitation. Returns None when nothing can
-        be classified (caller falls back to its generic message)."""
+    async def _probe_diagnosis(self, loc) -> dict:
+        """One probe_blocker evaluate on the live target, plus exposed-ref
+        resolution for the cover's ancestor chain. Returns {} when the probe
+        is unavailable (native dialog pending, detached element, timeout)."""
         if self._active_dialog() is not None:
-            return None  # renderer is frozen by a native dialog; evaluate would hang
+            return {}  # renderer is frozen by a native dialog; evaluate would hang
         try:
             handle = await loc.element_handle(timeout=2000)
             info = await asyncio.wait_for(probe_blocker(handle), timeout=3)
         except Exception:
-            return None
+            return {}
+        if not info:
+            return {}
+        if info.get("cover"):
+            exposed = self._ref_for_chain(info.get("chain") or [])
+            if exposed is not None:
+                info["exposedRef"] = exposed.ref
+                info["exposedDesc"] = exposed.desc.short_desc()
+        return info
+
+    def _blocked_error(self, info: dict, target: str) -> CommandError | None:
+        """Map a _probe_diagnosis result to an error naming an executable next
+        step — an exposed ref, an open dialog, or an honest limitation. Returns
+        None when nothing classifies (caller falls back to its generic message)."""
         cover = info.get("cover")
         dialog = info.get("coverDialog") or info.get("openDialog")
-        exposed = self._ref_for_chain(info.get("chain") or []) if cover else None
-        if cover and exposed is not None:
+        if cover and info.get("exposedRef"):
             return CommandError(
                 f"blocked: {target} is covered by {cover} — dismiss or interact with "
-                f"{exposed.ref} ({exposed.desc.short_desc()}) first",
+                f"{info['exposedRef']} ({info['exposedDesc']}) first",
                 ExitCode.ACTION_FAILED,
             )
         if cover and dialog:
@@ -311,20 +322,70 @@ class ActionsMixin:
             )
         return None
 
-    async def _arbitrate_cover(self, loc, target: str, cover: str) -> None:
+    async def _arbitrate_cover(
+        self, loc, target: str, cover: str, keyboard_fallback: bool = False
+    ) -> bool:
         """A one-point hit-test mismatch is too weak for a hard refusal; let
         Playwright's actionability engine (scroll + stability + receives-events,
         with retries) arbitrate via a trial click. Sustained interception →
-        blocked, with the failure diagnosis naming the recovery step."""
+        blocked, with the failure diagnosis naming the recovery step.
+
+        With keyboard_fallback, a natively focusable control blocked by a
+        NON-modal cover is activated via trusted focus + key press instead —
+        exactly what a keyboard user does when an overlay doesn't trap focus.
+        Never used when a dialog/inert context is detected: keyboard input
+        must not reach controls a modal is guarding. Returns True when the
+        action completed via keyboard (caller must not click again)."""
         try:
             await loc.click(trial=True, timeout=_TRIAL_TIMEOUT_MS)
+            return False
         except Exception as e:
-            err = await self._blocked_error(loc, target)
-            raise err or CommandError(
+            diag = await self._probe_diagnosis(loc)
+            modal_context = diag.get("coverDialog") or diag.get("openDialog") or diag.get("inert")
+            if keyboard_fallback and not modal_context and await self._keyboard_activate(loc):
+                self._notes.append(
+                    f"pointer route blocked by {cover}; activated via keyboard "
+                    "(trusted focus + key press)"
+                )
+                return True
+            raise self._blocked_error(diag, target) or CommandError(
                 f"blocked: {target} is covered by {cover} — interact "
                 "with that first (run 'ebrowse outline' to see it)",
                 ExitCode.ACTION_FAILED,
             ) from e
+
+    async def _keyboard_activate(self, loc) -> bool:
+        """Trusted keyboard activation for natively focusable controls: focus,
+        VERIFY the focus landed on the target (a focus trap or inert region
+        refusing it means stay blocked — fail closed), then press the element's
+        native activation key. Only web-platform activation semantics: links/
+        buttons/summary → Enter, checkbox/radio → Space. Custom widgets return
+        False — no guessing."""
+        try:
+            handle = await loc.element_handle(timeout=2000)
+            key = await handle.evaluate(
+                """(el) => {
+                    const tag = el.tagName.toLowerCase();
+                    if (tag === 'a') return el.getAttribute('href') ? 'Enter' : null;
+                    if (tag === 'button' || tag === 'summary') return 'Enter';
+                    if (tag === 'input') {
+                        const t = (el.getAttribute('type') || 'text').toLowerCase();
+                        if (['button', 'submit', 'reset', 'image'].includes(t)) return 'Enter';
+                        if (['checkbox', 'radio'].includes(t)) return 'Space';
+                    }
+                    return null;
+                }"""
+            )
+            if not key:
+                return False
+            await handle.focus()
+            focused = await handle.evaluate("(el) => el.getRootNode().activeElement === el")
+            if not focused:
+                return False
+            await self.page.keyboard.press(key)
+            return True
+        except Exception:
+            return False
 
     async def _click_via_label(self, loc) -> bool:
         """Click a form control's associated <label> instead of the control
@@ -431,7 +492,8 @@ class ActionsMixin:
                         ExitCode.ACTION_FAILED,
                     ) from e
                 if loc is not None and "intercepts pointer events" in str(e):
-                    err = await self._blocked_error(loc, target or action_line)
+                    diag = await self._probe_diagnosis(loc)
+                    err = self._blocked_error(diag, target or action_line)
                     if err is not None:
                         raise err from e
                 raise _map_playwright_error(e) from e
@@ -457,7 +519,14 @@ class ActionsMixin:
                     )
                     return
             elif info.get("covering"):
-                await self._arbitrate_cover(loc, target, info["covering"])
+                done = await self._arbitrate_cover(
+                    loc,
+                    target,
+                    info["covering"],
+                    keyboard_fallback=not (double or right or new_tab),
+                )
+                if done:
+                    return
             kwargs: dict = {"timeout": _ACTION_TIMEOUT_MS}
             if right:
                 kwargs["button"] = "right"
@@ -599,6 +668,47 @@ class ActionsMixin:
             await loc.set_input_files(files, timeout=_ACTION_TIMEOUT_MS)
 
         return await self._act(f"UPLOAD {desc} ← {len(files)} file(s)", do, loc=loc, target=target)
+
+    async def verb_diagnose(self, target: str) -> str:
+        """Read-only actionability report for a target: Playwright trial-click
+        verdict + blocker classification, without dispatching anything. The
+        trial may scroll the target into view; the page is otherwise untouched."""
+        await self._ensure_browser()
+        loc, desc = await self._locator_for(target)
+        lines = [f"DIAGNOSE {desc}"]
+        try:
+            await loc.click(trial=True, timeout=_TRIAL_TIMEOUT_MS)
+            trial_error = None
+        except Exception as e:
+            trial_error = str(e).splitlines()[0][:200]
+        diag = await self._probe_diagnosis(loc)
+        if trial_error is None:
+            lines.append("actionability: PASS — a normal click should succeed")
+            if diag.get("coverInLabel"):
+                lines.append("note: click point is label decoration (label activation applies)")
+        elif diag.get("coverInLabel"):
+            # the pointer trial fails on the decoration, but click/check route
+            # through the associated label, so the action will succeed
+            lines.append(
+                "actionability: PASS — click point is label decoration; actions are "
+                "routed via the associated label"
+            )
+        else:
+            err = self._blocked_error(diag, target)
+            reason = str(err) if err else f"trial click failed: {trial_error}"
+            lines.append(f"actionability: BLOCKED — {reason}")
+        facts = []
+        if diag.get("disabledFieldset"):
+            facts.append("inside a disabled <fieldset>")
+        if diag.get("pointerEvents") == "none":
+            facts.append("pointer-events: none")
+        if diag.get("inert"):
+            facts.append("inside an inert region")
+        if diag.get("openDialog") and trial_error is None:
+            facts.append(f"a dialog is open elsewhere: {diag['openDialog']}")
+        if facts:
+            lines.append("state: " + "; ".join(facts))
+        return "\n".join(lines)
 
     async def verb_eval(self, js: str) -> str:
         await self._ensure_browser()
