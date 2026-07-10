@@ -37,6 +37,21 @@ async def probe_blocker(handle) -> dict[str, Any]:
     return await handle.evaluate(_diagnose_cache)
 
 
+_COVER_ABOVE_JS_PATH = Path(__file__).parent / "js" / "cover_above.js"
+_cover_above_cache: str | None = None
+
+
+async def probe_cover_above(frame_element_handle, cx: float, cy: float) -> dict[str, Any]:
+    """Parent-document probe for iframe targets (js/cover_above.js): hit-test
+    the target's viewport point in the frame element's OWN document, where a
+    banner/modal above the iframe is visible. Raises on evaluate failure —
+    callers treat this as best-effort."""
+    global _cover_above_cache
+    if _cover_above_cache is None:
+        _cover_above_cache = _COVER_ABOVE_JS_PATH.read_text()
+    return await frame_element_handle.evaluate(_cover_above_cache, [cx, cy])
+
+
 @dataclass(slots=True)
 class DomNode:
     tag: str

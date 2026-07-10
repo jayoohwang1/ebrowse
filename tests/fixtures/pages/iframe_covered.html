@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Embedded Checkout — Consent Required</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    header { background: #630; color: #fff; padding: 12px 24px; }
+    header a { color: #fff; }
+    main { max-width: 720px; margin: 0 auto; padding: 24px; }
+    iframe { border: 1px solid #999; }
+    #consent-bar { align-items: center; background: rgba(35, 24, 20, .94); box-sizing: border-box; color: #fff; display: flex; gap: 16px; justify-content: center; position: fixed; z-index: 10; }
+  </style>
+</head>
+<body>
+  <header><a href="/">Fixture Pay</a></header>
+  <main>
+    <h1>Complete your order</h1>
+    <p>Order #4417 — 1 × Espresso Machine, $129.99. Payment is handled below.</p>
+    <iframe id="payframe" title="Payment form" src="frame_child.html" width="640" height="360"></iframe>
+    <p id="status">Consent is required before payment.</p>
+  </main>
+  <div id="consent-bar">Review our updated terms <button id="consent-ok" type="button">OK</button></div>
+  <script>
+    const frame = document.getElementById('payframe');
+    const bar = document.getElementById('consent-bar');
+    function coverFrame() {
+      const rect = frame.getBoundingClientRect();
+      bar.style.left = rect.left + 'px';
+      bar.style.top = rect.top + 'px';
+      bar.style.width = rect.width + 'px';
+      bar.style.height = rect.height + 'px';
+    }
+    coverFrame();
+    window.addEventListener('resize', coverFrame);
+    document.getElementById('consent-ok').addEventListener('click', () => {
+      bar.remove();
+      document.getElementById('status').textContent = 'Consent acknowledged.';
+    });
+  </script>
+</body>
+</html>

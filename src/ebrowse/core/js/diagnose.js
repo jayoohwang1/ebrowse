@@ -43,6 +43,7 @@
   const out = {
     cover: null,
     chain: [],
+    inside: [],
     coverDialog: null,
     openDialog: null,
     coverInLabel: 0,
@@ -61,21 +62,30 @@
       out.cover = name(t);
       const dlg = t.closest("dialog,[role=dialog],[role=alertdialog]");
       if (dlg) out.coverDialog = name(dlg);
+      const ident = (n) => ({
+        tag: n.tagName.toLowerCase(),
+        id: n.id || null,
+        tid:
+          n.getAttribute("data-testid") ||
+          n.getAttribute("data-qa") ||
+          n.getAttribute("data-test") ||
+          null,
+        role: n.getAttribute("role") || null,
+        nm: (n.getAttribute("aria-label") || "").trim().slice(0, 120) || null,
+      });
       let n = t;
       for (let i = 0; n && n !== document.documentElement && i < 12; i++) {
-        out.chain.push({
-          tag: n.tagName.toLowerCase(),
-          id: n.id || null,
-          tid:
-            n.getAttribute("data-testid") ||
-            n.getAttribute("data-qa") ||
-            n.getAttribute("data-test") ||
-            null,
-          role: n.getAttribute("role") || null,
-          nm: (n.getAttribute("aria-label") || "").trim().slice(0, 120) || null,
-        });
+        out.chain.push(ident(n));
         n = n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
       }
+      // interactive descendants of the cover: a consent bar's own OK button
+      // is usually the recovery action
+      try {
+        for (const c of t.querySelectorAll("button, a[href], input, [role=button], [onclick]")) {
+          out.inside.push(ident(c));
+          if (out.inside.length >= 5) break;
+        }
+      } catch (e) { /* selector unsupported */ }
     }
   }
 

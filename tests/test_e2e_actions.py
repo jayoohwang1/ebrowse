@@ -66,6 +66,17 @@ def ref_for(env, sid: str, pattern: str) -> str:
     return m.group(1)
 
 
+def ref_anywhere(env, pattern: str) -> str:
+    """ref_for without knowing the sid: search every outlined section."""
+    sids = re.findall(r"^(s\d+) ", ebrowse(env, "outline").stdout, re.M)
+    for sid in sids:
+        out = ebrowse(env, "expand", sid, "--all").stdout
+        m = re.search(pattern + r"[^)\]]*\((@e\d+)", out)
+        if m:
+            return m.group(1)
+    raise AssertionError(f"no element matching {pattern!r} in any section")
+
+
 def test_dropdown_click_reveals_options(server, env):
     r = ebrowse(env, "open", server.url("dropdown.html"))
     assert r.returncode == 0, r.stderr
@@ -329,6 +340,34 @@ def test_fancy_external_label_checkbox(server, env):
     assert re.search(r'checked: "false" → "true"', r.stdout)
 
 
+def test_aria_widgets_check_uncheck(server, env):
+    # role=checkbox/switch/radio widgets: Playwright's set_checked refuses
+    # them, so check/uncheck activates and verifies aria-checked instead
+    ebrowse(env, "open", server.url("aria_widgets.html"))
+    tos = ref_anywhere(env, r"Accept the terms")
+    r = ebrowse(env, "check", tos)
+    assert r.returncode == 0, r.stderr
+    assert "Terms: accepted" in r.stdout
+    r = ebrowse(env, "check", tos)  # idempotent: no toggle
+    assert r.returncode == 0, r.stderr
+    assert "no change detected" in r.stdout
+    r = ebrowse(env, "uncheck", tos)
+    assert r.returncode == 0, r.stderr
+    assert "partial change" in r.stdout
+    wifi = ref_anywhere(env, r"Wi-Fi")
+    r = ebrowse(env, "uncheck", wifi)  # switch, initially on
+    assert r.returncode == 0, r.stderr
+    assert "partial change" in r.stdout
+    pro = ref_anywhere(env, r"Pro")
+    r = ebrowse(env, "check", pro)
+    assert r.returncode == 0, r.stderr
+    assert "partial change" in r.stdout
+    # radios can't be unchecked — usage error naming the constraint
+    r = ebrowse(env, "uncheck", pro)
+    assert r.returncode == 2
+    assert "radio cannot be unchecked" in r.stderr
+
+
 def test_check_uncheck_via_label_on_fancy_checkbox(server, env):
     # check/uncheck on a restyled checkbox whose input center is covered by
     # label decoration: routed through the label with a verified postcondition
@@ -374,6 +413,29 @@ def test_iframe_form_flow(server, env):
     r = ebrowse(env, "fill", card, "4242 4242 4242 4242")
     assert r.returncode == 0, r.stderr
     pay = ref_for(env, "s2", r"\[Pay")
+    r = ebrowse(env, "click", pay)
+    assert r.returncode == 0, r.stderr
+    assert "Payment accepted." in r.stdout
+
+
+def test_parent_page_cover_over_iframe(server, env):
+    # a parent-page consent bar sits ABOVE the iframe: invisible to in-frame
+    # probes, but the cross-frame probe names it — including the actionable
+    # OK button INSIDE the cover as the recovery ref
+    ebrowse(env, "open", server.url("iframe_covered.html"))
+    card = ref_anywhere(env, r"Card number")
+    r = ebrowse(env, "diagnose", card)
+    assert r.returncode == 0, r.stderr
+    assert "actionability: BLOCKED" in r.stdout
+    assert "consent-bar" in r.stdout
+    m = re.search(r"dismiss or interact with (@e\d+)", r.stdout)
+    assert m, r.stdout
+    r = ebrowse(env, "click", m.group(1))  # the OK button in the parent page
+    assert r.returncode == 0, r.stderr
+    assert "acknowledged" in r.stdout
+    # cover gone: the in-frame flow proceeds normally
+    assert ebrowse(env, "fill", card, "4242 4242 4242 4242").returncode == 0
+    pay = ref_anywhere(env, r"\[Pay")
     r = ebrowse(env, "click", pay)
     assert r.returncode == 0, r.stderr
     assert "Payment accepted." in r.stdout

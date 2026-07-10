@@ -33,6 +33,19 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- **ARIA checkable widgets work with `check`/`uncheck`.** A non-native element
+  with role `checkbox`/`radio`/`switch`/`menuitemcheckbox`/`menuitemradio`
+  (Playwright's `set_checked` refuses these) is activated through the full
+  interaction plan and its `aria-checked` postcondition is verified; already-
+  in-state is a clean no-op, and unchecking a radio is a usage error naming
+  the constraint. Works for CSS targets too (live role read).
+- **Parent-page covers over iframes are now detected.** The in-frame probes
+  cannot see a banner/modal sitting above the target's iframe; a second probe
+  (`core/js/cover_above.js`) hit-tests the target's viewport point in the
+  parent document. Blocked errors and `diagnose` name the cover — including
+  an actionable control INSIDE it (a consent bar's own OK button) as the
+  recovery ref, in any frame. Cover-descendant matching also applies to
+  main-document covers.
 - **`diagnose <target>` verb** — read-only actionability report: Playwright
   trial-click verdict (`actionability: PASS/BLOCKED`) plus the blocker
   classification and recovery step from the failure-diagnosis machinery,
@@ -74,6 +87,14 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Changed
 
+- **All pointer verbs share one InteractionPlan** (`src/ebrowse/interaction.py`):
+  scroll → center-point probe → route (`direct` / `label` / `obstructed`), with
+  dialog covers and modal contexts raising immediately. `click`, `check`/
+  `uncheck`, and `type`'s focus click all plan the same way; `type` under a
+  non-modal cover now skips the focus click entirely (typing focuses without a
+  pointer) instead of timing out. Native `fill`/`select_option`/`upload` keep
+  their specialized non-pointer APIs. Compound verbs are untouched pending
+  their rework.
 - **`check`/`uncheck` get the same cover handling as `click`.** The occlusion
   preflight, label routing, and trial-click arbitration now also protect
   `set_checked`: a restyled checkbox/radio whose input center is covered by

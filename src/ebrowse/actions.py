@@ -7,7 +7,6 @@ mapped to actionable CommandErrors.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import json
 from dataclasses import dataclass, field
@@ -24,14 +23,11 @@ if TYPE_CHECKING:
 from ebrowse.core import render
 from ebrowse.core.diff import diff_pages
 from ebrowse.core.locate import resolve
-from ebrowse.core.snapshot import probe_blocker
 from ebrowse.errors import CommandError, ExitCode
+from ebrowse.interaction import _TRIAL_TIMEOUT_MS, InteractionMixin
 from ebrowse.model import Element, PageMem
 
 _ACTION_TIMEOUT_MS = 8_000
-# Trial-click budget when the one-point hit test found a cover: long enough for
-# transient overlays/animations to clear, short enough to fail fast on a real one.
-_TRIAL_TIMEOUT_MS = 2_000
 
 # Resolves when the DOM has been mutation-quiet for `quiet` ms (or `cap` ms
 # elapsed). Installed per-wait; cheap enough and avoids init-script lifecycle.
@@ -60,8 +56,9 @@ class ActionSnapshot:
     url: str = ""  # fragment-stripped; basis for navigation detection
 
 
-class ActionsMixin:
-    """Verb mixin for Session. The block below is its typed contract: everything
+class ActionsMixin(InteractionMixin):
+    """Verb mixin for Session (pointer planning/fallbacks live in
+    InteractionMixin). The block below is its typed contract: everything
     the host class must provide, declared so the checker verifies both sides."""
 
     if TYPE_CHECKING:
@@ -133,278 +130,6 @@ class ActionsMixin:
                 raise CommandError(f"no element matches CSS '{target}'", ExitCode.USAGE)
             return loc.first, desc
         return await resolve(self.page, element.desc), desc
-
-    async def _check_occlusion(self, loc, target: str) -> dict:
-        """Center-point hit test on the live target. Returns the probe result:
-        {covering, coverDialog, coverInLabel} (any subset). Hard-fails ONLY when
-        the cover sits inside a dialog — that is strong evidence the click can't
-        mean what the agent intended. A generic cover is weak evidence (restyled
-        controls, partial/transient overlays), so it is returned for the caller
-        to arbitrate with a Playwright trial click rather than refused outright.
-
-        Separately RECORDS a modal that blocks the page without covering the
-        target — native `showModal()` (top layer + inert) or an aria-modal
-        focus trap, where `::backdrop` is a pseudo-element invisible to the
-        geometric hit-test. That can't be pre-empted safely (a false positive
-        would block a valid click), so it's surfaced post-hoc only if the click
-        then no-ops (see _finish_action). Best-effort; Playwright still enforces."""
-        try:
-            handle = await loc.element_handle(timeout=2000)
-            # handle.evaluate runs in the element's own frame — essential for
-            # elements inside iframes, where main-frame elementFromPoint would
-            # see only the <iframe> region and falsely report occlusion
-            info = await handle.evaluate(
-                """(el) => {
-                    const name = (n) => n.tagName.toLowerCase()
-                        + (n.id ? '#' + n.id : '')
-                        + ((n.getAttribute('aria-label') || n.textContent || '')
-                            .trim().slice(0, 40) ? ' "' + (n.getAttribute('aria-label')
-                            || n.textContent).trim().slice(0, 40) + '"' : '');
-                    // composed-tree containment: .contains() is blind across
-                    // shadow roots, which turns open-shadow components into
-                    // false "covered" verdicts
-                    const within = (anc, n) => {
-                        while (n) {
-                            if (n === anc) return true;
-                            n = n.parentNode || (n instanceof ShadowRoot ? n.host : null);
-                        }
-                        return false;
-                    };
-                    // browser-defined label activation: a hit anywhere inside an
-                    // associated <label> (wrapping or for=) activates the control,
-                    // so decoration there is a click surface, not occlusion
-                    // (restyled radios/checkboxes: input + sibling icon in a label)
-                    const inLabel = (t) => {
-                        const labs = el.labels ? Array.from(el.labels) : [];
-                        const wrap = el.closest ? el.closest('label') : null;
-                        if (wrap && !labs.includes(wrap)) labs.push(wrap);
-                        return labs.some((l) => within(l, t));
-                    };
-                    // (1) geometric occlusion at the element's center point
-                    let covering = null, coverDialog = null, coverInLabel = 0;
-                    const r = el.getBoundingClientRect();
-                    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-                    if (cx >= 0 && cy >= 0 && cx <= innerWidth && cy <= innerHeight) {
-                        const t = document.elementFromPoint(cx, cy);
-                        if (t && !within(el, t) && !within(t, el)) {
-                            if (inLabel(t)) {
-                                coverInLabel = 1;
-                            } else {
-                                covering = name(t);
-                                const dlg = t.closest('[role=dialog],[role=alertdialog],dialog');
-                                coverDialog = dlg ? name(dlg) : null;
-                            }
-                        }
-                    }
-                    // (2) a modal blocking the page but NOT over this point.
-                    // Visible candidates only: aria-modal is often left set on
-                    // hidden/closed dialogs (a false-positive trap).
-                    let modal = null;
-                    try {
-                        for (const c of document.querySelectorAll(':modal,[aria-modal="true"]')) {
-                            if (c.contains(el) || c === el) continue;
-                            const cr = c.getBoundingClientRect();
-                            if (cr.width > 0 && cr.height > 0
-                                && getComputedStyle(c).visibility !== 'hidden') {
-                                modal = name(c); break;
-                            }
-                        }
-                    } catch (e) { /* :modal unsupported on this engine */ }
-                    return {covering, coverDialog, coverInLabel, modal};
-                }"""
-            )
-        except Exception:
-            return {}  # pre-check is best-effort; Playwright will still enforce
-        if not info:
-            return {}
-        if info.get("modal"):
-            self._blocking_modal = info["modal"]
-        if info.get("coverDialog"):
-            raise CommandError(
-                f"blocked: {target} is covered by {info['coverDialog']} — interact with "
-                "that first (run 'ebrowse outline' to see it)",
-                ExitCode.ACTION_FAILED,
-            )
-        return info
-
-    def _ref_for_chain(self, chain: list[dict]) -> Element | None:
-        """Map a live cover's ancestor chain (identifying attrs from diagnose.js)
-        to an exposed element, closest ancestor first. Exact id/testid/role+name
-        matches only — naming the wrong ref is worse than naming none."""
-        if not self.page_mem:
-            return None
-        by_id: dict[str, Element] = {}
-        by_tid: dict[str, Element] = {}
-        by_role_name: dict[tuple[str, str], Element] = {}
-        for sec in self.page_mem.sections:
-            for el in sec.elements:
-                d = el.desc
-                if d.id:
-                    by_id.setdefault(d.id, el)
-                if d.testid:
-                    by_tid.setdefault(d.testid, el)
-                if d.role and d.name:
-                    by_role_name.setdefault((d.role, d.name), el)
-        for node in chain:
-            nid, tid = node.get("id"), node.get("tid")
-            role, nm = node.get("role"), node.get("nm")
-            if nid and nid in by_id:
-                return by_id[nid]
-            if tid and tid in by_tid:
-                return by_tid[tid]
-            if role and nm and (role, nm) in by_role_name:
-                return by_role_name[(role, nm)]
-        return None
-
-    async def _probe_diagnosis(self, loc) -> dict:
-        """One probe_blocker evaluate on the live target, plus exposed-ref
-        resolution for the cover's ancestor chain. Returns {} when the probe
-        is unavailable (native dialog pending, detached element, timeout)."""
-        if self._active_dialog() is not None:
-            return {}  # renderer is frozen by a native dialog; evaluate would hang
-        try:
-            handle = await loc.element_handle(timeout=2000)
-            info = await asyncio.wait_for(probe_blocker(handle), timeout=3)
-        except Exception:
-            return {}
-        if not info:
-            return {}
-        if info.get("cover"):
-            exposed = self._ref_for_chain(info.get("chain") or [])
-            if exposed is not None:
-                info["exposedRef"] = exposed.ref
-                info["exposedDesc"] = exposed.desc.short_desc()
-        return info
-
-    def _blocked_error(self, info: dict, target: str) -> CommandError | None:
-        """Map a _probe_diagnosis result to an error naming an executable next
-        step — an exposed ref, an open dialog, or an honest limitation. Returns
-        None when nothing classifies (caller falls back to its generic message)."""
-        cover = info.get("cover")
-        dialog = info.get("coverDialog") or info.get("openDialog")
-        if cover and info.get("exposedRef"):
-            return CommandError(
-                f"blocked: {target} is covered by {cover} — dismiss or interact with "
-                f"{info['exposedRef']} ({info['exposedDesc']}) first",
-                ExitCode.ACTION_FAILED,
-            )
-        if cover and dialog:
-            return CommandError(
-                f"blocked: {target} is covered by {cover} — a dialog is open ({dialog}); "
-                "resolve it first (run 'ebrowse outline' to see its controls)",
-                ExitCode.ACTION_FAILED,
-            )
-        if cover:
-            return CommandError(
-                f"blocked: {target} is covered by {cover}, which has no exposed ref "
-                "(likely a new overlay) — run 'ebrowse outline' to re-read the page, or "
-                "try 'ebrowse press Escape' / 'ebrowse screenshot'",
-                ExitCode.ACTION_FAILED,
-            )
-        if info.get("disabledFieldset"):
-            return CommandError(
-                f"blocked: {target} is inside a disabled <fieldset> — the form section "
-                "must be enabled first (look for a control that unlocks it)",
-                ExitCode.ACTION_FAILED,
-            )
-        if info.get("pointerEvents") == "none":
-            return CommandError(
-                f"blocked: {target} has pointer-events: none — it never receives clicks; "
-                "run 'ebrowse expand' on its section to find the visible control instead",
-                ExitCode.ACTION_FAILED,
-            )
-        if info.get("inert") or dialog:
-            what = dialog or "an inert region"
-            return CommandError(
-                f"blocked: {target} is blocked by {what} — resolve or dismiss it first "
-                "(run 'ebrowse outline' to see it)",
-                ExitCode.ACTION_FAILED,
-            )
-        return None
-
-    async def _arbitrate_cover(
-        self, loc, target: str, cover: str, keyboard_fallback: bool = False
-    ) -> bool:
-        """A one-point hit-test mismatch is too weak for a hard refusal; let
-        Playwright's actionability engine (scroll + stability + receives-events,
-        with retries) arbitrate via a trial click. Sustained interception →
-        blocked, with the failure diagnosis naming the recovery step.
-
-        With keyboard_fallback, a natively focusable control blocked by a
-        NON-modal cover is activated via trusted focus + key press instead —
-        exactly what a keyboard user does when an overlay doesn't trap focus.
-        Never used when a dialog/inert context is detected: keyboard input
-        must not reach controls a modal is guarding. Returns True when the
-        action completed via keyboard (caller must not click again)."""
-        try:
-            await loc.click(trial=True, timeout=_TRIAL_TIMEOUT_MS)
-            return False
-        except Exception as e:
-            diag = await self._probe_diagnosis(loc)
-            modal_context = diag.get("coverDialog") or diag.get("openDialog") or diag.get("inert")
-            if keyboard_fallback and not modal_context and await self._keyboard_activate(loc):
-                self._notes.append(
-                    f"pointer route blocked by {cover}; activated via keyboard "
-                    "(trusted focus + key press)"
-                )
-                return True
-            raise self._blocked_error(diag, target) or CommandError(
-                f"blocked: {target} is covered by {cover} — interact "
-                "with that first (run 'ebrowse outline' to see it)",
-                ExitCode.ACTION_FAILED,
-            ) from e
-
-    async def _keyboard_activate(self, loc) -> bool:
-        """Trusted keyboard activation for natively focusable controls: focus,
-        VERIFY the focus landed on the target (a focus trap or inert region
-        refusing it means stay blocked — fail closed), then press the element's
-        native activation key. Only web-platform activation semantics: links/
-        buttons/summary → Enter, checkbox/radio → Space. Custom widgets return
-        False — no guessing."""
-        try:
-            handle = await loc.element_handle(timeout=2000)
-            key = await handle.evaluate(
-                """(el) => {
-                    const tag = el.tagName.toLowerCase();
-                    if (tag === 'a') return el.getAttribute('href') ? 'Enter' : null;
-                    if (tag === 'button' || tag === 'summary') return 'Enter';
-                    if (tag === 'input') {
-                        const t = (el.getAttribute('type') || 'text').toLowerCase();
-                        if (['button', 'submit', 'reset', 'image'].includes(t)) return 'Enter';
-                        if (['checkbox', 'radio'].includes(t)) return 'Space';
-                    }
-                    return null;
-                }"""
-            )
-            if not key:
-                return False
-            await handle.focus()
-            focused = await handle.evaluate("(el) => el.getRootNode().activeElement === el")
-            if not focused:
-                return False
-            await self.page.keyboard.press(key)
-            return True
-        except Exception:
-            return False
-
-    async def _click_via_label(self, loc) -> bool:
-        """Click a form control's associated <label> instead of the control
-        itself (browser semantics forward label activation to the control).
-        Used when the control's own click point is covered by decoration inside
-        its label — the label IS the visible click surface. Returns False to
-        fall back to the normal click path."""
-        try:
-            handle = await loc.element_handle(timeout=2000)
-            lab = await handle.evaluate_handle(
-                "(el) => (el.labels && el.labels[0]) || (el.closest && el.closest('label'))"
-            )
-            el = lab.as_element()
-            if el is None:
-                return False
-            await el.click(timeout=_ACTION_TIMEOUT_MS)
-            return True
-        except Exception:
-            return False
 
     def _section_texts(self) -> dict[str, str]:
         return {
@@ -507,10 +232,9 @@ class ActionsMixin:
         loc, desc = await self._locator_for(target)
 
         async def do() -> None:
-            with contextlib.suppress(Exception):
-                await loc.scroll_into_view_if_needed(timeout=2000)
-            info = await self._check_occlusion(loc, target)
-            if info.get("coverInLabel") and not (double or right or new_tab):
+            plain = not (double or right or new_tab)
+            plan = await self._plan_pointer(loc, target, plain=plain)
+            if plan.route == "label":
                 # the control's click point belongs to decoration inside its
                 # associated label — click the label (standards-defined proxy)
                 if await self._click_via_label(loc):
@@ -518,15 +242,15 @@ class ActionsMixin:
                         "clicked via the associated label (the control's visible surface)"
                     )
                     return
-            elif info.get("covering"):
-                done = await self._arbitrate_cover(
-                    loc,
-                    target,
-                    info["covering"],
-                    keyboard_fallback=not (double or right or new_tab),
-                )
-                if done:
+            elif plan.route == "obstructed":
+                if await self._keyboard_activate(loc):
+                    self._notes.append(
+                        f"pointer route blocked by {plan.cover}; activated via keyboard "
+                        "(trusted focus + key press)"
+                    )
                     return
+                assert plan.blocked is not None
+                raise plan.blocked
             kwargs: dict = {"timeout": _ACTION_TIMEOUT_MS}
             if right:
                 kwargs["button"] = "right"
@@ -551,7 +275,17 @@ class ActionsMixin:
         loc, desc = await self._locator_for(target)
 
         async def do() -> None:
-            await loc.click(timeout=_ACTION_TIMEOUT_MS)  # focus without clearing
+            # the click is only there to focus without clearing — so a blocked
+            # pointer route can simply be skipped (press_sequentially focuses
+            # the element itself, no pointer involved)
+            plan = await self._plan_pointer(loc, target)
+            if plan.route == "label":
+                if not await self._click_via_label(loc):
+                    await loc.click(timeout=_ACTION_TIMEOUT_MS)
+            elif plan.route == "obstructed":
+                self._notes.append(f"pointer route blocked by {plan.cover}; typed via direct focus")
+            else:
+                await loc.click(timeout=_ACTION_TIMEOUT_MS)  # focus without clearing
             await loc.press_sequentially(text, timeout=_ACTION_TIMEOUT_MS, delay=15)
             if enter:
                 await loc.press("Enter", timeout=_ACTION_TIMEOUT_MS)
@@ -565,15 +299,64 @@ class ActionsMixin:
 
         return await self._act(f"PRESS {keys}", do)
 
+    _ARIA_CHECKABLE_ROLES = ("checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio")
+
     async def verb_set_checked(self, target: str, checked: bool) -> str:
+        element, _ = self._element_for(target)
         loc, desc = await self._locator_for(target)
         want = "checked" if checked else "unchecked"
+        action_line = f"{'CHECK' if checked else 'UNCHECK'} {desc}"
+
+        # ARIA widget (role checkbox/radio/switch on a non-native element):
+        # Playwright's set_checked() refuses these, but the ARIA contract is
+        # activate + observe aria-checked — click (with the full plan) and
+        # verify the postcondition.
+        if element is not None:
+            role, tag = element.desc.role, element.desc.tag
+        else:  # CSS target: no cached descriptor; read the live element
+            role, tag = None, "input"
+            with contextlib.suppress(Exception):
+                role = await loc.get_attribute("role", timeout=1000)
+                tag = await loc.evaluate("(el) => el.tagName.toLowerCase()")
+        if tag != "input" and role in self._ARIA_CHECKABLE_ROLES:
+
+            async def do_aria() -> None:
+                state = await loc.get_attribute("aria-checked", timeout=2000)
+                if (state == "true") == checked:
+                    return  # already in the desired state; diff says no change
+                if not checked and role in ("radio", "menuitemradio"):
+                    raise CommandError(
+                        f"a radio cannot be unchecked directly — check another radio "
+                        f"in the group instead of unchecking {target}",
+                        ExitCode.USAGE,
+                    )
+                plan = await self._plan_pointer(loc, target)
+                activated = False
+                if plan.route == "label":
+                    activated = await self._click_via_label(loc)
+                elif plan.route == "obstructed":
+                    if not await self._keyboard_activate(loc):
+                        assert plan.blocked is not None
+                        raise plan.blocked
+                    activated = True
+                    self._notes.append(
+                        f"pointer route blocked by {plan.cover}; activated via keyboard"
+                    )
+                if not activated:
+                    await loc.click(timeout=_ACTION_TIMEOUT_MS)
+                new = await loc.get_attribute("aria-checked", timeout=2000)
+                if (new == "true") != checked:
+                    raise CommandError(
+                        f"could not set {target} to {want}: aria-checked did not change — "
+                        "the widget may need a different interaction; run 'ebrowse outline'",
+                        ExitCode.ACTION_FAILED,
+                    )
+
+            return await self._act(action_line, do_aria, loc=loc, target=target)
 
         async def do() -> None:
-            with contextlib.suppress(Exception):
-                await loc.scroll_into_view_if_needed(timeout=2000)
-            info = await self._check_occlusion(loc, target)
-            if info.get("coverInLabel"):
+            plan = await self._plan_pointer(loc, target)
+            if plan.route == "label":
                 # restyled checkbox/radio: the label is the click surface. Label
                 # activation TOGGLES, so only click when the state must change,
                 # and verify the postcondition (set_checked can't — it would
@@ -596,13 +379,18 @@ class ActionsMixin:
                             "'ebrowse outline' and check the diff",
                             ExitCode.ACTION_FAILED,
                         )
-            elif info.get("covering"):
-                await self._arbitrate_cover(loc, target, info["covering"])
+            elif plan.route == "obstructed":
+                if await self._keyboard_set_checked(loc, checked):
+                    self._notes.append(
+                        f"pointer route blocked by {plan.cover}; {want} via keyboard "
+                        "(trusted focus + Space, state verified)"
+                    )
+                    return
+                assert plan.blocked is not None
+                raise plan.blocked
             await loc.set_checked(checked, timeout=_ACTION_TIMEOUT_MS)
 
-        return await self._act(
-            f"{'CHECK' if checked else 'UNCHECK'} {desc}", do, loc=loc, target=target
-        )
+        return await self._act(action_line, do, loc=loc, target=target)
 
     async def verb_select(self, target: str, value: str) -> str:
         element, desc = self._element_for(target)
