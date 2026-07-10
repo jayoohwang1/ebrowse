@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Native selects</title>
+  <style>
+    label, select { display: block; margin: .5rem 0; }
+    select { min-width: 14rem; }
+  </style>
+</head>
+<body>
+  <header><h1>Native selects</h1></header>
+  <main>
+    <label for="toppings">Toppings</label>
+    <select id="toppings" multiple size="5">
+      <option>Cheese</option>
+      <option>Pepperoni</option>
+      <option>Mushrooms</option>
+      <option>Onions</option>
+      <option>Olives</option>
+      <option>Peppers</option>
+      <option>Bacon</option>
+      <option>Pineapple</option>
+    </select>
+    <label for="country">Country</label>
+    <select id="country"></select>
+    <p id="status">Ready.</p>
+  </main>
+  <script>
+    const toppings = document.querySelector('#toppings');
+    const country = document.querySelector('#country');
+    for (let number = 1; number <= 80; number += 1) {
+      const option = new Option('Country ' + number, String(number), number === 1, number === 1);
+      country.add(option);
+    }
+    toppings.addEventListener('change', () => {
+      const selected = [...toppings.selectedOptions].map(option => option.textContent);
+      document.querySelector('#status').textContent = 'Toppings: ' + selected.join(', ') + '.';
+    });
+    country.addEventListener('change', () => {
+      document.querySelector('#status').textContent = 'Country: ' + country.selectedOptions[0].textContent + '.';
+    });
+  </script>
+</body>
+</html>

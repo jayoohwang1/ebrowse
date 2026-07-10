@@ -179,6 +179,8 @@ def candidate_evidence(node: DomNode) -> str | None:
         return "focusable"
     if node.signals.get("as"):
         return "aria-state"
+    if node.signals.get("dg"):
+        return "draggable"
     return None
 
 

@@ -99,7 +99,9 @@ accessibility tree.
 - Links: `[text (@ref)](→ /path)` — href path-only for same-origin, whole for external.
 - Inputs: `[label (@ref: "value")]` / `empty`, `, required` when set; checkboxes
   `[x]`/`[ ]`; native selects `[label (@ref) ▾ "US" of 24 options]` (options inlined
-  when ≤ 15).
+  when ≤ 15; the total is the REAL option count even when the inline list is
+  truncated at 50; `, multiple` marks `<select multiple>`, whose current
+  selections join as `"A, B"`).
 - **Inner scroll containers**: when a section holds a real scroll container
   (overflow auto/scroll with hidden content), the expand header carries
   `(inner scrollable panel: y=0 of 1104px — 'ebrowse scroll s3 down' scrolls

@@ -132,9 +132,11 @@ expand <sid|@ref> [--cursor N] [--all]     lists/tables paginate; follow the
                                            "… N more items — expand s4 --cursor 20" hint
 click <t> [--double|--right|--new-tab]     t = @ref or CSS selector
 fill <t> <text>       clear + type          type <t> <text> [--enter]
+hover <t>             reveal hover menus (mouse stays; click revealed refs next)
+drag <src> <dst>      drag one element onto another (sortables, HTML5 dnd)
 press <keys>          e.g. Enter, Control+a, Escape
-check/uncheck <t>     select <t> <label>    native <select> AND custom dropdowns
-                                            (opens, matches option text, clicks)
+check/uncheck <t>     select <t> <label>…   native <select> (several labels for
+                                            <select multiple>) AND custom dropdowns
 scroll down|up [--pages N] | scroll <sid|@ref>          window / bring into view
 scroll <sid|@ref> down|up [--pages N]    scroll INSIDE the panel at/above the
                                          target (virtualized lists, modal bodies);

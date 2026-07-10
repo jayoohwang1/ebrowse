@@ -245,7 +245,12 @@ class Daemon:
         if verb == "diagnose":
             return await session.verb_diagnose(args["target"])
         if verb == "select":
-            return await session.verb_select(args["target"], args["value"])
+            values = args.get("values") or [args.get("value", "")]
+            return await session.verb_select(args["target"], values)
+        if verb == "hover":
+            return await session.verb_hover(args["target"])
+        if verb == "drag":
+            return await session.verb_drag(args["source"], args["target"])
         if verb == "scroll":
             return await session.verb_scroll(
                 args["direction"], pages=args.get("pages", 1), inner=args.get("inner")

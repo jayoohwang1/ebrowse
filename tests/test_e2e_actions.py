@@ -497,6 +497,61 @@ def test_link_click_is_navigation_landing(server, env):
     assert "Espresso Gear" in ebrowse(env, "outline").stdout
 
 
+def test_hover_reveals_menus_and_items_clickable(server, env):
+    # hover-only menus: CSS :hover and JS mouseenter — the diff exposes the
+    # revealed items with fresh refs, and the mouse stays so they're clickable
+    ebrowse(env, "open", server.url("hover_menu.html"))
+    products = ref_anywhere(env, r"\[Products")
+    r = ebrowse(env, "hover", products)
+    assert r.returncode == 0, r.stderr
+    m = re.search(r"\[Coffee makers \((@e\d+)\)", r.stdout)
+    assert m, r.stdout
+    r = ebrowse(env, "click", m.group(1))
+    assert r.returncode == 0, r.stderr
+    assert "Navigated: Coffee makers." in r.stdout
+    account = ref_anywhere(env, r"\[Account")
+    r = ebrowse(env, "hover", account)
+    assert r.returncode == 0, r.stderr
+    m = re.search(r"\[Log out \((@e\d+)\)", r.stdout)
+    assert m, r.stdout
+    r = ebrowse(env, "click", m.group(1))
+    assert r.returncode == 0, r.stderr
+    assert "Logged out." in r.stdout
+
+
+def test_drag_reorders_sortable_list(server, env):
+    # HTML5 draggable rows get candidate refs (draggable evidence) and
+    # drag_to reorders them
+    ebrowse(env, "open", server.url("dragdrop.html"))
+    one = ref_anywhere(env, r"Task One")
+    three = ref_anywhere(env, r"Task Three")
+    r = ebrowse(env, "drag", one, three)
+    assert r.returncode == 0, r.stderr
+    assert "Order:" in r.stdout, r.stdout
+    assert "partial change" in r.stdout
+
+
+def test_multi_select_and_truncation_honesty(server, env):
+    ebrowse(env, "open", server.url("multi_select.html"))
+    sids = re.findall(r"^(s\d+) ", ebrowse(env, "outline").stdout, re.M)
+    expanded = "".join(ebrowse(env, "expand", s, "--all").stdout for s in sids)
+    # multiple-select marked; truncated select reports the REAL option total
+    assert re.search(r"\[Toppings \(@e\d+\) ▾ .*multiple", expanded), expanded
+    assert "of 80 options" in expanded, expanded
+    toppings = ref_anywhere(env, r"\[Toppings")
+    r = ebrowse(env, "select", toppings, "Cheese", "Bacon")
+    assert r.returncode == 0, r.stderr
+    assert "Cheese, Bacon" in r.stdout
+    # multiple values against a single-choice select: usage error
+    country = ref_anywhere(env, r"\[Country")
+    r = ebrowse(env, "select", country, "Country 2", "Country 3")
+    assert r.returncode == 2
+    assert "single-choice" in r.stderr
+    r = ebrowse(env, "select", country, "Country 42")
+    assert r.returncode == 0, r.stderr
+    assert "Country 42" in r.stdout
+
+
 def test_nested_scroll_lazy_loading_panel(server, env):
     # an inner scroll container is annotated in expand, and 'scroll <sid> down'
     # scrolls INSIDE it — mounting virtualized/lazy content the window scroll

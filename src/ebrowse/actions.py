@@ -421,20 +421,64 @@ class ActionsMixin(InteractionMixin):
 
         return await self._act(action_line, do, loc=loc, target=target)
 
-    async def verb_select(self, target: str, value: str) -> str:
+    async def verb_hover(self, target: str) -> str:
+        """Hover the pointer over a target. The mouse STAYS there afterwards,
+        so hover-revealed menus remain open in the re-observe — revealed items
+        appear in the diff with fresh refs; click one next."""
+        loc, desc = await self._locator_for(target)
+
+        async def do() -> None:
+            with contextlib.suppress(Exception):
+                await loc.scroll_into_view_if_needed(timeout=2000)
+            await loc.hover(timeout=_ACTION_TIMEOUT_MS)
+
+        return await self._act(f"HOVER {desc}", do, loc=loc, target=target)
+
+    async def verb_drag(self, source: str, target: str) -> str:
+        """Drag source onto target (Playwright drag_to: real pointer sequence,
+        works for HTML5 draggable and mouse-based sortables)."""
+        src, sdesc = await self._locator_for(source)
+        dst, ddesc = await self._locator_for(target)
+
+        async def do() -> None:
+            with contextlib.suppress(Exception):
+                await src.scroll_into_view_if_needed(timeout=2000)
+            await src.drag_to(dst, timeout=_ACTION_TIMEOUT_MS)
+
+        return await self._act(f"DRAG {sdesc} → {ddesc}", do, loc=src, target=source)
+
+    async def verb_select(self, target: str, values: list[str]) -> str:
         element, desc = self._element_for(target)
         if element is not None and element.desc.tag != "select":
+            if len(values) > 1:
+                raise CommandError(
+                    "multiple values need a native <select multiple>; "
+                    f"{target} is a custom dropdown — select one value",
+                    ExitCode.USAGE,
+                )
             # custom dropdown: run the compound state machine (compound.py)
-            return await self._select_custom(element, target, value)
+            return await self._select_custom(element, target, values[0])
         loc, _ = await self._locator_for(target)
 
         async def do() -> None:
+            if len(values) > 1:
+                multi = False
+                with contextlib.suppress(Exception):
+                    multi = await loc.evaluate("(el) => el.multiple === true")
+                if not multi:
+                    raise CommandError(
+                        f"{target} is a single-choice <select> — pass exactly one value",
+                        ExitCode.USAGE,
+                    )
             try:
-                await loc.select_option(label=value, timeout=_ACTION_TIMEOUT_MS)
+                await loc.select_option(label=values, timeout=_ACTION_TIMEOUT_MS)
+            except CommandError:
+                raise
             except Exception:
-                await loc.select_option(value=value, timeout=_ACTION_TIMEOUT_MS)
+                await loc.select_option(value=values, timeout=_ACTION_TIMEOUT_MS)
 
-        return await self._act(f'SELECT {desc} = "{_clip(value)}"', do, loc=loc, target=target)
+        shown = ", ".join(values)
+        return await self._act(f'SELECT {desc} = "{_clip(shown)}"', do, loc=loc, target=target)
 
     async def verb_scroll(self, direction: str, pages: int = 1, inner: str | None = None) -> str:
         await self._ensure_browser()

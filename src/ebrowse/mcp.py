@@ -22,7 +22,7 @@ from ebrowse.cli.client import _autostart_daemon, _daemon_running, _send
 from ebrowse.daemon.protocol import Request
 
 _ACT_VERBS = [
-    "click", "fill", "type", "press", "check", "uncheck", "diagnose", "select",
+    "click", "fill", "type", "press", "check", "uncheck", "diagnose", "hover", "drag", "select",
     "scroll", "upload", "eval", "back", "forward", "reload",
     "fill-form", "search", "tabs", "tab", "dialog", "close",
 ]  # fmt: skip
@@ -100,6 +100,7 @@ TOOLS: list[dict[str, Any]] = [
                 "pages": _INT,
                 "index": _INT,
                 "js": _STR,
+                "to": {**_STR, "description": "drag: destination @ref/CSS"},
                 "files": {"type": "array", "items": _STR},
             },
             "required": ["verb"],
@@ -221,10 +222,12 @@ def _act(args: dict[str, Any], session: str) -> tuple[bool, str]:
             payload["enter"] = args.get("enter", False)
     elif verb == "press":
         payload = {"keys": args.get("keys", "Enter")}
-    elif verb in ("check", "uncheck", "diagnose"):
+    elif verb in ("check", "uncheck", "diagnose", "hover"):
         payload = {"target": args.get("target")}
+    elif verb == "drag":
+        payload = {"source": args.get("target"), "target": args.get("to", "")}
     elif verb == "select":
-        payload = {"target": args.get("target"), "value": args.get("value", "")}
+        payload = {"target": args.get("target"), "values": [args.get("value", "")]}
     elif verb == "scroll":
         payload = {
             "direction": args.get("direction", "down"),

@@ -8,6 +8,14 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Fixed
 
+- **Wrong-element resolution for links with repeated hrefs.** The locator
+  chain tried `a[href$="…"]` before any text-based candidate and disambiguated
+  multiple matches with `nth_hint` — but nth_hint counts identical
+  *descriptors*, not href matches, so on a page where several links share an
+  href (`"#"`, `/cart`), acting on `@ref (link "Products")` could silently hit
+  the FIRST such link (e.g. "Home") while reporting the right name. The
+  role+text candidate now precedes href, and href candidates are filtered by
+  the link text when one exists. Surfaced by the hover verb's e2e test.
 - **Full-page clickable overlays are no longer invisible to the outline.** The
   splitter never treated an oversized node as terminal, so a full-viewport
   overlay with no element children (cookie veil / interstitial wired via
@@ -33,6 +41,18 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- **`hover <target>` verb** — reveals hover-only menus (CSS `:hover` and JS
+  `mouseenter`); the mouse stays put, so revealed items survive the re-observe
+  and appear in the diff with fresh, immediately clickable refs.
+- **`drag <source> <to>` verb** — Playwright `drag_to` (real pointer sequence;
+  HTML5 draggable and mouse sortables). `draggable="true"` elements now count
+  as candidate evidence (`draggable`), so sortable rows get refs to drag.
+- **`<select multiple>` support + truncated-select honesty.** `select <t>
+  <label>…` accepts several labels for a multi-select (usage error against a
+  single-choice select or a custom dropdown); expand marks them `, multiple`
+  and joins current selections (`▾ "Cheese, Bacon"`). Selects with more than
+  50 options now report the REAL total (`of 80 options`), not the truncated
+  list length.
 - **Nested scrolling.** `scroll <sid|@ref> down|up [--pages N]` scrolls INSIDE
   the scroll container at/above the target (nearest composed ancestor with
   real overflow), reporting `container div#results scroll y=600/660` with

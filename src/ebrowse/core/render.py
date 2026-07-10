@@ -185,9 +185,11 @@ def _element_md(node: DomNode) -> str:
         label = a.get("nm") or "select"
         opts = a.get("opt") or []
         sel = a.get("sel", "")
+        multi = ", multiple" if a.get("mul") else ""
+        total = a.get("optn") or len(opts)
         if opts and len(opts) <= _MAX_SELECT_OPTIONS_INLINE:
-            return f'[{label} ({ref}) ▾ "{sel}"] options: {" | ".join(opts)}'
-        return f'[{label} ({ref}) ▾ "{sel}" of {len(opts)} options]'
+            return f'[{label} ({ref}) ▾ "{sel}"{multi}] options: {" | ".join(opts)}'
+        return f'[{label} ({ref}) ▾ "{sel}" of {total} options{multi}]'
     if tag in ("input", "textarea") or a.get("con"):
         typ = a.get("typ", "text")
         label = a.get("nm") or a.get("ph") or typ

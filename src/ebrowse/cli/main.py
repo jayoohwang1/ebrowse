@@ -133,6 +133,13 @@ def build_parser() -> argparse.ArgumentParser:
     v = verb("press", "press key(s) on the page. ex: ebrowse press Enter | Control+a")
     v.add_argument("keys")
 
+    v = verb("hover", "hover the pointer over an element (reveals hover menus; mouse stays)")
+    v.add_argument("target")
+
+    v = verb("drag", "drag one element onto another. ex: ebrowse drag @e5 @e9")
+    v.add_argument("source")
+    v.add_argument("to")
+
     v = verb("check", "check a checkbox/radio")
     v.add_argument("target")
     v = verb("uncheck", "uncheck a checkbox")
@@ -143,7 +150,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     v = verb("select", 'native <select> option by visible text. ex: ebrowse select @e7 "Canada"')
     v.add_argument("target")
-    v.add_argument("value")
+    v.add_argument("value", nargs="+", help="option label(s); several for <select multiple>")
 
     v = verb(
         "scroll",

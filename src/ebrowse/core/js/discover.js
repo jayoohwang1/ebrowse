@@ -150,8 +150,15 @@
         if (opts.length >= 50) break;
       }
       a.opt = opts;
-      const selIdx = el.selectedIndex;
-      if (selIdx >= 0 && el.options[selIdx]) a.sel = collapse(el.options[selIdx].text).slice(0, 80);
+      // honest total when the list is truncated ("of 80 options", not "of 50")
+      if (el.options.length > opts.length) a.optn = el.options.length;
+      if (el.multiple) a.mul = 1;
+      const chosen = [];
+      for (const o of el.selectedOptions) {
+        chosen.push(collapse(o.text).slice(0, 80));
+        if (chosen.length >= 5) break;
+      }
+      if (chosen.length) a.sel = chosen.join(", ");
     } else if (tag === "img") {
       const alt = el.getAttribute("alt");
       if (alt) a.alt = collapse(alt).slice(0, 160);
@@ -224,6 +231,7 @@
           break;
         }
       }
+      if (el.draggable === true && tag !== "img" && tag !== "a") k.dg = 1;
       if (hasPointerListener(el)) k.el = 1;
     }
     if (Object.keys(k).length) {

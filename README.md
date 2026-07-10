@@ -58,7 +58,7 @@ page — run `outline` to read it (your `@refs` survive the jump).
 **Working verbs:** `open/goto, back, forward, reload, outline, describe-screen,
 expand, screenshot, get, tabs, tab, dialog, connect, close, daemon status|stop, doctor`;
 actions `click, fill, type, press, check, uncheck, select, scroll, upload,
-eval`; `diagnose <target>` (read-only: why a click would or wouldn't land);
+eval, hover, drag`; `diagnose <target>` (read-only: why a click would or wouldn't land);
 compound verbs `fill-form, search` (and `select` handles custom
 dropdowns) that collapse multi-step interactions into one command with one
 diff. Every action prints a **diff of what changed**, e.g.:
