@@ -191,6 +191,13 @@ def _element_md(node: DomNode) -> str:
     state = ""
     if "exp" in a:
         state = " expanded" if a.get("exp") else " collapsed"
+    if a.get("prs"):
+        state += " pressed"
+    if a.get("asel"):
+        state += " selected"
+    if "chk" in a:  # ARIA checkbox/radio/switch: same marks as native inputs
+        mark = "x" if a.get("chk") else " "
+        return f"[{mark}] {_clip(text, 80)} ({ref}){state}"
     return f"[{_clip(text, 80)} ({ref}){state}]"
 
 

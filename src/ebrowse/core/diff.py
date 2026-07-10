@@ -13,7 +13,7 @@ import difflib
 
 from ebrowse.model import Diff, Element, PageMem, Section, SectionDiff
 
-_TRACKED_STATE = ("value", "checked", "expanded", "disabled")
+_TRACKED_STATE = ("value", "checked", "expanded", "disabled", "pressed", "selected")
 
 
 def added_text(old: str, new: str, max_len: int = 160) -> str:

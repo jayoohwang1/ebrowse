@@ -33,6 +33,14 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- **Outcome evidence beyond the DOM diff.** Tracked element state now includes
+  `pressed` (`aria-pressed`), `selected` (`aria-selected`), and `checked` from
+  `aria-checked` on role checkbox/radio/switch widgets (rendered with the same
+  `[x]`/`[ ]` marks as native inputs), so state-only toggles/tabs no longer
+  diff as "no change". Action results also report non-DOM outcomes as notes:
+  `download started: "…"` (page download event), `the document reloaded (same
+  URL)` (main-frame navigation counter), and on an otherwise-empty diff, URL
+  fragment jumps and scroll movement. Fixture: `outcomes.html`.
 - **ARIA checkable widgets work with `check`/`uncheck`.** A non-native element
   with role `checkbox`/`radio`/`switch`/`menuitemcheckbox`/`menuitemradio`
   (Playwright's `set_checked` refuses these) is activated through the full

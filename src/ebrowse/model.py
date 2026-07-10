@@ -120,6 +120,8 @@ class ElementState:
     disabled: bool = False
     expanded: bool | None = None  # aria-expanded
     options: list[str] | None = None  # native <select> only
+    pressed: bool | None = None  # aria-pressed (toggle buttons)
+    selected: bool | None = None  # aria-selected (tabs/options)
     # weak-evidence discovery provenance ("listener" | "focusable" |
     # "aria-state"); None = strong signal. Candidates render only in expand
     # (marked '?') and are excluded from outline counts.

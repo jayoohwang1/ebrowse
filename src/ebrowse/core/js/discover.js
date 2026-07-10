@@ -113,6 +113,17 @@
     if (exp !== null) a.exp = exp === "true" ? 1 : 0;
     const pop = el.getAttribute("aria-haspopup");
     if (pop && pop !== "false") a.pop = pop;
+    // ARIA state evidence: toggles/tabs/options whose ONLY reaction to a
+    // click is a state flip would otherwise diff as "no change"
+    const prs = el.getAttribute("aria-pressed");
+    if (prs !== null) a.prs = prs === "true" ? 1 : 0;
+    const asel = el.getAttribute("aria-selected");
+    if (asel !== null) a.asel = asel === "true" ? 1 : 0;
+    if (role && ["checkbox", "radio", "switch", "menuitemcheckbox",
+                 "menuitemradio"].includes(role)) {
+      const ac = el.getAttribute("aria-checked");
+      if (ac !== null) a.chk = ac === "true" ? 1 : 0;
+    }
     if (el.disabled === true || el.getAttribute("aria-disabled") === "true") a.dis = 1;
 
     if (tag === "input" || tag === "textarea") {

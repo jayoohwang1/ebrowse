@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Action outcomes</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    main { min-height: 3000px; }
+    button, a { margin-right: 1rem; }
+    .spacer { height: 2200px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Action outcomes</h1>
+    <a id="jump" href="#terms">Jump to terms</a>
+    <button id="reload-btn">Refresh data</button>
+    <a id="dl" href="data:text/plain;charset=utf-8,hello%20world" download="hello.txt">Download report</a>
+    <button id="mute-btn" aria-pressed="false">Mute notifications</button>
+    <div role="tablist" aria-label="Report sections">
+      <button role="tab" aria-selected="true" id="tab-a">Overview</button>
+      <button role="tab" aria-selected="false" id="tab-b">Details</button>
+    </div>
+  </header>
+  <main>
+    <p>This page contains actions whose useful outcomes may not produce visible text changes.</p>
+    <p>Its length makes the anchor link exercise a viewport-only navigation outcome.</p>
+    <div class="spacer"></div>
+    <p>Review the terms below before continuing.</p>
+    <h2 id="terms">Terms</h2>
+    <p>These terms are intentionally brief.</p>
+  </main>
+  <script>
+    document.getElementById("reload-btn").addEventListener("click", () => location.reload());
+    const mute = document.getElementById("mute-btn");
+    mute.addEventListener("click", () => mute.setAttribute("aria-pressed", String(mute.getAttribute("aria-pressed") !== "true")));
+    const tabs = [document.getElementById("tab-a"), document.getElementById("tab-b")];
+    for (const tab of tabs) tab.addEventListener("click", () => {
+      for (const other of tabs) other.setAttribute("aria-selected", String(other === tab));
+    });
+  </script>
+</body>
+</html>

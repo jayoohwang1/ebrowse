@@ -69,6 +69,8 @@ def _state_for(node: DomNode) -> ElementState:
     expanded = None
     if "exp" in a:
         expanded = bool(a["exp"])
+    pressed = bool(a["prs"]) if "prs" in a else None
+    selected = bool(a["asel"]) if "asel" in a else None
     return ElementState(
         bbox=BBox(*node.rect),
         visible=True,
@@ -77,6 +79,8 @@ def _state_for(node: DomNode) -> ElementState:
         disabled=bool(a.get("dis")),
         expanded=expanded,
         options=a.get("opt"),
+        pressed=pressed,
+        selected=selected,
         candidate=node.candidate,
     )
 

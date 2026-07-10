@@ -340,6 +340,34 @@ def test_fancy_external_label_checkbox(server, env):
     assert re.search(r'checked: "false" → "true"', r.stdout)
 
 
+def test_outcome_evidence_beyond_dom_diff(server, env):
+    # outcomes with little/no DOM footprint must still be reported truthfully
+    ebrowse(env, "open", server.url("outcomes.html"))
+    # aria-pressed flip is a tracked state change, not "no change detected"
+    mute = ref_anywhere(env, r"Mute notifications")
+    r = ebrowse(env, "click", mute)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'pressed: "false" → "true"', r.stdout), r.stdout
+    # aria-selected swap on tabs
+    tab_b = ref_anywhere(env, r"Details")
+    r = ebrowse(env, "click", tab_b)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'selected: "false" → "true"', r.stdout), r.stdout
+    # in-page anchor: no DOM change, but the jump is named
+    jump = ref_anywhere(env, r"Jump to terms")
+    r = ebrowse(env, "click", jump)
+    assert r.returncode == 0, r.stderr
+    assert "#terms" in r.stdout, r.stdout
+    # same-URL reload is named instead of "no change detected" alone
+    r = ebrowse(env, "click", "#reload-btn")
+    assert r.returncode == 0, r.stderr
+    assert "document reloaded" in r.stdout, r.stdout
+    # a download never touches the DOM but is reported by name
+    r = ebrowse(env, "click", "#dl")
+    assert r.returncode == 0, r.stderr
+    assert 'download started: "hello.txt"' in r.stdout, r.stdout
+
+
 def test_aria_widgets_check_uncheck(server, env):
     # role=checkbox/switch/radio widgets: Playwright's set_checked refuses
     # them, so check/uncheck activates and verifies aria-checked instead

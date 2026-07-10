@@ -54,6 +54,9 @@ class ActionSnapshot:
     page: PageMem | None
     texts: dict[str, str] = field(default_factory=dict)
     url: str = ""  # fragment-stripped; basis for navigation detection
+    full_url: str = ""  # with fragment; basis for anchor-jump detection
+    scroll_y: int = 0
+    navs: int = 0  # session main-frame navigation count at begin
 
 
 class ActionsMixin(InteractionMixin):
@@ -66,6 +69,7 @@ class ActionsMixin(InteractionMixin):
 
         cfg: Config
         nav_id: int
+        nav_events: int
         page_mem: PageMem | None
         raw_by_sid: dict[str, RawSection]
         _notes: list[str]
@@ -137,15 +141,21 @@ class ActionsMixin(InteractionMixin):
             for sid, raw in self.raw_by_sid.items()
         }
 
-    def _begin_action(self) -> ActionSnapshot:
+    async def _begin_action(self) -> ActionSnapshot:
         """Snapshot pre-action state; pairs with _finish_action."""
         prev = self.page_mem
         self._notes = []
         self._blocking_modal = None
+        scroll_y = 0
+        with contextlib.suppress(Exception):
+            scroll_y = int(await self.page.evaluate("() => Math.round(window.scrollY)"))
         return ActionSnapshot(
             page=prev,
             texts=self._section_texts() if prev else {},
             url=urldefrag(self.page.url)[0],
+            full_url=self.page.url,
+            scroll_y=scroll_y,
+            navs=self.nav_events,
         )
 
     async def _finish_action(self, action_line: str, begin_state: ActionSnapshot) -> str:
@@ -180,6 +190,25 @@ class ActionsMixin(InteractionMixin):
             return self._no_baseline_landing(action_line)
         diff = diff_pages(prev, new, begin_state.texts, self._section_texts())
         diff.notes = list(self._notes)
+        # Outcome evidence the DOM diff can't see: a same-URL reload (form
+        # resubmit, meta refresh) and — only when nothing else changed —
+        # anchor jumps and scroll movement, so a dispatched click isn't
+        # misreported as a dead no-op.
+        # (framenavigated also fires for same-document anchor jumps, so a
+        # fragment difference means "anchor", not "reload")
+        if self.nav_events > begin_state.navs and self.page.url == begin_state.full_url:
+            diff.notes.append("the document reloaded (same URL) — page state may have reset")
+        if diff.kind == "no_change":
+            if self.page.url != begin_state.full_url:
+                diff.notes.append(f"URL fragment changed: now at {self.page.url}")
+            else:
+                with contextlib.suppress(Exception):
+                    y = int(await self.page.evaluate("() => Math.round(window.scrollY)"))
+                    if abs(y - begin_state.scroll_y) > 40:
+                        diff.notes.append(
+                            f"scroll position moved y={begin_state.scroll_y} → {y} "
+                            "(likely an in-page jump)"
+                        )
         # A modal that blocks the page via the top layer / inert (rather than by
         # covering the target) lets the click dispatch to an inert element — a
         # harmless no-op. Name it so the agent doesn't retry the same dead click.
@@ -196,7 +225,7 @@ class ActionsMixin(InteractionMixin):
         steps produce ONE diff. When `loc`/`target` are given, a Playwright
         interception failure is enriched with the blocker diagnosis."""
         await self._ensure_browser()
-        begin_state = self._begin_action()
+        begin_state = await self._begin_action()
         try:
             await fn()
         except CommandError:

@@ -159,8 +159,14 @@ Sprite Stasis Ball added. [View cart (@e51)](→ /cart) [Checkout (@e52)](→ /c
   `→ dialog` (not `→ partial change`) and the line is tagged
   `+ s1 [dialog]: [Accept (@e6)], [Reject (@e7)]`, so a coalesced dialog carries
   the same signal as a standalone one.
+- Tracked element state in `~ @ref field:` lines: `value`, `checked` (native and
+  `aria-checked` on role checkbox/radio/switch), `expanded`, `disabled`,
+  `pressed` (`aria-pressed`), `selected` (`aria-selected`).
 - `no change detected` carries the honest caveat (may be a real no-op, or the effect
-  is outside the DOM / slower than the settle window).
+  is outside the DOM / slower than the settle window). Outcome evidence beyond the
+  DOM is reported as notes: `download started: "file.pdf"`, `the document reloaded
+  (same URL) — page state may have reset`, and — only on `no change detected` —
+  `URL fragment changed: now at …#anchor` or `scroll position moved y=A → B`.
 - Notes always surface: `note: native alert auto-accepted: "…"`, new-tab adoption.
 - Occluded clicks fail *before* acting:
   `blocked: @e42 is covered by <dialog "Cookie consent"> — interact with that first` (exit 1).
