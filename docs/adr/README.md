@@ -20,3 +20,4 @@ ADRs 0001–0006 were backfilled from the v1 implementation log (see git history
 | [0008](0008-explicit-outline-and-synchronous-visual-glance.md) | Explicit outline + synchronous visual glance (`◉`, `describe-screen`) |
 | [0009](0009-label-activation-and-trial-click-arbitration.md) | Label activation + Playwright trial-click arbitration in the click pre-check |
 | [0010](0010-interaction-plan-and-keyboard-fallback.md) | InteractionPlan routing + keyboard-activation fallback for non-modal covers |
+| [0011](0011-lossless-budgeted-section-partitioning.md) | Lossless budgeted section partitioning |

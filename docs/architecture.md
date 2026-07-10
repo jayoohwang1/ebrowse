@@ -74,7 +74,7 @@ ebrowse open <url>                      # navigation: land, don't render the pag
 ebrowse outline                         # the only verb that reads + summarizes
   → page.evaluate(discover.js)          # ONE round trip: full DOM walk in-page
   → DomSnapshot (JSON tree)             # nodes: tag/attrs/text/bbox/clickable signals
-  → split(DomSnapshot) → [RawSection]   # WebChallenger DividePage adaptation
+  → split(DomSnapshot) → [RawSection]   # lossless, budgeted owned fragments
   → extract elements, assign refs (RefRegistry), fingerprint, label
   → (sync, if summarizer enabled) summarize.batch + caption_screen → sqlite cache
                                         # text labels + ◉ glance, concurrent, timeout-bounded
@@ -103,6 +103,7 @@ src/ebrowse/
     js/discover.js    # single-pass DOM walker (the only page-side code)
     snapshot.py       # DomSnapshot types + the evaluate() wrapper
     split.py          # DomSnapshot → [RawSection]
+    collection.py     # shared native/ARIA list-table item semantics
     clickable.py      # interactable predicate (canonical sets, templated into JS)
     label.py          # deterministic heading/preview labels
     fingerprint.py    # section fingerprints, class normalization, RefRegistry
@@ -130,7 +131,7 @@ scripts/smoke_real_sites.py  # manual real-site outline quality check
 | Risk | Stance |
 |---|---|
 | SPA quiescence heuristics fire early/late | MutationObserver debounce is best-effort; capped, with an honest `no change detected` caveat. Effects animated past the window attribute to the next diff (observed, accepted). |
-| Section splitter quality on wild pages | The most quality-sensitive code. Golden fixtures + real-site smoke script; `max_sections` overflow valve. The failure mode of generic heuristics is "everything collapses into one section" — test on css-in-js sites. |
+| Section splitter quality on wild pages | The most quality-sensitive code. Golden fixtures + real-site smoke script; ordinary expansions are budgeted and `max_sections` is a soft target. Safe ownership/query boundaries outrank outline length — test on css-in-js sites. |
 | Descriptor matching too strict/loose | Strict by design; misbinding is worse than ref churn. See [ADR 0003](adr/0003-strict-ref-matching.md). |
 | Cross-origin iframes invisible | Surfaced in the outline so the agent knows to screenshot. CDP route is future work. |
 | Closed shadow DOM | Out of scope; open shadow roots are walked. |

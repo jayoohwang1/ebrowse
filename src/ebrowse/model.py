@@ -261,6 +261,9 @@ class PageMem:
     # routing signal, never load-bearing; None when no vision sidecar. Populated
     # by the summarizer, cached per screen_key. Provenance: model-generated.
     screen_gist: str | None = None
+    # True when discover.js hit its node cap. Optional/defaulted for wire
+    # compatibility with PageMem payloads written before this field existed.
+    truncated: bool = False
 
     def section(self, sid: str) -> Section | None:
         for s in self.sections:
@@ -283,6 +286,7 @@ class PageMem:
             "captured_at": self.captured_at,
             "nav_id": self.nav_id,
             "screen_gist": self.screen_gist,
+            "truncated": self.truncated,
         }
 
     @classmethod
@@ -294,6 +298,7 @@ class PageMem:
             captured_at=d.get("captured_at", 0.0),
             nav_id=d.get("nav_id", 0),
             screen_gist=d.get("screen_gist"),
+            truncated=d.get("truncated", False),
         )
 
 

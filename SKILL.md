@@ -189,11 +189,17 @@ and clicks it. No-match errors list every revealed option.
 
 **Long lists/tables:** `expand` shows a 20-item page — page through it with
 `--cursor N` (follow the "… N more — expand s4 --cursor 20" hint), or `--all` for
-everything (rarely; the outline row shows item count and token cost). To *filter*
+everything (rarely; the outline row shows item count and the default page's token
+cost). A page may contain fewer than 20 unusually large rows to stay within the
+expansion budget. To *filter*
 or *cap* rows instead, use `query`: `ebrowse query s4 --filter "under.*100"
 --limit 5` (regex over row text), `--cols "name,price"` projects table columns.
 The flags don't cross: `--filter/--cols/--limit` are `query`-only; `expand` takes
 only `--cursor/--all`. To see just the first item, `expand s4` already shows it.
+
+Oversized ordinary content is split automatically. A large form can therefore
+appear as form controls, then a queryable table, then another form section; use the
+section IDs in outline order and never assume one DOM `<form>` maps to one sid.
 
 **Cookie banners / modals:** an appearing dialog shows in the action diff with
 its controls' `@refs` ready — a substantial one as its own `dialog` section

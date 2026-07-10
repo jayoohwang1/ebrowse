@@ -47,6 +47,8 @@ async def check(url: str) -> str:
         ot, at = estimate_tokens(outline), estimate_tokens(aria)
         n = len(pagemem.sections)
         elems = sum(len(s.elements) for s in pagemem.sections)
+        ordinary = [s.token_estimate for s in pagemem.sections if s.type not in ("list", "table")]
+        max_ordinary = max(ordinary, default=0)
         flags = []
         if n <= 1:
             flags.append("SINGLE-SECTION")
@@ -54,10 +56,15 @@ async def check(url: str) -> str:
             flags.append("MANY-SECTIONS")
         if "Access Denied" in pagemem.title or "denied" in outline[:300].lower():
             flags.append("BLOCKED")
+        if max_ordinary > cfg.observe.max_section_tokens:
+            flags.append("OVERSIZED-SECTION")
+        if pagemem.truncated:
+            flags.append("SNAPSHOT-TRUNCATED")
         flag = f"  << {' '.join(flags)}" if flags else ""
         return (
             f"{url:40s} sections={n:3d} elements={elems:4d} "
-            f"outline={ot:5d}t aria={at:6d}t ratio={ot / max(at, 1):5.1%}{flag}"
+            f"outline={ot:5d}t aria={at:6d}t maxord={max_ordinary:5d}t "
+            f"ratio={ot / max(at, 1):5.1%}{flag}"
         )
     finally:
         await browser.close()

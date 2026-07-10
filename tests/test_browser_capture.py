@@ -98,3 +98,20 @@ async def test_dropdown_reveal_appears_in_recapture(server, page):
     snap2 = await capture(page)
     n_after = sum(1 for n in snap2.root.walk() if n.attrs.get("role") == "menuitem")
     assert n_after == 5
+
+
+async def test_large_form_promotes_live_nested_table(page):
+    rows = "".join(f"<tr><td>Order {i}</td><td>{'long detail ' * 20}</td></tr>" for i in range(30))
+    await page.set_content(
+        "<form><label>Filter <input name='filter'></label>"
+        "<table><thead><tr><th>Order</th><th>Detail</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table><button>Export</button></form>"
+    )
+    snap = await capture(page)
+    page_mem, raws = build_page(
+        snap, RefRegistry(), ObserveConfig(max_section_tokens=300), captured_at=0
+    )
+    assert [section.type for section in page_mem.sections] == ["form", "table", "form"]
+    table = page_mem.sections[1]
+    assert table.item_count == 30
+    assert "Order 29" in raws[table.sid].node.subtree_text()

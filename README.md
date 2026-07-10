@@ -36,7 +36,7 @@ $ ebrowse outline                        # read the page (table of contents)
 PAGE Espresso Gear — Fixture Shop — http://shop.example.com/
 s1 header  4 links, 1 input, 1 button  ~42t  | "Fixture Shop Products Deals Help Search"
 s2 form    6 inputs, 1 button          ~46t  | "Filters — Bella Breville Gaggia 4★ & up"
-s4 list    32 items, 32 links          ~1.0kt | "Bella Espresso Machine Pro $19.99 ..."
+s4 list    32 items, 32 links          ~659t | "Bella Espresso Machine Pro $19.99 ..."
 
 $ ebrowse expand s2                      # one section as markdown with refs
 ## s2 form — Filters
@@ -84,6 +84,12 @@ Reading a page costs what you choose to read: skim the outline (~50–700
 tokens), expand only relevant sections. Element refs (`@e7`) are durable — they
 survive re-observation and even page navigations (a site's header search box
 keeps its ref on every page), so you can act without re-reading.
+
+Ordinary sections are automatically partitioned before their default expansion
+becomes excessive (16k-token ceiling by default). Nested lists/tables are promoted
+into pageable, queryable sections without losing surrounding form controls. Very
+large outlines may exceed the 60-section target rather than merge content into one
+unusable section.
 
 ### Sessions & browser modes
 

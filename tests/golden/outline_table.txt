@@ -2,4 +2,4 @@ PAGE Orders — Fixture Admin — http://127.0.0.1:8901/table.html
 s1 header  4 links  ~34t  | "Fixture Admin Orders Customers Reports"
 s2 content no elements  ~5t  | "Orders"
 s3 form    2 inputs, 1 button  ~30t  | "Filter"
-s4 table   25 items, 25 links, 54 buttons  ~850t  | "ID ▲ Description Date Total Status Actions #4400 Order from Turin 1 Jun 2026 $24.50 Open…"
+s4 table   25 items, 25 links, 54 buttons  ~696t  | "ID ▲ Description Date Total Status Actions #4400 Order from Turin 1 Jun 2026 $24.50 Open…"

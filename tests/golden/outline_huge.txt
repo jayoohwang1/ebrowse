@@ -1,3 +1,3 @@
 PAGE The Long Travelogue — Fixture — http://127.0.0.1:8901/huge.html
 s1 content no elements  ~8t  | "The Long Travelogue"
-s2 list    120 items, 120 links  ~5.4kt  | "Entry 1 in a very long travelogue. The espresso in Turin was excellent, and the trains ra…"
+s2 list    120 items, 120 links  ~893t  | "Entry 1 in a very long travelogue. The espresso in Turin was excellent, and the trains ra…"

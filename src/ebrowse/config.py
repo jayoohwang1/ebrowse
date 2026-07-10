@@ -74,6 +74,9 @@ class ObserveConfig:
     preview_chars: int = 120
     list_page_size: int = 20
     max_sections: int = 60
+    # Approximate expansion ceiling for ordinary sections. Lists/tables are
+    # pageable and therefore use this as a per-page rendering budget instead.
+    max_section_tokens: int = 16_384
     # `outline --preview` only: chars of verbatim text appended after each ≈
     # summary. Tune the summary-vs-preview token tradeoff here (shorter = leaner).
     combined_preview_chars: int = 60

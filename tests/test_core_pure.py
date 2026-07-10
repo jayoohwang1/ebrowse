@@ -175,6 +175,314 @@ def test_table_items_counted():
     assert tables and tables[0].item_count == 25
 
 
+def test_oversized_form_promotes_nested_table_without_losing_controls():
+    """A semantic form is not an unconditional terminal once it exceeds budget."""
+    from ebrowse.core.snapshot import DomNode
+
+    def cell(tag: str, text: str):
+        return DomNode(tag=tag, rect=(0, 0, 300, 30), text=text)
+
+    rows = [
+        DomNode(
+            tag="tr",
+            rect=(0, 100 + i * 30, 600, 30),
+            children=[cell("td", f"row {i} " + "detail " * 30), cell("td", f"${i}.00")],
+        )
+        for i in range(12)
+    ]
+    table = DomNode(
+        tag="table",
+        rect=(0, 100, 600, 500),
+        children=[
+            DomNode(
+                tag="thead",
+                rect=(0, 100, 600, 30),
+                children=[
+                    DomNode(
+                        tag="tr",
+                        rect=(0, 100, 600, 30),
+                        children=[cell("th", "Product"), cell("th", "Price")],
+                    )
+                ],
+            ),
+            DomNode(tag="tbody", rect=(0, 130, 600, 470), children=rows),
+        ],
+    )
+    before = DomNode(
+        tag="input",
+        rect=(0, 40, 200, 30),
+        attrs={"nm": "Filter", "typ": "search"},
+        signals={"tg": 1},
+    )
+    after = DomNode(tag="button", rect=(0, 620, 100, 30), text="Export", signals={"tg": 1})
+    spacer = DomNode(tag="div", rect=(0, 80, 700, 0), attrs={"id": "layout-anchor"})
+    form = DomNode(tag="form", rect=(0, 0, 700, 700), children=[before, spacer, table, after])
+    snap = DomSnapshot(
+        url="https://x.test/",
+        title="Orders",
+        viewport=(1280, 800),
+        scroll_y=0,
+        doc_height=700,
+        truncated=False,
+        root=DomNode(tag="body", rect=(0, 0, 1280, 700), children=[form]),
+    )
+    cfg = ObserveConfig(max_section_tokens=200)
+    page, raws = build_page(snap, RefRegistry(), cfg, captured_at=0)
+
+    assert [s.type for s in page.sections] == ["form", "table", "form"]
+    assert page.sections[1].item_count == 12
+    assert {e.desc.name for e in page.sections[0].elements} == {"Filter"}
+    assert {e.desc.text_head for e in page.sections[2].elements} == {"Export"}
+    assert len({e.ref for s in page.sections for e in s.elements}) == 2
+    query = render.render_query(page.sections[1], raws["s2"], cfg, filter_expr="row 7")
+    assert "matched 1 of 12 items" in query and "row 7" in query
+
+
+def test_descending_preserves_clickable_wrapper_identity_and_direct_text():
+    from ebrowse.core.snapshot import DomNode
+
+    wrapper = DomNode(
+        tag="div",
+        rect=(0, 0, 700, 1200),
+        text="Open report",
+        children=[
+            DomNode(tag="section", rect=(0, 50, 600, 500), text="Quarterly results"),
+            DomNode(tag="section", rect=(0, 600, 600, 500), text="Regional results"),
+        ],
+        signals={"ls": 1},
+    )
+    snap = DomSnapshot(
+        url="https://x.test/",
+        title="Report",
+        viewport=(1280, 800),
+        scroll_y=0,
+        doc_height=1200,
+        truncated=False,
+        root=DomNode(tag="body", rect=(0, 0, 1280, 1200), children=[wrapper]),
+    )
+    page, raws = build_page(snap, RefRegistry(), ObserveConfig(), captured_at=0)
+    elements = [e for s in page.sections for e in s.elements]
+    assert len(elements) == 1
+    assert elements[0].desc.text_head.startswith("Open report Quarterly results")
+    expanded = "\n".join(
+        render.render_section_markdown(s, raws[s.sid], ObserveConfig()) for s in page.sections
+    )
+    assert "Open report" in expanded
+    assert "Quarterly results" in expanded
+    assert "Regional results" in expanded
+
+
+def test_collection_adapter_supports_multiple_tbody_and_aria_grid():
+    from ebrowse.core.collection import collection_items, collection_kind, table_cells
+    from ebrowse.core.snapshot import DomNode
+
+    def row(text: str):
+        return DomNode(
+            tag="tr",
+            rect=(0, 0, 100, 20),
+            children=[DomNode(tag="td", rect=(0, 0, 100, 20), text=text)],
+        )
+
+    table = DomNode(
+        tag="table",
+        rect=(0, 0, 100, 100),
+        children=[
+            DomNode(tag="tbody", rect=(0, 0, 100, 40), children=[row("one"), row("two")]),
+            DomNode(tag="tbody", rect=(0, 40, 100, 20), children=[row("three")]),
+        ],
+    )
+    assert [r.subtree_text() for r in collection_items(table)] == ["one", "two", "three"]
+
+    grid_row = DomNode(
+        tag="div",
+        rect=(0, 0, 100, 20),
+        attrs={"role": "row"},
+        children=[DomNode(tag="div", rect=(0, 0, 100, 20), attrs={"role": "gridcell"}, text="A")],
+    )
+    grid = DomNode(tag="div", rect=(0, 0, 100, 100), attrs={"role": "grid"}, children=[grid_row])
+    assert collection_kind(grid) == "table"
+    assert collection_items(grid) == [grid_row]
+    assert table_cells(grid_row)[0].text == "A"
+
+
+def test_max_sections_is_soft_when_only_collections_remain():
+    from ebrowse.core.snapshot import DomNode
+    from ebrowse.core.split import split_page
+
+    lists = [
+        DomNode(
+            tag="ul",
+            rect=(0, i * 100, 500, 80),
+            children=[DomNode(tag="li", rect=(0, i * 100, 500, 20), text=f"item {i}")],
+        )
+        for i in range(4)
+    ]
+    snap = DomSnapshot(
+        url="https://x.test/",
+        title="Lists",
+        viewport=(1280, 800),
+        scroll_y=0,
+        doc_height=500,
+        truncated=False,
+        root=DomNode(tag="body", rect=(0, 0, 1280, 500), children=lists),
+    )
+    sections = split_page(snap, max_sections=1)
+    assert len(sections) == 4
+    assert all(section.stype == "list" for section in sections)
+
+
+def test_ordinary_sections_respect_expansion_budget_at_child_boundaries():
+    from ebrowse.core.snapshot import DomNode
+
+    children = [
+        DomNode(tag="p", rect=(0, i * 50, 600, 40), text=f"paragraph {i} " + "word " * 45)
+        for i in range(10)
+    ]
+    article = DomNode(tag="article", rect=(0, 0, 700, 600), children=children)
+    snap = DomSnapshot(
+        url="https://x.test/",
+        title="Article",
+        viewport=(1280, 800),
+        scroll_y=0,
+        doc_height=600,
+        truncated=False,
+        root=DomNode(tag="body", rect=(0, 0, 1280, 600), children=[article]),
+    )
+    cfg = ObserveConfig(max_section_tokens=100)
+    page, _ = build_page(snap, RefRegistry(), cfg, captured_at=0)
+    assert len(page.sections) > 1
+    assert all(s.type != "list" and s.type != "table" for s in page.sections)
+    assert all(s.token_estimate <= cfg.max_section_tokens for s in page.sections)
+
+
+def test_outline_warns_when_snapshot_capture_was_truncated():
+    page, _ = build("article")
+    page.truncated = True
+    outline = render.render_outline(page)
+    assert "NOTE snapshot truncated" in outline
+    assert "ebrowse screenshot --full" in outline
+
+
+def test_collection_default_page_is_token_budgeted_but_all_is_explicit_escape_hatch():
+    snap = load_snapshot("huge")
+    cfg = ObserveConfig(max_section_tokens=200)
+    page, raws = build_page(snap, RefRegistry(), cfg, captured_at=0)
+    section = next(s for s in page.sections if s.type == "list")
+    default = render.render_section_markdown(section, raws[section.sid], cfg)
+    full = render.render_section_markdown(section, raws[section.sid], cfg, show_all=True)
+    assert section.token_estimate <= cfg.max_section_tokens
+    assert "more items" in default
+    assert len(full) > len(default) * 5
+
+
+def test_collection_only_oversized_dialog_keeps_modal_section():
+    from ebrowse.core.snapshot import DomNode
+
+    items = [
+        DomNode(tag="li", rect=(0, i * 20, 500, 20), text="choice " + "detail " * 30)
+        for i in range(20)
+    ]
+    dialog = DomNode(
+        tag="dialog",
+        rect=(0, 0, 600, 600),
+        attrs={"nm": "Choose records"},
+        children=[DomNode(tag="ul", rect=(0, 0, 500, 500), children=items)],
+    )
+    snap = DomSnapshot(
+        url="https://x.test/",
+        title="Dialog",
+        viewport=(1280, 800),
+        scroll_y=0,
+        doc_height=800,
+        truncated=False,
+        root=DomNode(tag="body", rect=(0, 0, 1280, 800), children=[dialog]),
+    )
+    page, _ = build_page(snap, RefRegistry(), ObserveConfig(max_section_tokens=100), captured_at=0)
+    assert [section.type for section in page.sections] == ["dialog", "list"]
+    assert page.sections[0].heading == "Choose records"
+
+
+def test_taller_small_siblings_coalesce_with_same_owner():
+    from ebrowse.core.snapshot import DomNode
+
+    parent = DomNode(
+        tag="div",
+        rect=(0, 0, 700, 1200),
+        children=[
+            DomNode(tag="section", rect=(0, 0, 600, 300), text="First cohesive block"),
+            DomNode(tag="section", rect=(0, 310, 600, 300), text="Second cohesive block"),
+        ],
+    )
+    snap = DomSnapshot(
+        url="https://x.test/",
+        title="Blocks",
+        viewport=(1280, 800),
+        scroll_y=0,
+        doc_height=1200,
+        truncated=False,
+        root=DomNode(tag="body", rect=(0, 0, 1280, 1200), children=[parent]),
+    )
+    page, _ = build_page(snap, RefRegistry(), ObserveConfig(), captured_at=0)
+    content = [section for section in page.sections if section.type == "content"]
+    assert len(content) == 1
+    assert "First cohesive block" in content[0].preview
+
+
+def test_same_owner_form_fragments_are_coalescible():
+    from ebrowse.core.snapshot import DomNode
+    from ebrowse.core.split import RawSection, _coalesce_small
+
+    first = RawSection(
+        node=DomNode(tag="div", rect=(0, 0, 500, 280), text="First fields"),
+        parent_tags=("body", "form"),
+        stype="form",
+        context_key=42,
+        estimated_chars=100,
+    )
+    second = RawSection(
+        node=DomNode(tag="div", rect=(0, 290, 500, 280), text="Second fields"),
+        parent_tags=("body", "form"),
+        stype="form",
+        context_key=42,
+        estimated_chars=100,
+    )
+    merged = _coalesce_small([first, second], max_chars=1000)
+    assert len(merged) == 1
+    assert merged[0].stype == "form"
+    assert merged[0].node.subtree_text() == "First fields Second fields"
+
+
+def test_heading_only_section_attaches_to_taller_following_content():
+    from ebrowse.core.snapshot import DomNode
+
+    parent = DomNode(
+        tag="div",
+        rect=(0, 0, 700, 1200),
+        children=[
+            DomNode(tag="h2", rect=(0, 0, 600, 50), text="Coverage details"),
+            DomNode(
+                tag="article",
+                rect=(0, 60, 600, 700),
+                children=[DomNode(tag="p", rect=(0, 60, 600, 100), text="Covered services")],
+            ),
+        ],
+    )
+    snap = DomSnapshot(
+        url="https://x.test/",
+        title="Coverage",
+        viewport=(1280, 800),
+        scroll_y=0,
+        doc_height=1200,
+        truncated=False,
+        root=DomNode(tag="body", rect=(0, 0, 1280, 1200), children=[parent]),
+    )
+    page, raws = build_page(snap, RefRegistry(), ObserveConfig(), captured_at=0)
+    assert len(page.sections) == 1
+    assert page.sections[0].heading == "Coverage details"
+    expanded = render.render_section_markdown(page.sections[0], raws["s1"], ObserveConfig())
+    assert "Covered services" in expanded
+
+
 def test_candidate_discovery_semantics():
     """Weak-evidence candidates: exposed with provenance in expand, excluded
     from outline counts, suppressed around strong elements, decoys dropped."""

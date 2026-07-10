@@ -41,7 +41,8 @@ quiescence_ms = 300             # post-action DOM-quiet debounce
 quiescence_max_ms = 3000        # hard cap on the settle wait
 preview_chars = 120             # deterministic label preview length
 list_page_size = 20             # expand/query pagination window
-max_sections = 60               # outline overflow valve; tail sections merge
+max_sections = 60               # soft outline-size target; safe merges only
+max_section_tokens = 16384      # ordinary expansion ceiling; collection page budget
 
 [security]
 allowed_domains = []            # empty = all; subdomains of listed domains allowed

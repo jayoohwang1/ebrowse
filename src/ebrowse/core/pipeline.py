@@ -53,7 +53,9 @@ def _desc_for(node: DomNode, page_url: str) -> ElementDesc:
         placeholder=a.get("ph"),
         href=normalize_href(a.get("href", ""), page_url),
         input_type=a.get("typ"),
-        text_head=node.subtree_text(cap=_TEXT_HEAD_LEN * 2)[:_TEXT_HEAD_LEN],
+        text_head=(node.identity_text or node.subtree_text(cap=_TEXT_HEAD_LEN * 2))[
+            :_TEXT_HEAD_LEN
+        ],
         iframe_path=node.iframe_path,
     )
 
@@ -135,7 +137,11 @@ def build_page(
 ) -> tuple[PageMem, dict[str, RawSection]]:
     """Build a PageMem. Also returns sid -> RawSection so callers (expand,
     screenshots) can reach the underlying DOM subtree of each section."""
-    raws = split_page(snapshot, max_sections=observe.max_sections)
+    raws = split_page(
+        snapshot,
+        max_sections=observe.max_sections,
+        max_section_tokens=observe.max_section_tokens,
+    )
 
     # 1) extract all element nodes page-wide (document order matters for refs)
     section_nodes: list[list[DomNode]] = [extract_element_nodes(r) for r in raws]
@@ -159,6 +165,7 @@ def build_page(
     raw_by_sid: dict[str, RawSection] = {}
     i = 0
     for idx, raw in enumerate(raws):
+        identity_node = raw.fingerprint_node or raw.node
         nodes = section_nodes[idx]
         elements = []
         for node in nodes:
@@ -177,11 +184,11 @@ def build_page(
         section = Section(
             sid=sid,
             fingerprint=section_fingerprint(
-                tag=raw.node.tag,
-                cls=raw.node.attrs.get("cls", ""),
-                role=raw.node.attrs.get("role", ""),
+                tag=identity_node.tag,
+                cls=identity_node.attrs.get("cls", ""),
+                role=identity_node.attrs.get("role", ""),
                 heading=heading or "",
-                iframe_path=raw.node.iframe_path,
+                iframe_path=identity_node.iframe_path,
                 parent_tags=raw.parent_tags,
             ),
             type=raw.stype,
@@ -203,7 +210,7 @@ def build_page(
             host = urlsplit(src).netloc if "//" in src else src
             section.preview = f"cross-origin: {host or 'unknown'}"
         section.token_estimate = estimate_tokens(
-            render.render_section_markdown(section, raw, observe, show_all=True)
+            render.render_section_markdown(section, raw, observe)
         )
         sections.append(section)
         raw_by_sid[sid] = raw
@@ -214,6 +221,7 @@ def build_page(
         sections=sections,
         captured_at=captured_at if captured_at is not None else time.time(),
         nav_id=nav_id,
+        truncated=snapshot.truncated,
     )
     return page, raw_by_sid
 

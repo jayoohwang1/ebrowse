@@ -61,6 +61,9 @@ def test_model_round_trip():
     assert restored.sections[0].elements[0].ref == "@e1"
     assert restored.find_element("@e1") is not None
     assert restored.section("s1").counts_desc() == "1 button"
+    old_payload = page.to_dict()
+    old_payload.pop("truncated")
+    assert PageMem.from_dict(old_payload).truncated is False
 
 
 def test_diff_round_trip():
@@ -115,9 +118,11 @@ x = 1
 def test_config_env_override(tmp_path, monkeypatch):
     monkeypatch.setenv("EBROWSE_BROWSER_HEADLESS", "false")
     monkeypatch.setenv("EBROWSE_OBSERVE_MAX_SECTIONS", "10")
+    monkeypatch.setenv("EBROWSE_OBSERVE_MAX_SECTION_TOKENS", "2048")
     cfg = load_config(tmp_path / "missing.toml")
     assert cfg.browser.headless is False
     assert cfg.observe.max_sections == 10
+    assert cfg.observe.max_section_tokens == 2048
 
 
 def test_cli_parses_all_verbs():

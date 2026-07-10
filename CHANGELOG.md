@@ -8,6 +8,21 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Changed
 
+- **Section splitting is now lossless and expansion-budgeted.** Oversized semantic
+  containers are partitioned without dropping direct text or wrapper actions;
+  nested lists/tables are promoted into pageable, queryable sections while form
+  residuals remain in order. `observe.max_section_tokens` defaults to 16,384.
+  `max_sections` is now a soft target using only safe adjacent merges, so it can no
+  longer recreate a giant tail section. Native multi-`tbody` tables and ARIA
+  list/table/grid collections share the same classification/query adapter.
+  Small same-owner content/form fragments now coalesce across moderately taller
+  layouts, standalone headings attach to compatible following content, and a final
+  substance gate removes empty layout projections.
+- Outline token estimates for collections now report the default paginated expansion
+  cost rather than `--all`; default expand/query windows also stop at the configured
+  token budget. Explicit `--all` / query `--limit` retain the large-output escape
+  hatches. Outlines now warn when DOM capture hit its 15,000-node cap.
+
 - **Diff new-text extraction: status messages no longer lose to bulk content**
   (#11). `added_text()` now ranks short fragments (≤ 100 chars — status
   messages, validation errors) ahead of bulk insertions, caps each fragment so

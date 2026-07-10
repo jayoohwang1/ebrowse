@@ -10,6 +10,7 @@ the screenshot (untrusted routing signal, even weaker than ≈ — never act on 
 from __future__ import annotations
 
 from ebrowse.config import ObserveConfig
+from ebrowse.core.collection import collection_items, table_cells, table_headers
 from ebrowse.core.label import deterministic_label
 from ebrowse.core.snapshot import DomNode
 from ebrowse.core.split import RawSection
@@ -43,6 +44,11 @@ def render_outline(
         lines.append(outline_line(s, preview=preview, preview_chars=preview_chars))
     if summaries_note:
         lines.append(summaries_note)
+    if page.truncated:
+        lines.append(
+            "NOTE snapshot truncated at the DOM node limit — use 'ebrowse screenshot --full' "
+            "to inspect potentially omitted content"
+        )
     return "\n".join(lines)
 
 
@@ -106,17 +112,7 @@ def render_section_markdown(
 
 
 def _items_of(raw: RawSection) -> list[DomNode]:
-    node = raw.node
-    if node.is_list_group:
-        return node.children
-    if node.tag in ("ul", "ol", "dl"):
-        return [c for c in node.children if c.tag in ("li", "dt", "dd")]
-    if node.tag == "table":
-        for n in node.walk():
-            if n.tag == "tbody":
-                return [c for c in n.children if c.tag == "tr"]
-        return [n for n in node.walk() if n.tag == "tr"]
-    return []
+    return collection_items(raw.node)
 
 
 def _render_items(
@@ -128,25 +124,47 @@ def _render_items(
 ) -> str:
     items = _items_of(raw)
     total = len(items)
-    window = items if show_all else items[cursor : cursor + observe.list_page_size]
+    candidates = items[cursor:] if show_all else items[cursor : cursor + observe.list_page_size]
+    window: list[DomNode] = []
     lines: list[str] = []
+    char_budget = observe.max_section_tokens * 4
+
+    def fits(line: str) -> bool:
+        # Always return at least one complete item. Collections are the one
+        # allowed exception when an individual row/card is itself indivisible.
+        return (
+            show_all
+            or not window
+            or sum(len(existing) + 1 for existing in lines) + len(line) <= char_budget
+        )
 
     if section.type == "table":
         header_cells = _table_header(raw.node)
         if header_cells:
             lines.append("| # | " + " | ".join(header_cells) + " |")
             lines.append("|---" * (len(header_cells) + 1) + "|")
-        for i, row in enumerate(window, start=cursor + 1):
-            cells = [c for c in row.children if c.tag in ("td", "th")]
+        for row in candidates:
+            cells = table_cells(row)
             rendered = " | ".join(_inline(c) or " " for c in cells)
-            lines.append(f"| {i} | {rendered} |")
+            line = f"| {cursor + len(window) + 1} | {rendered} |"
+            if not fits(line):
+                break
+            window.append(row)
+            lines.append(line)
     else:
+        for item in candidates:
+            line = f"{cursor + len(window) + 1}. {_inline(item)}"
+            if not fits(line):
+                break
+            window.append(item)
+            lines.append(line)
         if not show_all and cursor:
-            lines.append(f"(items {cursor + 1}–{min(cursor + len(window), total)} of {total})")
-        for i, item in enumerate(window, start=cursor + 1):
-            lines.append(f"{i}. {_inline(item)}")
+            lines.insert(
+                0,
+                f"(items {cursor + 1}–{min(cursor + len(window), total)} of {total})",
+            )
 
-    shown_end = total if show_all else cursor + len(window)
+    shown_end = cursor + len(window)
     if shown_end < total:
         lines.append(
             f"… {total - shown_end} more items — expand {section.sid} --cursor {shown_end}"
@@ -155,12 +173,7 @@ def _render_items(
 
 
 def _table_header(table: DomNode) -> list[str]:
-    for n in table.walk():
-        if n.tag == "tr":
-            ths = [c for c in n.children if c.tag == "th"]
-            if ths:
-                return [_inline(th) or " " for th in ths]
-    return []
+    return [_inline(cell) or " " for cell in table_headers(table)]
 
 
 # ------------------------------------------------------------ node -> md ----
@@ -205,7 +218,7 @@ def _element_md(node: DomNode) -> str:
         req += ", disabled" if a.get("dis") else ""
         return f"[{label} ({ref}: {shown}{req})]"
     # buttons and everything else clickable
-    text = a.get("nm") or node.subtree_text(cap=120) or a.get("ttl") or tag
+    text = a.get("nm") or node.identity_text or node.subtree_text(cap=120) or a.get("ttl") or tag
     state = ""
     if "exp" in a:
         state = " expanded" if a.get("exp") else " collapsed"
@@ -577,6 +590,7 @@ def render_query(
     items = _items_of(raw)
     if not items:
         return f"{section.sid} has no queryable items (type={section.type})"
+    explicit_limit = limit is not None
     limit = limit or observe.list_page_size
 
     pattern = None
@@ -611,10 +625,10 @@ def render_query(
         if pattern and not pattern.search(item.subtree_text(cap=4000)):
             continue
         if is_table:
-            cells = [c for c in item.children if c.tag in ("td", "th")]
+            cells = table_cells(item)
             texts = [_inline(c) or " " for c in cells]
-            shown = [texts[j] for j in col_idx if j < len(texts)] if col_idx else texts
-            matched.append((i, "| " + " | ".join(shown) + " |"))
+            selected_cells = [texts[j] for j in col_idx if j < len(texts)] if col_idx else texts
+            matched.append((i, "| " + " | ".join(selected_cells) + " |"))
         else:
             matched.append((i, _inline(item)))
 
@@ -629,9 +643,19 @@ def render_query(
         shown_headers = [headers[j] for j in col_idx] if col_idx else headers
         if shown_headers:
             lines.append("| # | " + " | ".join(shown_headers) + " |")
-    for i, text in window:
-        lines.append(f"| {i} {text}" if is_table else f"{i}. {text}")
-    end = cursor + len(window)
+    shown: list[tuple[int, str]] = []
+    for i, item_text in window:
+        line = f"| {i} {item_text}" if is_table else f"{i}. {item_text}"
+        if (
+            not explicit_limit
+            and shown
+            and sum(len(existing) + 1 for existing in lines) + len(line)
+            > observe.max_section_tokens * 4
+        ):
+            break
+        shown.append((i, item_text))
+        lines.append(line)
+    end = cursor + len(shown)
     if end < total_matched:
         lines.append(f"… {total_matched - end} more — add --cursor {end}")
     return "\n".join(lines)

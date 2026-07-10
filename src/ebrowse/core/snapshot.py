@@ -66,6 +66,14 @@ class DomNode:
     ref: str | None = None
     is_list_group: bool = False  # synthetic node wrapping grouped siblings
     candidate: str | None = None  # weak-evidence provenance (clickable.candidate_evidence)
+    # A shallow projection used by the section splitter can own a wrapper's
+    # direct text/signals without owning its descendants. Interactive identity
+    # must still use the original live subtree text when resolving the wrapper.
+    identity_text: str | None = None
+    # Splitter memoization: one capture can contain 15k nodes, so repeated
+    # subtree scans during recursive partitioning must remain O(n).
+    split_cost: int | None = None
+    has_collection_descendant: bool | None = None
 
     def bbox_area(self) -> int:
         return max(0, self.rect[2]) * max(0, self.rect[3])

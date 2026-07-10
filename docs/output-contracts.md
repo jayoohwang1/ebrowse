@@ -12,6 +12,9 @@ commit.** Default output is compact plaintext for LLM consumption.
 `slots=True` dataclasses, JSON-serializable via `to_dict()/from_dict()`. The semantic
 rules that are not visible from the field list:
 
+`PageMem.truncated` is an optional, backward-compatible capture-completeness flag.
+When true it produces the outline warning documented below; absence means false.
+
 ### Ref semantics (@eN)
 
 - Refs are **session-scoped and monotonic**: `@e1, @e2, …` assigned on first sight,
@@ -40,6 +43,9 @@ rules that are not visible from the field list:
   `hash(tag, normalized_class, role, heading, iframe_path, parent_tag_chain)`. Class
   normalization strips state/generated tokens (`is-*`, `css-*`, hashes…).
 - Diffing and summary caching key on `fingerprint` + `content_hash`, never on sid.
+- Oversized semantic containers may be represented by multiple lossless fragments.
+  A nested queryable collection is its own section; residual form/content runs remain
+  in document order and every interactive element belongs to exactly one section.
 
 ## Outline (`ebrowse outline`)
 
@@ -74,7 +80,15 @@ s5 iframe  (cross-origin: ads.doubleclick.net)
   There is no async "backfill running" phase.
 - `~Nt` is the token estimate of expanding that section (`len(rendered)//4`) — the
   outline renderer and expand renderer are coupled on purpose so the estimate is
-  exactly what `expand` would cost.
+  exactly what the default `expand` would cost. For a list/table this is the default
+  paginated window, not the explicitly requested `--all` output.
+- Ordinary sections are partitioned near `observe.max_section_tokens` (default
+  16,384). `observe.max_sections` is a soft outline-size target: the outline may
+  exceed it rather than hide controls, merge collections, or violate the expansion
+  budget.
+- If DOM discovery reaches its node cap, the final outline line warns:
+  `NOTE snapshot truncated at the DOM node limit — use 'ebrowse screenshot --full'
+  to inspect potentially omitted content`.
 - Cross-origin iframes are listed but not entered.
 - `--no-summaries` skips the `≈` labels; `--no-glance` skips the `◉` line.
 - `--preview` (opt-in) appends a short verbatim preview after each summary line,
@@ -120,9 +134,11 @@ accessibility tree.
   their evidence never authorizes proxy activation (ElementState.candidate holds
   the provenance: `listener` | `focusable` | `aria-state`).
 - Images: `![alt](@i3)` or `![≈caption](@i3)` (VLM caption, cached).
-- List/table sections paginate (default 20 items):
+- List/table sections paginate (up to 20 items by default, also bounded by
+  `observe.max_section_tokens`):
   `… 104 more items — expand s3 --cursor 20`. Tables render as markdown tables with
   a `#` index column; row indices are stable so `--cursor` composes with `query`.
+  `--all` explicitly bypasses the page budget.
 
 ## Expand a select (`ebrowse expand @e5`, `--cursor N`, `--all`)
 
@@ -276,6 +292,8 @@ QUERY s4 filter="Cold Brew" — matched 2 of 24 items
 - Filter is regex (bad regex falls back to literal substring), case-insensitive,
   matched against each item's *plain text*, never the rendered markdown.
 - Item indices are the original list positions (consistent with `expand --cursor`).
+- Without `--limit`, query uses the configured item-count and token budgets. An
+  explicit `--limit` opts into that many matching rows even when the result is large.
 - Unknown `--cols` exit 2 listing the real column names.
 
 ## Diagnose (`ebrowse diagnose <target>`)
