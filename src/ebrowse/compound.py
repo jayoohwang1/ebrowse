@@ -102,7 +102,7 @@ class CompoundMixin(ActionsMixin):
 
     async def _open_and_reveal(self, element: Element) -> list[Element]:
         """Click a dropdown trigger, settle, re-observe; return what it revealed."""
-        loc = await resolve(self.page, element.desc)
+        loc = await resolve(self.page, element.desc, ref=element.ref)
         with contextlib.suppress(Exception):
             await loc.scroll_into_view_if_needed(timeout=2000)
         prev = self.page_mem
@@ -147,7 +147,7 @@ class CompoundMixin(ActionsMixin):
         option = await self._match_one(value, revealed)
         steps.append(f"  ✓ opened, {len(revealed)} options revealed")
 
-        opt_loc = await resolve(self.page, option.desc)
+        opt_loc = await resolve(self.page, option.desc, ref=option.ref)
         try:
             await opt_loc.click(timeout=5000)
         except Exception as e:
@@ -212,7 +212,7 @@ class CompoundMixin(ActionsMixin):
 
         matches = _best_matches(str(key), controls)
         if radio_hit is not None and (not matches or matches[0].desc.input_type == "radio"):
-            loc = await resolve(self.page, radio_hit.desc)
+            loc = await resolve(self.page, radio_hit.desc, ref=radio_hit.ref)
             await loc.set_checked(True, timeout=5000)
             return f'{key} = "{value}" (radio)'
         if not matches:
@@ -227,26 +227,26 @@ class CompoundMixin(ActionsMixin):
         if isinstance(value, bool):
             if d.input_type not in ("checkbox", "radio"):
                 raise CommandError(f"{d.short_desc()} is not a checkbox", ExitCode.USAGE)
-            loc = await resolve(self.page, d)
+            loc = await resolve(self.page, d, ref=el.ref)
             await loc.set_checked(value, timeout=5000)
             return f"{key} = {str(value).lower()}"
 
         value = str(value)
         if d.tag == "select":
-            loc = await resolve(self.page, d)
+            loc = await resolve(self.page, d, ref=el.ref)
             try:
                 await loc.select_option(label=value, timeout=5000)
             except Exception:
                 await loc.select_option(value=value, timeout=5000)
             return f'{key} = "{value}" (native select)'
         if d.tag == "input" and d.input_type == "checkbox":
-            loc = await resolve(self.page, d)
+            loc = await resolve(self.page, d, ref=el.ref)
             await loc.set_checked(value.casefold() in ("true", "yes", "on", "1"), timeout=5000)
             return f"{key} = {value}"
         if (d.tag in ("input", "textarea") and (d.input_type or "text") in _TEXTY_INPUTS) or (
             d.input_type == "search"
         ):
-            loc = await resolve(self.page, d)
+            loc = await resolve(self.page, d, ref=el.ref)
             await loc.fill(value, timeout=5000)
             return f'{key} = "{value}"'
         if d.tag == "button" or d.role == "combobox":
@@ -260,7 +260,7 @@ class CompoundMixin(ActionsMixin):
         """Open→match→click without emitting its own diff (used by fill-form)."""
         revealed = await self._open_and_reveal(element)
         option = await self._match_one(value, revealed)
-        opt_loc = await resolve(self.page, option.desc)
+        opt_loc = await resolve(self.page, option.desc, ref=option.ref)
         await opt_loc.click(timeout=5000)
 
     # -------------------------------------------------------------- search ----
@@ -317,7 +317,7 @@ class CompoundMixin(ActionsMixin):
         steps = [f'SEARCH "{query}"']
 
         if box:
-            loc = await resolve(self.page, box.desc)
+            loc = await resolve(self.page, box.desc, ref=box.ref)
         else:
             assert target is not None  # box is None only on the CSS --in path
             loc = self.page.locator(target).first
@@ -358,7 +358,7 @@ class CompoundMixin(ActionsMixin):
                 pool = _describe_pool(matches or revealed)
                 word = "ambiguous among" if matches else f'no suggestion matching "{pick}"; saw'
                 raise CommandError(f"{word}: {pool}", ExitCode.USAGE)
-            opt = await resolve(self.page, matches[0].desc)
+            opt = await resolve(self.page, matches[0].desc, ref=matches[0].ref)
             await opt.click(timeout=5000)
             steps.append(f"  ✓ picked suggestion {matches[0].desc.short_desc()}")
         elif not no_submit:

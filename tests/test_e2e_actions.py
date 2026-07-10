@@ -655,3 +655,61 @@ def test_inert_modal_coalesced_and_names_block(server, env):
     r = ebrowse(env, "click", "#outside")
     assert r.returncode == 1
     assert "modal is open" in r.stderr and "Trap modal" in r.stderr
+
+
+# --- issue #12: pre-act verification of disambiguated refs -------------------
+
+
+def _cart_refs(env, server):
+    ebrowse(env, "open", server.url("reorder_cart.html"))
+    sids = re.findall(r"^(s\d+) ", ebrowse(env, "outline").stdout, re.M)
+    expanded = "".join(ebrowse(env, "expand", s, "--all").stdout for s in sids)
+    return expanded
+
+
+def test_shifted_ref_after_reorder_refuses(server, env):
+    # Positional ids: removing Apple re-renders (delayed past the quiescence
+    # window) so the live ids shift while the last observation keeps the old
+    # ones. The old ref for Durian's button then falls through its dead #id
+    # to a broad multi-match; verification must refuse, not click Banana's.
+    import time
+
+    expanded = _cart_refs(env, server)
+    removes = re.findall(r"Remove \((@e\d+)\)", expanded)
+    assert len(removes) >= 4, expanded
+    r = ebrowse(env, "click", removes[0])  # Apple
+    assert r.returncode == 0, r.stderr
+    time.sleep(3.5)  # let the delayed positional re-render fire
+    r = ebrowse(env, "click", removes[3])  # Durian's old ref, ids now shifted
+    assert r.returncode == 2, r.stdout + r.stderr
+    assert "stale ref" in r.stderr and "different element" in r.stderr
+    assert "ebrowse outline" in r.stderr
+    # nothing was wrongly removed: the three surviving items are all present
+    r = ebrowse(env, "eval", "document.querySelectorAll('#cart li').length")
+    assert "result: 3" in r.stdout, r.stdout
+
+
+def test_nth_disambiguated_ref_still_works(server, env):
+    # identical Archive buttons (no id/testid) resolve via nth_hint; the
+    # verification pass must not falsely refuse them
+    expanded = _cart_refs(env, server)
+    archives = re.findall(r"Archive \((@e\d+)\)", expanded)
+    assert len(archives) == 3, expanded
+    r = ebrowse(env, "click", archives[2])
+    assert r.returncode == 0, r.stderr
+    r = ebrowse(env, "eval", "document.getElementById('archived').textContent")
+    assert "Message three" in r.stdout, r.stdout
+
+
+def test_shared_name_distinct_text_resolves_right_sibling(server, env):
+    # buttons share a captured name ("Dismiss" via title) but differ in text;
+    # the non-exact name candidate binds all three, and nth(0) used to click
+    # notice A whichever ref was targeted. Text verification rejects that and
+    # the chain recovers via the exact-text candidate.
+    expanded = _cart_refs(env, server)
+    dismisses = re.findall(r"Dismiss \((@e\d+)\)", expanded)
+    assert len(dismisses) == 3, expanded
+    r = ebrowse(env, "click", dismisses[1])  # notice B
+    assert r.returncode == 0, r.stderr
+    r = ebrowse(env, "eval", "document.getElementById('dismissed').textContent")
+    assert "beta" in r.stdout, r.stdout

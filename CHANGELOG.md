@@ -8,6 +8,20 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Fixed
 
+- **Refs verified against their descriptor before acting** (#12). When a ref
+  resolves through disambiguation (`nth_hint` among identical descriptors, or
+  any candidate after a mismatch was seen), the live element's identity facts
+  (tag; id/testid when recorded; text head, leniently) are checked with one
+  evaluate before the action dispatches. A page that reordered
+  descriptor-identical siblings between observation and action (item removed,
+  list re-sorted) now refuses with `stale ref @eN: … now resolves to a
+  different element … — run 'ebrowse outline'` (exit 2) instead of silently
+  acting on the wrong sibling (refuse > misbind, ADR 0003). The mismatch
+  check also recovers via later locator candidates — buttons sharing a
+  captured name but differing in text used to all resolve to the first
+  sibling; they now resolve correctly. Unique untainted matches skip the
+  check (zero happy-path cost). Fixture: `reorder_cart.html`.
+
 - **Wrong-element resolution for links with repeated hrefs.** The locator
   chain tried `a[href$="…"]` before any text-based candidate and disambiguated
   multiple matches with `nth_hint` — but nth_hint counts identical
