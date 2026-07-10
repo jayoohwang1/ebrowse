@@ -216,6 +216,11 @@ Sprite Stasis Ball added. [View cart (@e51)](→ /cart) [Checkout (@e52)](→ /c
   (same URL) — page state may have reset`, and — only on `no change detected` —
   `URL fragment changed: now at …#anchor` or `scroll position moved y=A → B`.
 - Notes always surface: `note: native alert auto-accepted: "…"`, new-tab adoption.
+- If an adopted tab closes, ebrowse falls back to the most recently active live
+  tab and foregrounds it; tab listings keep exactly one `*` active marker.
+- A hover that Playwright reports as dispatched but whose live target is not
+  `:hover` adds an input-delivery warning only when the action also produced no
+  DOM change: restart with `ebrowse daemon stop` before retrying.
 - Occluded clicks fail *before* acting:
   `blocked: @e42 is covered by <dialog "Cookie consent"> — interact with that first` (exit 1).
   A modal that blocks the page *without* covering the target (native `showModal()`

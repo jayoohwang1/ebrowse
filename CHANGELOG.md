@@ -31,6 +31,14 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Fixed
 
+- **Long-lived tab/input lifecycle guardrails** (#9). New tabs are foregrounded
+  when adopted; when the active popup/tab closes, the session immediately
+  falls back to its most recently active live tab instead of retaining a dead
+  Playwright page. Page event wiring is idempotent. `hover` also verifies the
+  live target acquired `:hover`; a successful dispatch with neither `:hover`
+  nor a DOM change now warns that browser input delivery may be degraded and
+  names `ebrowse daemon stop` as the recovery action.
+
 - **Refs verified against their descriptor before acting** (#12). When a ref
   resolves through disambiguation (`nth_hint` among identical descriptors, or
   any candidate after a mismatch was seen), the live element's identity facts

@@ -519,6 +519,39 @@ def test_hover_reveals_menus_and_items_clickable(server, env):
     assert "Logged out." in r.stdout
 
 
+def test_hover_noop_canary_warns_when_target_is_not_hovered(server, env):
+    ebrowse(env, "open", server.url("hover_menu.html"))
+    r = ebrowse(env, "hover", "#hover-canary-false")
+    assert r.returncode == 0, r.stderr
+    assert "→ no change detected" in r.stdout
+    assert "hover dispatched but the target is not :hover" in r.stdout
+    assert "ebrowse daemon stop" in r.stdout
+
+
+def test_active_popup_close_restores_live_opener(server, env):
+    import time
+
+    ebrowse(env, "open", server.url("popup_lifecycle.html"))
+    r = ebrowse(env, "click", "#open-popup")
+    assert r.returncode == 0, r.stderr
+    assert "new tab opened and is now active" in r.stdout
+    time.sleep(2.0)  # popup closes itself after the opening action has returned
+
+    r = ebrowse(env, "tabs")
+    assert r.returncode == 0, r.stderr
+    assert "* 0: Popup lifecycle" in r.stdout, r.stdout
+    assert "Temporary popup" not in r.stdout
+
+    # No explicit `tab 0` recovery: the opener is already active and receives
+    # pointer input, proving both lifecycle fallback and foregrounding worked.
+    r = ebrowse(env, "hover", "#hover-target")
+    assert r.returncode == 0, r.stderr
+    assert "no prior outline to diff" in r.stdout, r.stdout
+    r = ebrowse(env, "get", "text", "#status")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == "hover delivered"
+
+
 def test_drag_reorders_sortable_list(server, env):
     # HTML5 draggable rows get candidate refs (draggable evidence) and
     # drag_to reorders them

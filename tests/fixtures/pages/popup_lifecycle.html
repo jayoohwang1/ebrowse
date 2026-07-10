@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Popup lifecycle</title>
+</head>
+<body>
+  <main>
+    <h1>Popup lifecycle</h1>
+    <button id="hover-target">Hover target</button>
+    <button id="open-popup">Open temporary popup</button>
+    <p id="status">opener ready</p>
+  </main>
+  <script>
+    document.querySelector('#hover-target').addEventListener('mouseenter', () => {
+      document.querySelector('#status').textContent = 'hover delivered';
+    });
+    document.querySelector('#open-popup').addEventListener('click', () => {
+      window.open('popup_lifecycle.html?popup=1', '_blank');
+    });
+    if (location.search === '?popup=1') {
+      document.title = 'Temporary popup';
+      document.body.innerHTML = '<main><h1>Temporary popup</h1><p>closing soon</p></main>';
+      setTimeout(() => window.close(), 1500);
+    }
+  </script>
+</body>
+</html>

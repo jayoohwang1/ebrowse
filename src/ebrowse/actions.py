@@ -74,6 +74,7 @@ class ActionsMixin(InteractionMixin):
         raw_by_sid: dict[str, RawSection]
         _notes: list[str]
         _blocking_modal: str | None
+        _hover_delivery_suspect: bool
 
         def _active_dialog(self) -> PendingDialog | None: ...
         @property
@@ -149,6 +150,7 @@ class ActionsMixin(InteractionMixin):
         prev = self.page_mem
         self._notes = []
         self._blocking_modal = None
+        self._hover_delivery_suspect = False
         scroll_y = 0
         with contextlib.suppress(Exception):
             scroll_y = int(await self.page.evaluate("() => Math.round(window.scrollY)"))
@@ -193,6 +195,11 @@ class ActionsMixin(InteractionMixin):
             return self._no_baseline_landing(action_line)
         diff = diff_pages(prev, new, begin_state.texts, self._section_texts(), self._expanded_now())
         diff.notes = list(self._notes)
+        if diff.kind == "no_change" and self._hover_delivery_suspect:
+            diff.notes.append(
+                "hover dispatched but the target is not :hover and no page change was detected; "
+                "browser input delivery may be degraded — run 'ebrowse daemon stop' and retry"
+            )
         # Outcome evidence the DOM diff can't see: a same-URL reload (form
         # resubmit, meta refresh) and — only when nothing else changed —
         # anchor jumps and scroll movement, so a dispatched click isn't
@@ -434,6 +441,14 @@ class ActionsMixin(InteractionMixin):
             with contextlib.suppress(Exception):
                 await loc.scroll_into_view_if_needed(timeout=2000)
             await loc.hover(timeout=_ACTION_TIMEOUT_MS)
+            # A successful Playwright hover should leave the live target under
+            # the pointer. Treat a contrary DOM fact as a canary only: target
+            # replacement/overlays can be legitimate, so _finish_action warns
+            # solely when the page also reports no observable change.
+            with contextlib.suppress(Exception):
+                self._hover_delivery_suspect = not bool(
+                    await loc.evaluate("(el) => el.matches(':hover')")
+                )
 
         return await self._act(f"HOVER {desc}", do, loc=loc, target=target)
 

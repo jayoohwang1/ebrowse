@@ -85,6 +85,9 @@ Diff vocabulary:
   `start … end`. Sections you have `expand`ed on the current page get a much
   larger quote budget, so expand a section you're watching to see its text
   changes near-verbatim in later diffs.
+- A no-change hover may warn that the target never acquired `:hover`. Treat
+  that as degraded browser input delivery: run `ebrowse daemon stop`, retry
+  once with the fresh daemon, and don't burn turns repeating the dead hover.
 - `→ dialog` — an in-page DOM dialog appeared. If it's its own section, its full
   content is expanded right there in the diff; if it was folded into a section,
   its controls show as `+ sN [dialog]: [Accept (@e6)] …`. Interact with its
@@ -141,7 +144,7 @@ expand <sid|@ref> [--cursor N] [--all]     lists/tables paginate; follow the
                                            ("… 300 more options — expand @e5 --cursor 50")
 click <t> [--double|--right|--new-tab]     t = @ref or CSS selector
 fill <t> <text>       clear + type          type <t> <text> [--enter]
-hover <t>             reveal hover menus (mouse stays; click revealed refs next)
+hover <t>             reveal hover menus (mouse stays; warns if delivery looks dead)
 drag <src> <dst>      drag one element onto another (sortables, HTML5 dnd)
 press <keys>          e.g. Enter, Control+a, Escape
 check/uncheck <t>     select <t> <label>…   native <select> (several labels for

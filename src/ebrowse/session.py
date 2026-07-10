@@ -120,6 +120,8 @@ class Session(CompoundMixin, ActionsMixin):
         self._browser: Browser | None = None  # launch mode only
         self._context: BrowserContext | None = None
         self._page: Page | None = None
+        self._page_mru: list[Page] = []
+        self._wired_pages: set[Page] = set()
         self._cdp_url: str | None = cfg.browser.cdp_url or None
         # observation state
         self.page_mem: PageMem | None = None
@@ -130,6 +132,7 @@ class Session(CompoundMixin, ActionsMixin):
         # covering the target (native showModal top-layer / aria-modal focus trap);
         # surfaced as a hint only if that click then registers no change
         self._blocking_modal: str | None = None
+        self._hover_delivery_suspect = False
         self.nav_events = 0  # main-frame navigations (same-URL reload detection)
         # sections the agent expanded, fingerprint -> nav_id at expand time; the
         # diff quotes far more new text for these (it is actively reading them).
@@ -183,17 +186,42 @@ class Session(CompoundMixin, ActionsMixin):
             ) from e
         self._context.on("page", self._on_new_page)
         pages = self._context.pages
-        self._page = pages[0] if pages else await self._context.new_page()
-        self._wire_page(self._page)
+        if pages:
+            for page in pages:
+                self._wire_page(page)
+            self._activate_page(pages[0])
+        else:
+            # The context "page" event adopts and wires this page. _wire_page
+            # is idempotent in case a backend delivers the event late.
+            self._activate_page(await self._context.new_page())
+
+    def _activate_page(self, page: Page) -> None:
+        """Make page the logical active tab and move it to the MRU front."""
+        self._page = page
+        self._page_mru = [p for p in self._page_mru if p is not page]
+        self._page_mru.insert(0, page)
+        self._wire_page(page)
+
+    def _bring_to_front_soon(self, page: Page) -> None:
+        """Page events are synchronous; foreground the adopted tab asynchronously."""
+
+        async def bring() -> None:
+            with contextlib.suppress(Exception):
+                await page.bring_to_front()
+
+        asyncio.create_task(bring())
 
     def _on_new_page(self, page: Page) -> None:
         # adopt tabs opened by the page (target=_blank etc.) as the active tab
         logger.info(f"[{self.name}] new tab: adopting")
         self._notes.append(f"a new tab opened and is now active: {page.url[:100]}")
-        self._page = page
-        self._wire_page(page)
+        self._activate_page(page)
+        self._bring_to_front_soon(page)
 
     def _wire_page(self, page: Page) -> None:
+        if page in self._wired_pages:
+            return
+        self._wired_pages.add(page)
         page.set_default_timeout(10_000)
         # bind the page so a dialog is attributed to the tab it blocked
         page.on("dialog", lambda d, p=page: self._on_dialog(d, p))
@@ -204,6 +232,32 @@ class Session(CompoundMixin, ActionsMixin):
             lambda d: self._notes.append(f'download started: "{d.suggested_filename}"'),
         )
         page.on("framenavigated", lambda fr, p=page: self._on_framenavigated(fr, p))
+        page.on("close", lambda p=page: self._on_page_closed(p))
+
+    def _on_page_closed(self, page: Page) -> None:
+        """Recover when an adopted popup/tab closes behind the agent's back."""
+        self._page_mru = [p for p in self._page_mru if p is not page]
+        self._pending_dialogs.pop(page, None)
+        if page is not self._page:
+            return
+        live = [p for p in self._page_mru if not p.is_closed()]
+        if not live and self._context is not None:
+            live = [p for p in reversed(self._context.pages) if not p.is_closed()]
+        if not live:
+            self._page = None
+            self.page_mem = None
+            self.raw_by_sid = {}
+            self._notes.append("the active tab closed; no tabs remain — run 'ebrowse open <url>'")
+            return
+        fallback = live[0]
+        self._activate_page(fallback)
+        self.page_mem = None
+        self.raw_by_sid = {}
+        self.nav_id += 1
+        self._notes.append(
+            f"the active tab closed; switched to the most recent live tab: {fallback.url[:100]}"
+        )
+        self._bring_to_front_soon(fallback)
 
     def _on_framenavigated(self, frame, page: Page) -> None:
         if page is self._page and frame is page.main_frame:
@@ -265,6 +319,8 @@ class Session(CompoundMixin, ActionsMixin):
             if self._pw:
                 await self._pw.stop()
         self._pw = self._browser = self._context = self._page = None
+        self._page_mru = []
+        self._wired_pages = set()
         self.page_mem = None
         self.raw_by_sid = {}
         self._pending_dialogs = {}
@@ -819,8 +875,8 @@ class Session(CompoundMixin, ActionsMixin):
         pages = self._context.pages
         if not 0 <= index < len(pages):
             raise CommandError(f"no tab {index} (have 0..{len(pages) - 1})", ExitCode.USAGE)
-        self._page = pages[index]
-        await self._page.bring_to_front()
+        self._activate_page(pages[index])
+        await self.page.bring_to_front()
         self._notes = []
         self.nav_id += 1
         await self._observe_page()

@@ -35,6 +35,7 @@
   <main>
     <h1>Hover menus</h1>
     <p id="status">Ready.</p>
+    <button id="hover-canary-false">No-op hover canary</button>
   </main>
   <script>
     const accountWrapper = document.querySelector('#account-wrapper');
@@ -50,6 +51,14 @@
     document.querySelector('#logout-btn').addEventListener('click', () => {
       document.querySelector('#status').textContent = 'Logged out.';
     });
+    // Deterministically simulate issue #9's impossible state: Playwright's
+    // hover returns, but the target reports that it is not :hover. This target
+    // intentionally has no hover handler/DOM effect so the runtime canary warns.
+    const nativeMatches = Element.prototype.matches;
+    Element.prototype.matches = function(selector) {
+      if (selector === ':hover' && this.id === 'hover-canary-false') return false;
+      return nativeMatches.call(this, selector);
+    };
   </script>
 </body>
 </html>
