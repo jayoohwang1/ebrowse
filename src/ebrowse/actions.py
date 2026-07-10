@@ -134,7 +134,7 @@ class ActionsMixin(InteractionMixin):
             if n == 0:
                 raise CommandError(f"no element matches CSS '{target}'", ExitCode.USAGE)
             return loc.first, desc
-        return await resolve(self.page, element.desc), desc
+        return await resolve(self.page, element.desc, ref=element.ref), desc
 
     def _section_texts(self) -> dict[str, str]:
         # per-node cap must be able to carry diff.EXPANDED_TEXT_BUDGET worth of

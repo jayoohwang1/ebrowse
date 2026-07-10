@@ -50,7 +50,10 @@ the DOM truth. The `◉` line appears only when a vision sidecar is running.
 - Refs are **durable**: they survive re-observation and even navigation. A
   site's header search box keeps its ref on every page. Act without re-reading.
 - If a ref stops resolving you get `stale ref @e12 … — run 'ebrowse outline'`
-  (exit 2). Just re-outline and re-expand; never guess refs.
+  (exit 2). Just re-outline and re-expand; never guess refs. The same error
+  (`… now resolves to a different element`) fires when the page reordered
+  look-alike elements under your ref — the action was refused BEFORE touching
+  the wrong element, so nothing happened; re-outline and act on fresh refs.
 - `disabled` / `inert` after a ref — `[Place order (@e9) disabled]` — means the
   control exists but can't be used yet: something must enable it first (fill a
   required field, close a modal). Clicking it fails fast telling you so; when
@@ -133,7 +136,9 @@ open <url>            navigate (alias goto); back / forward / reload  → landin
 outline [--no-summaries|--no-glance|--refresh]   read the page (table of contents)
 describe-screen [prompt]                   ask the local vision model about the screen
 expand <sid|@ref> [--cursor N] [--all]     lists/tables paginate; follow the
-                                           "… N more items — expand s4 --cursor 20" hint
+                                           "… N more items — expand s4 --cursor 20" hint;
+                                           on a <select> ref: pages through ITS options
+                                           ("… 300 more options — expand @e5 --cursor 50")
 click <t> [--double|--right|--new-tab]     t = @ref or CSS selector
 fill <t> <text>       clear + type          type <t> <text> [--enter]
 hover <t>             reveal hover menus (mouse stays; click revealed refs next)

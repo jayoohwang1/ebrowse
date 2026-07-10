@@ -595,6 +595,13 @@ class Session(CompoundMixin, ActionsMixin):
                     ExitCode.USAGE,
                 )
             sid = found[0].sid
+            # expanding a <select> ref lists ITS options (paginated), not the
+            # section — the only way to browse past the 15-option inline limit
+            if found[1].desc.tag == "select":
+                raw = self.raw_by_sid.get(sid)
+                node = next((n for n in raw.iter_walk() if n.ref == target), None) if raw else None
+                if node is not None and node.attrs.get("opt"):
+                    return render.render_select_options(node, cursor=cursor, show_all=show_all)
         section = self._get_section(sid)
         self._expanded_fps[section.fingerprint] = self.nav_id
         await self._caption_section_images(sid)
@@ -916,7 +923,7 @@ class Session(CompoundMixin, ActionsMixin):
         _, element = found
         from ebrowse.core.locate import resolve
 
-        return await resolve(self.page, element.desc)
+        return await resolve(self.page, element.desc, ref=element.ref)
 
 
 def _first_line(e: Exception) -> str:

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Reorder Cart</title>
+</head>
+<body>
+<main>
+  <!-- Cart: Remove buttons carry POSITIONAL ids (index-based, like framework-
+       generated keys). Removing an item re-renders the list AFTER a delay
+       longer than the post-action quiescence window, so ebrowse's last
+       observation still holds the old ids while the live DOM has renumbered —
+       the exact observation/action divergence issue #12 guards against. -->
+  <section aria-label="Cart">
+    <h2>Cart</h2>
+    <ul id="cart">
+      <li>Apple <button class="rm" id="rm-0">Remove</button></li>
+      <li>Banana <button class="rm" id="rm-1">Remove</button></li>
+      <li>Cherry <button class="rm" id="rm-2">Remove</button></li>
+      <li>Durian <button class="rm" id="rm-3">Remove</button></li>
+    </ul>
+  </section>
+
+  <!-- Inbox: fully identical Archive buttons (no id/testid) disambiguated by
+       nth_hint; nothing reorders, so old refs must keep working. -->
+  <section aria-label="Inbox">
+    <h2>Inbox</h2>
+    <ul id="inbox">
+      <li>Message one <button class="ar">Archive</button></li>
+      <li>Message two <button class="ar">Archive</button></li>
+      <li>Message three <button class="ar">Archive</button></li>
+    </ul>
+    <p id="archived">archived: none</p>
+  </section>
+
+  <!-- Notices: buttons share a title (-> identical captured name "Dismiss")
+       but have distinct visible text. A non-exact name match binds them all,
+       so nth(0) used to click notice A whichever ref was targeted; text-head
+       verification must reject that and fall through to the exact-text
+       candidate, which resolves the right sibling. -->
+  <section aria-label="Notices">
+    <h2>Notices</h2>
+    <div id="notices">
+      <div>alpha <button title="Dismiss">Dismiss notice A</button></div>
+      <div>beta <button title="Dismiss">Dismiss notice B</button></div>
+      <div>gamma <button title="Dismiss">Dismiss notice C</button></div>
+    </div>
+    <p id="dismissed">dismissed: none</p>
+  </section>
+</main>
+<script>
+  document.getElementById('cart').addEventListener('click', (e) => {
+    const b = e.target.closest('button.rm');
+    if (!b) return;
+    b.closest('li').remove();
+    // delayed positional re-render: fires after ebrowse's post-click
+    // observation (quiescence quiet window is 300ms by default)
+    setTimeout(() => {
+      document.querySelectorAll('#cart button.rm').forEach((btn, i) => {
+        btn.id = 'rm-' + i;
+      });
+    }, 2000);
+  });
+  document.getElementById('inbox').addEventListener('click', (e) => {
+    const b = e.target.closest('button.ar');
+    if (!b) return;
+    const li = b.closest('li');
+    document.getElementById('archived').textContent =
+      'archived: ' + li.textContent.replace('Archive', '').trim();
+    li.remove();
+  });
+  document.getElementById('notices').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const row = b.closest('div');
+    document.getElementById('dismissed').textContent =
+      'dismissed: ' + row.firstChild.textContent.trim();
+    row.remove();
+  });
+</script>
+</body>
+</html>

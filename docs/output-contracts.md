@@ -99,9 +99,10 @@ accessibility tree.
 - Links: `[text (@ref)](→ /path)` — href path-only for same-origin, whole for external.
 - Inputs: `[label (@ref: "value")]` / `empty`, `, required` when set; checkboxes
   `[x]`/`[ ]`; native selects `[label (@ref) ▾ "US" of 24 options]` (options inlined
-  when ≤ 15; the total is the REAL option count even when the inline list is
-  truncated at 50; `, multiple` marks `<select multiple>`, whose current
-  selections join as `"A, B"`).
+  when ≤ 15; the total is the REAL option count even when capture stops at 350
+  options; `, multiple` marks `<select multiple>`, whose current selections join
+  as `"A, B"`). `expand @ref` on a select pages through the full option list
+  (see below).
 - **Inner scroll containers**: when a section holds a real scroll container
   (overflow auto/scroll with hidden content), the expand header carries
   `(inner scrollable panel: y=0 of 1104px — 'ebrowse scroll s3 down' scrolls
@@ -122,6 +123,29 @@ accessibility tree.
 - List/table sections paginate (default 20 items):
   `… 104 more items — expand s3 --cursor 20`. Tables render as markdown tables with
   a `#` index column; row indices are stable so `--cursor` composes with `query`.
+
+## Expand a select (`ebrowse expand @e5`, `--cursor N`, `--all`)
+
+`expand` on a ref that is a native `<select>` lists ITS options (50 per page),
+not the enclosing section — the way to browse past the 15-option inline limit.
+
+```
+SELECT Country (@e5) ▾ "Country 1" — 400 options
+1. Country 1
+2. Country 2
+…
+50. Country 50
+… 300 more options — expand @e5 --cursor 50
+```
+
+- Header mirrors the inline form: label, ref, current selection(s), REAL total,
+  `, multiple` when applicable. Later pages start with
+  `(options 301–350 of 400)`.
+- Capture stops at 350 options; past that the tail is honestly absent:
+  `(options beyond 350 were not captured — 'ebrowse select @e5 "<label>"' still
+  matches any option by its text)`. `select` always matches against the live
+  DOM, captured or not.
+- `expand @ref` on any non-select element still expands its section.
 
 ## Navigation result (`open`, `back`, `forward`, `reload`, `tab`, navigating actions)
 

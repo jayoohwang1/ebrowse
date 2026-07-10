@@ -536,8 +536,9 @@ def test_multi_select_and_truncation_honesty(server, env):
     sids = re.findall(r"^(s\d+) ", ebrowse(env, "outline").stdout, re.M)
     expanded = "".join(ebrowse(env, "expand", s, "--all").stdout for s in sids)
     # multiple-select marked; truncated select reports the REAL option total
+    # (400 options > the 350 capture cap)
     assert re.search(r"\[Toppings \(@e\d+\) ▾ .*multiple", expanded), expanded
-    assert "of 80 options" in expanded, expanded
+    assert "of 400 options" in expanded, expanded
     toppings = ref_anywhere(env, r"\[Toppings")
     r = ebrowse(env, "select", toppings, "Cheese", "Bacon")
     assert r.returncode == 0, r.stderr
@@ -550,6 +551,41 @@ def test_multi_select_and_truncation_honesty(server, env):
     r = ebrowse(env, "select", country, "Country 42")
     assert r.returncode == 0, r.stderr
     assert "Country 42" in r.stdout
+    # a label past the capture cap still matches against the live DOM
+    r = ebrowse(env, "select", country, "Country 388")
+    assert r.returncode == 0, r.stderr
+    assert "Country 388" in r.stdout
+
+
+def test_expand_select_ref_pages_through_options(server, env):
+    # expand @ref on a <select> lists ITS options (paginated), the only way to
+    # browse past the 15-option inline limit; the tail past the capture cap is
+    # honestly absent with the live-match escape hatch named
+    ebrowse(env, "open", server.url("multi_select.html"))
+    country = ref_anywhere(env, r"\[Country")
+    r = ebrowse(env, "expand", country)
+    assert r.returncode == 0, r.stderr
+    assert f"SELECT Country ({country})" in r.stdout, r.stdout
+    assert "— 400 options" in r.stdout
+    assert "1. Country 1" in r.stdout and "50. Country 50" in r.stdout
+    assert "51. Country 51" not in r.stdout
+    assert f"… 300 more options — expand {country} --cursor 50" in r.stdout
+    # follow the cursor hint into a middle page
+    r = ebrowse(env, "expand", country, "--cursor", "300")
+    assert "(options 301–350 of 400)" in r.stdout
+    assert "350. Country 350" in r.stdout
+    # end of the captured list: the uncaptured tail is named, not implied absent
+    assert "options beyond 350 were not captured" in r.stdout
+    assert "still matches any option by its text" in r.stdout
+    # --all dumps every captured option in one shot
+    r = ebrowse(env, "expand", country, "--all")
+    assert "350. Country 350" in r.stdout
+    # a fully captured multi-select: marked multiple, no pagination hint
+    toppings = ref_anywhere(env, r"\[Toppings")
+    r = ebrowse(env, "expand", toppings)
+    assert "— 8 options, multiple" in r.stdout, r.stdout
+    assert "8. Pineapple" in r.stdout
+    assert "more options" not in r.stdout and "not captured" not in r.stdout
 
 
 def test_nested_scroll_lazy_loading_panel(server, env):
@@ -657,3 +693,61 @@ def test_inert_modal_coalesced_and_names_block(server, env):
     r = ebrowse(env, "click", "#outside")
     assert r.returncode == 1
     assert "modal is open" in r.stderr and "Trap modal" in r.stderr
+
+
+# --- issue #12: pre-act verification of disambiguated refs -------------------
+
+
+def _cart_refs(env, server):
+    ebrowse(env, "open", server.url("reorder_cart.html"))
+    sids = re.findall(r"^(s\d+) ", ebrowse(env, "outline").stdout, re.M)
+    expanded = "".join(ebrowse(env, "expand", s, "--all").stdout for s in sids)
+    return expanded
+
+
+def test_shifted_ref_after_reorder_refuses(server, env):
+    # Positional ids: removing Apple re-renders (delayed past the quiescence
+    # window) so the live ids shift while the last observation keeps the old
+    # ones. The old ref for Durian's button then falls through its dead #id
+    # to a broad multi-match; verification must refuse, not click Banana's.
+    import time
+
+    expanded = _cart_refs(env, server)
+    removes = re.findall(r"Remove \((@e\d+)\)", expanded)
+    assert len(removes) >= 4, expanded
+    r = ebrowse(env, "click", removes[0])  # Apple
+    assert r.returncode == 0, r.stderr
+    time.sleep(3.5)  # let the delayed positional re-render fire
+    r = ebrowse(env, "click", removes[3])  # Durian's old ref, ids now shifted
+    assert r.returncode == 2, r.stdout + r.stderr
+    assert "stale ref" in r.stderr and "different element" in r.stderr
+    assert "ebrowse outline" in r.stderr
+    # nothing was wrongly removed: the three surviving items are all present
+    r = ebrowse(env, "eval", "document.querySelectorAll('#cart li').length")
+    assert "result: 3" in r.stdout, r.stdout
+
+
+def test_nth_disambiguated_ref_still_works(server, env):
+    # identical Archive buttons (no id/testid) resolve via nth_hint; the
+    # verification pass must not falsely refuse them
+    expanded = _cart_refs(env, server)
+    archives = re.findall(r"Archive \((@e\d+)\)", expanded)
+    assert len(archives) == 3, expanded
+    r = ebrowse(env, "click", archives[2])
+    assert r.returncode == 0, r.stderr
+    r = ebrowse(env, "eval", "document.getElementById('archived').textContent")
+    assert "Message three" in r.stdout, r.stdout
+
+
+def test_shared_name_distinct_text_resolves_right_sibling(server, env):
+    # buttons share a captured name ("Dismiss" via title) but differ in text;
+    # the non-exact name candidate binds all three, and nth(0) used to click
+    # notice A whichever ref was targeted. Text verification rejects that and
+    # the chain recovers via the exact-text candidate.
+    expanded = _cart_refs(env, server)
+    dismisses = re.findall(r"Dismiss \((@e\d+)\)", expanded)
+    assert len(dismisses) == 3, expanded
+    r = ebrowse(env, "click", dismisses[1])  # notice B
+    assert r.returncode == 0, r.stderr
+    r = ebrowse(env, "eval", "document.getElementById('dismissed').textContent")
+    assert "beta" in r.stdout, r.stdout
