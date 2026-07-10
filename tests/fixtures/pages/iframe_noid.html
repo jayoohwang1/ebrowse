@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Embedded Checkout (id-less frame) — Fixture</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    header { background: #630; color: #fff; padding: 12px 24px; }
+    main { max-width: 720px; margin: 0 auto; padding: 24px; }
+    iframe { border: 1px solid #999; }
+  </style>
+</head>
+<body>
+  <header><a href="/" style="color:#fff">Fixture Pay</a></header>
+  <main>
+    <h1>Complete your order</h1>
+    <p>Order #4418 — 1 × Grinder, $79.99. The payment frame below has no id or
+       title, only a src (a common third-party embed shape).</p>
+    <iframe src="frame_child.html" width="640" height="360"></iframe>
+    <p><a href="/help.html">Need help?</a></p>
+  </main>
+</body>
+</html>

@@ -9,7 +9,8 @@
 //   t: tag (lowercase)          a: curated attrs (only when present)
 //   r: [x, y, w, h] absolute page CSS px (rounded)
 //   x: own text (direct text-node children, whitespace-collapsed)
-//   c: children                 k: clickable signals {tg,rl,ls,cp} (only when any)
+//   c: children                 k: clickable signals (only when any):
+//                                  strong {tg,rl,ls,cp} | weak candidate {el,tb,as}
 //   sh: 1 if children include a shadow root's content
 //
 // Attr keys in `a`: id, cls, role, nm (resolved accessible name), tid (testid),
@@ -26,8 +27,24 @@
   const CLICKABLE_ROLES = new Set(__CLICKABLE_ROLES__);
   const LISTENER_ATTRS = __LISTENER_ATTRS__;
   const SKIP_TAGS = new Set(__SKIP_TAGS__);
+  const CANDIDATE_ARIA_ATTRS = __CANDIDATE_ARIA_ATTRS__;
+  const CANDIDATE_LISTENER_TYPES = __CANDIDATE_LISTENER_TYPES__;
   const MAX_NODES = 15000;
   const TEXT_CAP = 4000;
+
+  // getEventListeners is the devtools command-line API: present only when this
+  // script runs via CDP Runtime.evaluate with includeCommandLineAPI (main
+  // frame; see core/snapshot.py). Absent under plain evaluate — degrade to
+  // no `el` signals rather than fail.
+  const canSniffListeners = typeof getEventListeners === "function";
+  function hasPointerListener(el) {
+    if (!canSniffListeners) return false;
+    try {
+      const ls = getEventListeners(el);
+      for (const t of CANDIDATE_LISTENER_TYPES) if (ls[t] && ls[t].length) return true;
+    } catch (e) { /* cross-origin node or API hiccup */ }
+    return false;
+  }
 
   let nodeCount = 0;
   let truncated = false;
@@ -96,7 +113,23 @@
     if (exp !== null) a.exp = exp === "true" ? 1 : 0;
     const pop = el.getAttribute("aria-haspopup");
     if (pop && pop !== "false") a.pop = pop;
-    if (el.disabled === true || el.getAttribute("aria-disabled") === "true") a.dis = 1;
+    // ARIA state evidence: toggles/tabs/options whose ONLY reaction to a
+    // click is a state flip would otherwise diff as "no change"
+    const prs = el.getAttribute("aria-pressed");
+    if (prs !== null) a.prs = prs === "true" ? 1 : 0;
+    const asel = el.getAttribute("aria-selected");
+    if (asel !== null) a.asel = asel === "true" ? 1 : 0;
+    if (role && ["checkbox", "radio", "switch", "menuitemcheckbox",
+                 "menuitemradio"].includes(role)) {
+      const ac = el.getAttribute("aria-checked");
+      if (ac !== null) a.chk = ac === "true" ? 1 : 0;
+    }
+    // :disabled matches inherited fieldset disabling too, unlike el.disabled
+    let dis = el.getAttribute("aria-disabled") === "true";
+    if (!dis) {
+      try { dis = el.matches(":disabled"); } catch (e) { dis = el.disabled === true; }
+    }
+    if (dis) a.dis = 1;
 
     if (tag === "input" || tag === "textarea") {
       a.typ = tag === "textarea" ? "textarea" : (el.getAttribute("type") || "text").toLowerCase();
@@ -117,12 +150,23 @@
         if (opts.length >= 50) break;
       }
       a.opt = opts;
-      const selIdx = el.selectedIndex;
-      if (selIdx >= 0 && el.options[selIdx]) a.sel = collapse(el.options[selIdx].text).slice(0, 80);
+      // honest total when the list is truncated ("of 80 options", not "of 50")
+      if (el.options.length > opts.length) a.optn = el.options.length;
+      if (el.multiple) a.mul = 1;
+      const chosen = [];
+      for (const o of el.selectedOptions) {
+        chosen.push(collapse(o.text).slice(0, 80));
+        if (chosen.length >= 5) break;
+      }
+      if (chosen.length) a.sel = chosen.join(", ");
     } else if (tag === "img") {
       const alt = el.getAttribute("alt");
       if (alt) a.alt = collapse(alt).slice(0, 160);
       const src = el.currentSrc || el.getAttribute("src") || "";
+      if (src) a.src = src.slice(0, 300);
+    } else if (tag === "iframe") {
+      // frame identity for stitching + locator resolution when id/title absent
+      const src = el.getAttribute("src");
       if (src) a.src = src.slice(0, 300);
     }
     return a;
@@ -151,9 +195,17 @@
 
     const node = { t: tag, r };
     const a = curatedAttrs(el, tag);
+    // real inner scroll container (body/html scroll via the window instead):
+    // scr = [scrollTop, maxScrollTop] so outlines can say "more below the fold"
+    if (tag !== "body" && tag !== "html") {
+      const oy = style.overflowY;
+      if ((oy === "auto" || oy === "scroll") && el.scrollHeight > el.clientHeight + 4) {
+        a.scr = [Math.round(el.scrollTop), Math.round(el.scrollHeight - el.clientHeight)];
+      }
+    }
     if (Object.keys(a).length) node.a = a;
 
-    // clickable signals
+    // clickable signals (strong tier: tg/rl/ls/cp)
     const cursorPointer = style.cursor === "pointer";
     const k = {};
     if (CLICKABLE_TAGS.has(tag)) k.tg = 1;
@@ -167,7 +219,30 @@
     }
     if (cursorPointer && !parentCursorPointer) k.cp = 1;
     if (a.con) k.tg = 1; // contenteditable acts as an input
-    if (Object.keys(k).length) node.k = k;
+    // candidate signals (weak tier: el/tb/as) — only sniffed when no strong
+    // signal exists; they yield expand-only '?' refs, never default behavior
+    if (!Object.keys(k).length) {
+      if (el.hasAttribute("tabindex") && (parseInt(el.getAttribute("tabindex"), 10) || 0) >= 0) {
+        k.tb = 1;
+      }
+      for (const aa of CANDIDATE_ARIA_ATTRS) {
+        if (el.hasAttribute(aa)) {
+          k.as = 1;
+          break;
+        }
+      }
+      if (el.draggable === true && tag !== "img" && tag !== "a") k.dg = 1;
+      if (hasPointerListener(el)) k.el = 1;
+    }
+    if (Object.keys(k).length) {
+      node.k = k;
+      // effective-state annotation for interactive nodes only: an element
+      // under [inert] renders normally but can never be interacted with
+      if (el.closest("[inert]")) {
+        if (!node.a) node.a = a;
+        a.inr = 1;
+      }
+    }
 
     // own text (direct text-node children only)
     let own = "";

@@ -84,6 +84,20 @@ def render_section_markdown(
     if section.cross_origin:
         return f"{head}\n(cross-origin iframe: {section.preview} — content not accessible; try `screenshot --section {section.sid}`)"
 
+    # an inner scroll container hides content below its fold — say so, and how
+    # to reach it (the largest such container speaks for the section)
+    scr_best: tuple[int, list] | None = None
+    for n in raw.iter_walk():
+        v = n.attrs.get("scr")
+        if v and (scr_best is None or n.bbox_area() > scr_best[0]):
+            scr_best = (n.bbox_area(), v)
+    if scr_best:
+        top, mx = scr_best[1][0], scr_best[1][1]
+        head += (
+            f"\n(inner scrollable panel: y={top} of {mx}px — "
+            f"'ebrowse scroll {section.sid} down' scrolls it)"
+        )
+
     if section.type in ("list", "table") and _items_of(raw):
         body = _render_items(section, raw, observe, cursor, show_all)
     else:
@@ -153,9 +167,11 @@ def _table_header(table: DomNode) -> list[str]:
 
 
 def _element_md(node: DomNode) -> str:
-    """Inline markdown for a node that carries a ref (an interactive element)."""
+    """Inline markdown for a node that carries a ref (an interactive element).
+    Weak-evidence candidates get a trailing '?' provenance marker inside the
+    ref parens (docs/output-contracts.md): likely interactive, not proven."""
     a = node.attrs
-    ref = node.ref
+    ref = f"{node.ref} ?" if node.candidate else node.ref
     tag = node.tag
     if tag == "a" or (a.get("role") == "link"):
         text = a.get("nm") or node.subtree_text(cap=120) or a.get("href", "link")
@@ -169,26 +185,41 @@ def _element_md(node: DomNode) -> str:
         label = a.get("nm") or "select"
         opts = a.get("opt") or []
         sel = a.get("sel", "")
+        multi = ", multiple" if a.get("mul") else ""
+        total = a.get("optn") or len(opts)
         if opts and len(opts) <= _MAX_SELECT_OPTIONS_INLINE:
-            return f'[{label} ({ref}) ▾ "{sel}"] options: {" | ".join(opts)}'
-        return f'[{label} ({ref}) ▾ "{sel}" of {len(opts)} options]'
+            return f'[{label} ({ref}) ▾ "{sel}"{multi}] options: {" | ".join(opts)}'
+        return f'[{label} ({ref}) ▾ "{sel}" of {total} options{multi}]'
     if tag in ("input", "textarea") or a.get("con"):
         typ = a.get("typ", "text")
         label = a.get("nm") or a.get("ph") or typ
+        dis = " disabled" if a.get("dis") else ""
         if typ in ("checkbox", "radio"):
             mark = "x" if a.get("chk") else " "
-            return f"[{mark}] {label} ({ref})"
+            return f"[{mark}] {label} ({ref}){dis}"
         if typ in ("submit", "button", "reset"):
-            return f"[{a.get('val') or label} ({ref})]"
+            return f"[{a.get('val') or label} ({ref}){dis}]"
         val = a.get("val", "")
         shown = f'"{_clip(val, 60)}"' if val else "empty"
         req = ", required" if a.get("req") else ""
+        req += ", disabled" if a.get("dis") else ""
         return f"[{label} ({ref}: {shown}{req})]"
     # buttons and everything else clickable
     text = a.get("nm") or node.subtree_text(cap=120) or a.get("ttl") or tag
     state = ""
     if "exp" in a:
         state = " expanded" if a.get("exp") else " collapsed"
+    if a.get("prs"):
+        state += " pressed"
+    if a.get("asel"):
+        state += " selected"
+    if a.get("dis"):
+        state += " disabled"
+    if a.get("inr"):
+        state += " inert"
+    if "chk" in a:  # ARIA checkbox/radio/switch: same marks as native inputs
+        mark = "x" if a.get("chk") else " "
+        return f"[{mark}] {_clip(text, 80)} ({ref}){state}"
     return f"[{_clip(text, 80)} ({ref}){state}]"
 
 

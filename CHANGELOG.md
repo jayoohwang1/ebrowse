@@ -6,7 +6,159 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ## [Unreleased]
 
+### Fixed
+
+- **Wrong-element resolution for links with repeated hrefs.** The locator
+  chain tried `a[href$="…"]` before any text-based candidate and disambiguated
+  multiple matches with `nth_hint` — but nth_hint counts identical
+  *descriptors*, not href matches, so on a page where several links share an
+  href (`"#"`, `/cart`), acting on `@ref (link "Products")` could silently hit
+  the FIRST such link (e.g. "Home") while reporting the right name. The
+  role+text candidate now precedes href, and href candidates are filtered by
+  the link text when one exists. Surfaced by the hover verb's e2e test.
+- **Full-page clickable overlays are no longer invisible to the outline.** The
+  splitter never treated an oversized node as terminal, so a full-viewport
+  overlay with no element children (cookie veil / interstitial wired via
+  `onclick`, holding only a text node) vanished during descent — no section,
+  no ref, and a click it blocked could only report "no exposed ref". Oversized
+  childless nodes are now terminal; the substance gate still drops bare
+  decorative backdrops. Blocked clicks can now name the veil's own ref as the
+  recovery action.
+- **Restyled native controls no longer falsely block clicks.** The click
+  pre-check treated any unrelated element at the target's center as a cover, so
+  Amazon-style radios/checkboxes (transparent native input + decorative sibling
+  inside a `<label>`) hard-failed with `covered by <i …>` pointing at an
+  unexposed decorative node. A hit inside an associated label is now recognized
+  as the control's legitimate click surface (HTML label activation): the click
+  is routed through the label and the diff notes
+  `clicked via the associated label`. The pre-check is also shadow-DOM-aware now
+  (composed-tree containment instead of `.contains()`).
+- **Refs inside id-less iframes are now actionable.** Frame identity captured
+  for an iframe without `id`/`title` fell back to the frame URL, which locator
+  resolution could never match — refs inside such frames (common third-party
+  embeds) errored on every action. Capture now records the iframe's `src`
+  attribute and resolution matches `iframe[src=…]` as well.
+
+### Added
+
+- **`hover <target>` verb** — reveals hover-only menus (CSS `:hover` and JS
+  `mouseenter`); the mouse stays put, so revealed items survive the re-observe
+  and appear in the diff with fresh, immediately clickable refs.
+- **`drag <source> <to>` verb** — Playwright `drag_to` (real pointer sequence;
+  HTML5 draggable and mouse sortables). `draggable="true"` elements now count
+  as candidate evidence (`draggable`), so sortable rows get refs to drag.
+- **`<select multiple>` support + truncated-select honesty.** `select <t>
+  <label>…` accepts several labels for a multi-select (usage error against a
+  single-choice select or a custom dropdown); expand marks them `, multiple`
+  and joins current selections (`▾ "Cheese, Bacon"`). Selects with more than
+  50 options now report the REAL total (`of 80 options`), not the truncated
+  list length.
+- **Nested scrolling.** `scroll <sid|@ref> down|up [--pages N]` scrolls INSIDE
+  the scroll container at/above the target (nearest composed ancestor with
+  real overflow), reporting `container div#results scroll y=600/660` with
+  at-the-bottom/top edges — the route to virtualized lists, lazy-loading
+  panels, and modal bodies that window scrolling can't reach (newly mounted
+  rows show in the action diff). Discovery flags real scroll containers
+  (`scr` = [scrollTop, max]) and expand headers announce them:
+  `(inner scrollable panel: y=0 of 1104px — 'ebrowse scroll s3 down' scrolls
+  it)`. A target with no scrollable ancestor is refused with the window-scroll
+  alternative named. Fixture: `nested_scroll.html`.
+- **Disabled controls are visible, marked, and fast-refused.** Previously a
+  disabled control got no ref at all — a grayed-out submit was invisible in
+  expand, so an agent couldn't reason about enabling it. Disabled controls
+  (own attribute, `aria-disabled`, or fieldset-inherited via `:disabled`) now
+  keep their refs with a `disabled` marker; acting on one fails fast naming
+  the state instead of burning the 8s Playwright timeout, and the
+  `disabled: "true" → "false"` transition shows in the diff when another
+  action unlocks them. Elements under `[inert]` are marked ` inert` in
+  expand. Weak-evidence candidates remain gated on enabled. Fixture:
+  `disabled_states.html`.
+- **Outcome evidence beyond the DOM diff.** Tracked element state now includes
+  `pressed` (`aria-pressed`), `selected` (`aria-selected`), and `checked` from
+  `aria-checked` on role checkbox/radio/switch widgets (rendered with the same
+  `[x]`/`[ ]` marks as native inputs), so state-only toggles/tabs no longer
+  diff as "no change". Action results also report non-DOM outcomes as notes:
+  `download started: "…"` (page download event), `the document reloaded (same
+  URL)` (main-frame navigation counter), and on an otherwise-empty diff, URL
+  fragment jumps and scroll movement. Fixture: `outcomes.html`.
+- **ARIA checkable widgets work with `check`/`uncheck`.** A non-native element
+  with role `checkbox`/`radio`/`switch`/`menuitemcheckbox`/`menuitemradio`
+  (Playwright's `set_checked` refuses these) is activated through the full
+  interaction plan and its `aria-checked` postcondition is verified; already-
+  in-state is a clean no-op, and unchecking a radio is a usage error naming
+  the constraint. Works for CSS targets too (live role read).
+- **Parent-page covers over iframes are now detected.** The in-frame probes
+  cannot see a banner/modal sitting above the target's iframe; a second probe
+  (`core/js/cover_above.js`) hit-tests the target's viewport point in the
+  parent document. Blocked errors and `diagnose` name the cover — including
+  an actionable control INSIDE it (a consent bar's own OK button) as the
+  recovery ref, in any frame. Cover-descendant matching also applies to
+  main-document covers.
+- **`diagnose <target>` verb** — read-only actionability report: Playwright
+  trial-click verdict (`actionability: PASS/BLOCKED`) plus the blocker
+  classification and recovery step from the failure-diagnosis machinery,
+  without dispatching anything (the trial may scroll the target into view).
+  Label-decoration hits report PASS since actions route via the label.
+  Exposed on CLI, daemon, and MCP.
+- **Keyboard-activation fallback for blocked clicks.** When a plain click on
+  a natively focusable control (link, button, summary, checkbox/radio) is
+  pointer-blocked by a NON-modal cover, the click completes as trusted
+  focus + Enter/Space — what a keyboard user does when an overlay doesn't
+  trap focus. Fails closed: never used when a dialog/aria-modal/inert
+  context is detected, and the focus must verifiably land on the target
+  (traps refuse it). Disclosed in the diff:
+  `note: pointer route blocked by …; activated via keyboard`. Custom widgets
+  (cursor-pointer divs) are never keyboard-guessed.
+- **Candidate discovery: weak-evidence custom widgets get expand-only refs.**
+  Elements with no strong clickable signal but real interactivity evidence — a
+  live pointer listener (found via one CDP `getEventListeners` sweep, chromium
+  main frame, single round trip), an explicit `tabindex`, or role-less ARIA
+  state — now become `?`-marked refs in `expand`: `[Save changes (@e4 ?)]`.
+  ElementState gains an optional `candidate` provenance field
+  (`listener`/`focusable`/`aria-state`). Outline counts, default outline
+  output, and action policy are unchanged: candidates are excluded from
+  counts, and candidate evidence never authorizes proxy activation. A
+  candidate containing (or inside) a strong element is suppressed — the
+  native control is the real target. Zero-signal decorative nodes still get
+  no ref. Fixture: `custom_widgets.html`.
+- **Failure-only blocker diagnostics.** When a click is refused (trial-click
+  failure, or Playwright "intercepts pointer events" on any pointer verb), one
+  diagnostic probe (`core/js/diagnose.js`, exposed via
+  `snapshot.probe_blocker`) classifies the blocker and the error names an
+  executable next step: the cover's own exposed ref (`dismiss or interact with
+  @eN (…) first`), an open dialog (`a dialog is open (…); resolve it first` —
+  found even when the hit target is only its anonymous backdrop), or an honest
+  limitation (`has no exposed ref (likely a new overlay)` with
+  `outline`/`press Escape`/`screenshot` suggestions). Also detects
+  disabled-`<fieldset>` inheritance, `pointer-events: none` targets, and inert
+  regions. Zero cost on the happy path — the probe only runs after a failure.
+
 ### Changed
+
+- **All pointer verbs share one InteractionPlan** (`src/ebrowse/interaction.py`):
+  scroll → center-point probe → route (`direct` / `label` / `obstructed`), with
+  dialog covers and modal contexts raising immediately. `click`, `check`/
+  `uncheck`, and `type`'s focus click all plan the same way; `type` under a
+  non-modal cover now skips the focus click entirely (typing focuses without a
+  pointer) instead of timing out. Native `fill`/`select_option`/`upload` keep
+  their specialized non-pointer APIs. Compound verbs are untouched pending
+  their rework.
+- **`check`/`uncheck` get the same cover handling as `click`.** The occlusion
+  preflight, label routing, and trial-click arbitration now also protect
+  `set_checked`: a restyled checkbox/radio whose input center is covered by
+  label decoration is toggled via its label — only when the state must change
+  (label clicks toggle), with the resulting state verified — instead of timing
+  out after 8s with a misleading error. The failure diagnosis (diagnose.js)
+  also learned label semantics, so a control's own label decoration is never
+  misreported as "no exposed ref (likely a new overlay)" on any verb.
+  Compound verbs (`search`, custom `select`, `fill-form`) are intentionally
+  untouched pending their rework.
+- **Generic covers are arbitrated by Playwright, not the one-point hit test.**
+  Only a cover inside a dialog still fails the click pre-emptively. Any other
+  center-point mismatch (partial overlays, sticky headers, transient layers,
+  odd geometry) runs a short trial click — the same scroll/stability/
+  receives-events rules as the real click, with retries — and only a sustained
+  interception raises `blocked: … covered by …`. See docs/adr/0009.
 
 - **Navigation no longer prints the outline.** `open`/`back`/`forward`/`reload`/
   `tab` and any navigating action now return a terse landing line

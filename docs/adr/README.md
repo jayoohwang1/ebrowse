@@ -18,3 +18,5 @@ ADRs 0001–0006 were backfilled from the v1 implementation log (see git history
 | [0006](0006-image-refs-not-durable.md) | @i image refs are page-scoped, captions expand-time only |
 | [0007](0007-agent-resolves-native-dialogs.md) | Agent resolves native confirm/prompt dialogs (`dialog` verb) |
 | [0008](0008-explicit-outline-and-synchronous-visual-glance.md) | Explicit outline + synchronous visual glance (`◉`, `describe-screen`) |
+| [0009](0009-label-activation-and-trial-click-arbitration.md) | Label activation + Playwright trial-click arbitration in the click pre-check |
+| [0010](0010-interaction-plan-and-keyboard-fallback.md) | InteractionPlan routing + keyboard-activation fallback for non-modal covers |

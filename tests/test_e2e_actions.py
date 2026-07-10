@@ -66,6 +66,17 @@ def ref_for(env, sid: str, pattern: str) -> str:
     return m.group(1)
 
 
+def ref_anywhere(env, pattern: str) -> str:
+    """ref_for without knowing the sid: search every outlined section."""
+    sids = re.findall(r"^(s\d+) ", ebrowse(env, "outline").stdout, re.M)
+    for sid in sids:
+        out = ebrowse(env, "expand", sid, "--all").stdout
+        m = re.search(pattern + r"[^)\]]*\((@e\d+)", out)
+        if m:
+            return m.group(1)
+    raise AssertionError(f"no element matching {pattern!r} in any section")
+
+
 def test_dropdown_click_reveals_options(server, env):
     r = ebrowse(env, "open", server.url("dropdown.html"))
     assert r.returncode == 0, r.stderr
@@ -172,12 +183,235 @@ def test_occluded_click_blocked(server, env):
     r = ebrowse(env, "click", "#covered-btn")
     assert r.returncode == 1
     assert "covered by" in r.stderr
+    # the cover itself is an anonymous backdrop, but the diagnosis names the
+    # open dialog as the thing to resolve
+    assert "dialog is open" in r.stderr and "cookie consent" in r.stderr.lower()
     # dismiss the modal, then the click goes through
     r = ebrowse(env, "click", "#accept-cookies")
     assert r.returncode == 0
     r = ebrowse(env, "click", "#covered-btn")
     assert r.returncode == 0, r.stderr
     assert "Purchase started." in r.stdout
+
+
+def test_blocked_click_names_exposed_cover_ref(server, env):
+    # the covering promo banner has a clickable signal, so it has a ref of its
+    # own — the blocked error must name it as the executable next step
+    ebrowse(env, "open", server.url("covers.html"))
+    buy_a = ref_for(env, "s2", r"\[Buy plan A")
+    r = ebrowse(env, "click", buy_a)
+    assert r.returncode == 1
+    assert "covered by" in r.stderr
+    m = re.search(r"dismiss or interact with (@e\d+)", r.stderr)
+    assert m, r.stderr
+    # following the recovery action unblocks the original click
+    assert ebrowse(env, "click", m.group(1)).returncode == 0
+    r = ebrowse(env, "click", buy_a)
+    assert r.returncode == 0, r.stderr
+    assert "Purchased plan A." in r.stdout
+
+
+def test_diagnose_reports_blocker_and_pass(server, env):
+    # read-only diagnosis: blocked target names the cover's ref without acting
+    ebrowse(env, "open", server.url("covers.html"))  # fresh covers
+    buy_a = ref_for(env, "s2", r"\[Buy plan A")
+    r = ebrowse(env, "diagnose", buy_a)
+    assert r.returncode == 0, r.stderr
+    assert "actionability: BLOCKED" in r.stdout
+    assert re.search(r"dismiss or interact with @e\d+", r.stdout)
+    # nothing was clicked: the promo banner is still there
+    r = ebrowse(env, "diagnose", buy_a)
+    assert "actionability: BLOCKED" in r.stdout
+    # an uncovered control diagnoses as PASS
+    nav = ref_for(env, "s1", r"\[Products")
+    r = ebrowse(env, "diagnose", nav)
+    assert r.returncode == 0, r.stderr
+    assert "actionability: PASS" in r.stdout
+
+
+def test_keyboard_fallback_on_covered_native_button(server, env):
+    # a native button under an anonymous non-modal cover: the pointer route is
+    # blocked, so the click falls back to trusted focus + Enter (what a
+    # keyboard user would do), disclosed in the diff notes
+    ebrowse(env, "open", server.url("covers.html"))
+    buy_c = ref_for(env, "s2", r"\[Buy plan C")
+    r = ebrowse(env, "click", buy_c)
+    assert r.returncode == 0, r.stderr
+    assert "Purchased plan C." in r.stdout
+    assert "note: pointer route blocked" in r.stdout
+    assert "activated via keyboard" in r.stdout
+
+
+def test_blocked_click_honest_about_unexposed_cover(server, env):
+    # an anonymous overlay with no clickable signal has no ref; the error must
+    # say so instead of pointing at an invisible node, and suggest recovery
+    buy_b = ref_for(env, "s2", r"\[Buy plan B")
+    r = ebrowse(env, "click", buy_b)
+    assert r.returncode == 1
+    assert "no exposed ref" in r.stderr
+    assert "press Escape" in r.stderr
+    assert ebrowse(env, "press", "Escape").returncode == 0
+    r = ebrowse(env, "click", buy_b)
+    assert r.returncode == 0, r.stderr
+    assert "partial change" in r.stdout  # the previously-blocked click now lands
+
+
+def test_candidate_widgets_discovered_and_clickable(server, env):
+    # signal-less custom widgets (addEventListener-only, tabindex, role-less
+    # aria state) get '?'-marked candidate refs in expand and are clickable;
+    # the zero-signal decoy stays ref-less
+    ebrowse(env, "open", server.url("custom_widgets.html"))
+    out = ebrowse(env, "expand", "s2", "--all").stdout
+    assert re.search(r"\[Save changes \(@e\d+ \?\)\]", out), out
+    assert not re.search(r"Settings saved automatically \(@e", out)
+    save = ref_for(env, "s2", r"\[Save changes")
+    r = ebrowse(env, "click", save)
+    assert r.returncode == 0, r.stderr
+    assert "Changes saved" in r.stdout
+    # the aria-expanded flip on a candidate is a tracked state change, and the
+    # revealed links appear with fresh refs
+    toggle = ref_for(env, "s2", r"Notification preferences")
+    r = ebrowse(env, "click", toggle)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r"expanded: \"false\" → \"true\"", r.stdout)
+    assert "Manage alerts" in r.stdout
+
+
+def test_full_page_veil_exposed_and_keyboard_fallback(server, env):
+    # a full-viewport childless clickable overlay must get a ref of its own
+    # (splitter: oversized childless nodes are terminal). The covered target
+    # is a native button and the veil is not a modal (no dialog/inert/trap),
+    # so the click completes via the keyboard fallback; diagnose still names
+    # the veil's ref as the pointer-route blocker
+    ebrowse(env, "open", server.url("veil_overlay.html"))
+    r = ebrowse(env, "outline")
+    assert "value your privacy" in r.stdout, r.stdout
+    sub = ref_for(env, "s2", r"\[Subscribe")
+    r = ebrowse(env, "diagnose", sub)
+    assert "actionability: BLOCKED" in r.stdout
+    m = re.search(r"dismiss or interact with (@e\d+)", r.stdout)
+    assert m, r.stdout
+    r = ebrowse(env, "click", sub)
+    assert r.returncode == 0, r.stderr
+    assert "Subscribed!" in r.stdout
+    assert "activated via keyboard" in r.stdout
+    # the veil is still up (keyboard didn't click through it); its own ref works
+    r = ebrowse(env, "click", m.group(1))
+    assert r.returncode == 0, r.stderr
+    assert "disappeared" in r.stdout or "removed" in r.stdout
+
+
+def test_diagnose_label_decoration_and_modal_cover(server, env):
+    # label decoration over a fancy control is PASS (label activation), and a
+    # dialog-guarded target must NOT be keyboard-activated — it stays blocked
+    ebrowse(env, "open", server.url("dialogs.html"))
+    ebrowse(env, "click", "#modal-btn")
+    r = ebrowse(env, "click", "#covered-btn")  # native button under modal backdrop
+    assert r.returncode == 1
+    assert "dialog is open" in r.stderr
+    assert "activated via keyboard" not in r.stdout + r.stderr
+    ebrowse(env, "click", "#accept-cookies")
+    ebrowse(env, "open", server.url("styled_controls.html"))
+    news = ref_for(env, "s2", r"Subscribe to the deals")
+    r = ebrowse(env, "diagnose", news)
+    assert r.returncode == 0, r.stderr
+    assert "actionability: PASS" in r.stdout
+    assert "label" in r.stdout
+
+
+def test_fancy_radio_clicks_despite_decorative_cover(server, env):
+    # Amazon-style restyled radio: transparent native input whose center is
+    # covered by a decorative sibling <i> inside the wrapping label. The old
+    # center-point preflight hard-blocked this; label semantics make it valid.
+    ebrowse(env, "open", server.url("styled_controls.html"))
+    eur = ref_for(env, "s2", r"EUR - Euro")
+    r = ebrowse(env, "click", eur)
+    assert r.returncode == 0, r.stderr
+    assert "covered by" not in r.stderr
+    assert re.search(r'checked: "false" → "true"', r.stdout)
+    assert "note: clicked via the associated label" in r.stdout
+
+
+def test_fancy_external_label_checkbox(server, env):
+    # external <label for=...> owns the visual box that covers the input center
+    news = ref_for(env, "s2", r"Subscribe to the deals")
+    r = ebrowse(env, "click", news)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'checked: "false" → "true"', r.stdout)
+
+
+def test_outcome_evidence_beyond_dom_diff(server, env):
+    # outcomes with little/no DOM footprint must still be reported truthfully
+    ebrowse(env, "open", server.url("outcomes.html"))
+    # aria-pressed flip is a tracked state change, not "no change detected"
+    mute = ref_anywhere(env, r"Mute notifications")
+    r = ebrowse(env, "click", mute)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'pressed: "false" → "true"', r.stdout), r.stdout
+    # aria-selected swap on tabs
+    tab_b = ref_anywhere(env, r"Details")
+    r = ebrowse(env, "click", tab_b)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'selected: "false" → "true"', r.stdout), r.stdout
+    # in-page anchor: no DOM change, but the jump is named
+    jump = ref_anywhere(env, r"Jump to terms")
+    r = ebrowse(env, "click", jump)
+    assert r.returncode == 0, r.stderr
+    assert "#terms" in r.stdout, r.stdout
+    # same-URL reload is named instead of "no change detected" alone
+    r = ebrowse(env, "click", "#reload-btn")
+    assert r.returncode == 0, r.stderr
+    assert "document reloaded" in r.stdout, r.stdout
+    # a download never touches the DOM but is reported by name
+    r = ebrowse(env, "click", "#dl")
+    assert r.returncode == 0, r.stderr
+    assert 'download started: "hello.txt"' in r.stdout, r.stdout
+
+
+def test_aria_widgets_check_uncheck(server, env):
+    # role=checkbox/switch/radio widgets: Playwright's set_checked refuses
+    # them, so check/uncheck activates and verifies aria-checked instead
+    ebrowse(env, "open", server.url("aria_widgets.html"))
+    tos = ref_anywhere(env, r"Accept the terms")
+    r = ebrowse(env, "check", tos)
+    assert r.returncode == 0, r.stderr
+    assert "Terms: accepted" in r.stdout
+    r = ebrowse(env, "check", tos)  # idempotent: no toggle
+    assert r.returncode == 0, r.stderr
+    assert "no change detected" in r.stdout
+    r = ebrowse(env, "uncheck", tos)
+    assert r.returncode == 0, r.stderr
+    assert "partial change" in r.stdout
+    wifi = ref_anywhere(env, r"Wi-Fi")
+    r = ebrowse(env, "uncheck", wifi)  # switch, initially on
+    assert r.returncode == 0, r.stderr
+    assert "partial change" in r.stdout
+    pro = ref_anywhere(env, r"Pro")
+    r = ebrowse(env, "check", pro)
+    assert r.returncode == 0, r.stderr
+    assert "partial change" in r.stdout
+    # radios can't be unchecked — usage error naming the constraint
+    r = ebrowse(env, "uncheck", pro)
+    assert r.returncode == 2
+    assert "radio cannot be unchecked" in r.stderr
+
+
+def test_check_uncheck_via_label_on_fancy_checkbox(server, env):
+    # check/uncheck on a restyled checkbox whose input center is covered by
+    # label decoration: routed through the label with a verified postcondition
+    ebrowse(env, "open", server.url("styled_controls.html"))
+    news = ref_for(env, "s2", r"Subscribe to the deals")
+    r = ebrowse(env, "check", news)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'checked: "false" → "true"', r.stdout)
+    assert "note: checked via the associated label" in r.stdout
+    # already-checked check is a clean no-op, not a toggle
+    r = ebrowse(env, "check", news)
+    assert r.returncode == 0, r.stderr
+    assert "no change detected" in r.stdout
+    r = ebrowse(env, "uncheck", news)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'checked: "true" → "false"', r.stdout)
 
 
 def test_spa_mutation_and_noop(server, env):
@@ -212,6 +446,42 @@ def test_iframe_form_flow(server, env):
     assert "Payment accepted." in r.stdout
 
 
+def test_parent_page_cover_over_iframe(server, env):
+    # a parent-page consent bar sits ABOVE the iframe: invisible to in-frame
+    # probes, but the cross-frame probe names it — including the actionable
+    # OK button INSIDE the cover as the recovery ref
+    ebrowse(env, "open", server.url("iframe_covered.html"))
+    card = ref_anywhere(env, r"Card number")
+    r = ebrowse(env, "diagnose", card)
+    assert r.returncode == 0, r.stderr
+    assert "actionability: BLOCKED" in r.stdout
+    assert "consent-bar" in r.stdout
+    m = re.search(r"dismiss or interact with (@e\d+)", r.stdout)
+    assert m, r.stdout
+    r = ebrowse(env, "click", m.group(1))  # the OK button in the parent page
+    assert r.returncode == 0, r.stderr
+    assert "acknowledged" in r.stdout
+    # cover gone: the in-frame flow proceeds normally
+    assert ebrowse(env, "fill", card, "4242 4242 4242 4242").returncode == 0
+    pay = ref_anywhere(env, r"\[Pay")
+    r = ebrowse(env, "click", pay)
+    assert r.returncode == 0, r.stderr
+    assert "Payment accepted." in r.stdout
+
+
+def test_iframe_without_id_form_flow(server, env):
+    # an iframe with no id/title used to capture refs that locate() could
+    # never resolve (frame identity fell back to the frame URL)
+    ebrowse(env, "open", server.url("iframe_noid.html"))
+    card = ref_for(env, "s2", r"Card number")
+    r = ebrowse(env, "fill", card, "4242 4242 4242 4242")
+    assert r.returncode == 0, r.stderr
+    pay = ref_for(env, "s2", r"\[Pay")
+    r = ebrowse(env, "click", pay)
+    assert r.returncode == 0, r.stderr
+    assert "Payment accepted." in r.stdout
+
+
 def test_link_click_is_navigation_landing(server, env):
     ebrowse(env, "open", server.url("list.html"))
     ebrowse(env, "open", server.url("form.html"))
@@ -225,6 +495,90 @@ def test_link_click_is_navigation_landing(server, env):
     assert "PAGE" not in r.stdout
     # durable refs stay live post-navigation without an explicit outline
     assert "Espresso Gear" in ebrowse(env, "outline").stdout
+
+
+def test_hover_reveals_menus_and_items_clickable(server, env):
+    # hover-only menus: CSS :hover and JS mouseenter — the diff exposes the
+    # revealed items with fresh refs, and the mouse stays so they're clickable
+    ebrowse(env, "open", server.url("hover_menu.html"))
+    products = ref_anywhere(env, r"\[Products")
+    r = ebrowse(env, "hover", products)
+    assert r.returncode == 0, r.stderr
+    m = re.search(r"\[Coffee makers \((@e\d+)\)", r.stdout)
+    assert m, r.stdout
+    r = ebrowse(env, "click", m.group(1))
+    assert r.returncode == 0, r.stderr
+    assert "Navigated: Coffee makers." in r.stdout
+    account = ref_anywhere(env, r"\[Account")
+    r = ebrowse(env, "hover", account)
+    assert r.returncode == 0, r.stderr
+    m = re.search(r"\[Log out \((@e\d+)\)", r.stdout)
+    assert m, r.stdout
+    r = ebrowse(env, "click", m.group(1))
+    assert r.returncode == 0, r.stderr
+    assert "Logged out." in r.stdout
+
+
+def test_drag_reorders_sortable_list(server, env):
+    # HTML5 draggable rows get candidate refs (draggable evidence) and
+    # drag_to reorders them
+    ebrowse(env, "open", server.url("dragdrop.html"))
+    one = ref_anywhere(env, r"Task One")
+    three = ref_anywhere(env, r"Task Three")
+    r = ebrowse(env, "drag", one, three)
+    assert r.returncode == 0, r.stderr
+    assert "Order:" in r.stdout, r.stdout
+    assert "partial change" in r.stdout
+
+
+def test_multi_select_and_truncation_honesty(server, env):
+    ebrowse(env, "open", server.url("multi_select.html"))
+    sids = re.findall(r"^(s\d+) ", ebrowse(env, "outline").stdout, re.M)
+    expanded = "".join(ebrowse(env, "expand", s, "--all").stdout for s in sids)
+    # multiple-select marked; truncated select reports the REAL option total
+    assert re.search(r"\[Toppings \(@e\d+\) ▾ .*multiple", expanded), expanded
+    assert "of 80 options" in expanded, expanded
+    toppings = ref_anywhere(env, r"\[Toppings")
+    r = ebrowse(env, "select", toppings, "Cheese", "Bacon")
+    assert r.returncode == 0, r.stderr
+    assert "Cheese, Bacon" in r.stdout
+    # multiple values against a single-choice select: usage error
+    country = ref_anywhere(env, r"\[Country")
+    r = ebrowse(env, "select", country, "Country 2", "Country 3")
+    assert r.returncode == 2
+    assert "single-choice" in r.stderr
+    r = ebrowse(env, "select", country, "Country 42")
+    assert r.returncode == 0, r.stderr
+    assert "Country 42" in r.stdout
+
+
+def test_nested_scroll_lazy_loading_panel(server, env):
+    # an inner scroll container is annotated in expand, and 'scroll <sid> down'
+    # scrolls INSIDE it — mounting virtualized/lazy content the window scroll
+    # could never reach
+    ebrowse(env, "open", server.url("nested_scroll.html"))
+    sids = re.findall(r"^(s\d+) ", ebrowse(env, "outline").stdout, re.M)
+    expanded = "".join(ebrowse(env, "expand", s, "--all").stdout for s in sids)
+    m = re.search(r"inner scrollable panel: y=0 of \d+px — 'ebrowse scroll (s\d+) down'", expanded)
+    assert m, expanded
+    sid = m.group(1)
+    r = ebrowse(env, "scroll", sid, "down", "--pages", "2")
+    assert r.returncode == 0, r.stderr
+    assert "container div#results scroll y=" in r.stdout, r.stdout
+    assert "Result item 21" in r.stdout  # lazy-loaded rows mounted; diff caught them
+    # scroll until the lazy list is exhausted; the end marker mounts
+    for _ in range(5):
+        r = ebrowse(env, "scroll", sid, "down", "--pages", "5")
+        assert r.returncode == 0, r.stderr
+    assert "End of results" in ebrowse(env, "expand", sid, "--all").stdout
+    r = ebrowse(env, "scroll", sid, "up", "--pages", "50")
+    assert r.returncode == 0, r.stderr
+    assert "at the top" in r.stdout
+    # a target with no scrollable ancestor is refused honestly
+    clear = ref_anywhere(env, r"Clear results")
+    r = ebrowse(env, "scroll", clear, "down")
+    assert r.returncode == 2
+    assert "no scrollable container" in r.stderr
 
 
 def test_scroll_reports_position(server, env):
@@ -259,12 +613,43 @@ def test_native_dialog_expands_and_blocks_outside(server, env):
     assert "blocked" in r.stderr and "dialog" in r.stderr.lower()
 
 
+def test_disabled_controls_exposed_and_fast_refused(server, env):
+    # disabled controls (own attr AND fieldset-inherited) get refs and a
+    # 'disabled' marker; acting on one fails fast naming the state; the diff
+    # shows the disabled → enabled transition when the page unlocks them
+    ebrowse(env, "open", server.url("disabled_states.html"))
+    out = ebrowse(env, "outline").stdout
+    sids = re.findall(r"^(s\d+) ", out, re.M)
+    expanded = "".join(ebrowse(env, "expand", s, "--all").stdout for s in sids)
+    assert re.search(r"\[Save address \(@e\d+\) disabled\]", expanded), expanded
+    assert re.search(r"\[Place order \(@e\d+\) disabled\]", expanded), expanded
+    order = ref_anywhere(env, r"Place order")
+    r = ebrowse(env, "click", order)
+    assert r.returncode == 1
+    assert "is disabled" in r.stderr and "enable it first" in r.stderr
+    tos = ref_anywhere(env, r"I agree to the terms")
+    r = ebrowse(env, "check", tos)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'disabled: "true" → "false"', r.stdout), r.stdout
+    r = ebrowse(env, "click", order)
+    assert r.returncode == 0, r.stderr
+    assert "Order placed!" in r.stdout
+    # fieldset unlock enables all inherited-disabled controls at once
+    unlock = ref_anywhere(env, r"Ship to a different")
+    r = ebrowse(env, "check", unlock)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'disabled: "true" → "false"', r.stdout), r.stdout
+
+
 def test_inert_modal_coalesced_and_names_block(server, env):
     ebrowse(env, "open", server.url("inert_modal.html"))
     # an aria-modal div coalesced into the content section is still flagged dialog
     r = ebrowse(env, "click", "#open")
     assert r.returncode == 0, r.stderr
     assert "→ dialog" in r.stdout and "[dialog]" in r.stdout
+    # background elements under [inert] carry the marker in expand
+    out = ebrowse(env, "expand", "s1", "--all").stdout
+    assert re.search(r"\[Outside action \(@e\d+\) inert\]", out), out
     # it blocks the page via inert (no covering element) → Playwright can't click;
     # the error names the specific modal instead of "an overlay is probably open"
     r = ebrowse(env, "click", "#outside")

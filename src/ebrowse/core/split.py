@@ -75,7 +75,12 @@ def _is_terminal(node: DomNode) -> bool:
     if (node.attrs.get("role") or "") in GROUP_ROLES:
         return True
     if _oversized(node):
-        return False
+        # A childless oversized node has nothing to descend into; descending
+        # would discard it along with its own text and clickable signal
+        # (full-viewport cookie veils / interstitial covers wired via onclick).
+        # Terminal + the _has_substance gate keeps real overlays and still
+        # drops bare decorative backdrops.
+        return not node.children
     semantic_children = sum(1 for c in node.children if c.tag in SEMANTIC_CHILD_TAGS)
     return semantic_children < 2
 

@@ -12,7 +12,9 @@ from pathlib import Path
 from typing import Any
 
 _JS_PATH = Path(__file__).parent / "js" / "discover.js"
+_DIAGNOSE_JS_PATH = Path(__file__).parent / "js" / "diagnose.js"
 _js_cache: str | None = None
+_diagnose_cache: str | None = None
 
 
 def discover_js() -> str:
@@ -22,6 +24,32 @@ def discover_js() -> str:
 
         _js_cache = render_js_template(_JS_PATH.read_text())
     return _js_cache
+
+
+async def probe_blocker(handle) -> dict[str, Any]:
+    """Failure-only diagnostic: classify what is blocking a refused click.
+    One evaluate against the target's element handle, in its own frame
+    (js/diagnose.js). Raises whatever the evaluate raises — callers treat
+    this as best-effort."""
+    global _diagnose_cache
+    if _diagnose_cache is None:
+        _diagnose_cache = _DIAGNOSE_JS_PATH.read_text()
+    return await handle.evaluate(_diagnose_cache)
+
+
+_COVER_ABOVE_JS_PATH = Path(__file__).parent / "js" / "cover_above.js"
+_cover_above_cache: str | None = None
+
+
+async def probe_cover_above(frame_element_handle, cx: float, cy: float) -> dict[str, Any]:
+    """Parent-document probe for iframe targets (js/cover_above.js): hit-test
+    the target's viewport point in the frame element's OWN document, where a
+    banner/modal above the iframe is visible. Raises on evaluate failure —
+    callers treat this as best-effort."""
+    global _cover_above_cache
+    if _cover_above_cache is None:
+        _cover_above_cache = _COVER_ABOVE_JS_PATH.read_text()
+    return await frame_element_handle.evaluate(_cover_above_cache, [cx, cy])
 
 
 @dataclass(slots=True)
@@ -37,6 +65,7 @@ class DomNode:
     # runtime annotations (not serialized): set during element extraction
     ref: str | None = None
     is_list_group: bool = False  # synthetic node wrapping grouped siblings
+    candidate: str | None = None  # weak-evidence provenance (clickable.candidate_evidence)
 
     def bbox_area(self) -> int:
         return max(0, self.rect[2]) * max(0, self.rect[3])
@@ -133,6 +162,33 @@ class DomSnapshot:
 _MIN_FRAME_W, _MIN_FRAME_H = 100, 60
 
 
+async def _discover_main_frame(page) -> dict[str, Any]:
+    """Run discover.js in the main frame, preferring one CDP Runtime.evaluate
+    with includeCommandLineAPI so the walk can use the devtools
+    getEventListeners() API (weak `el` candidate signal) — still a single
+    round trip, per architecture principle 3. Chromium-only; any failure
+    degrades to a plain evaluate with no listener signals."""
+    try:
+        cdp = await page.context.new_cdp_session(page)
+        try:
+            r = await cdp.send(
+                "Runtime.evaluate",
+                {
+                    "expression": f"({discover_js()})()",
+                    "includeCommandLineAPI": True,
+                    "returnByValue": True,
+                },
+            )
+            value = r.get("result", {}).get("value")
+            if isinstance(value, dict) and value.get("root"):
+                return value
+        finally:
+            await cdp.detach()
+    except Exception:
+        pass
+    return await page.evaluate(discover_js())
+
+
 async def capture(page) -> DomSnapshot:
     """Snapshot the page: one evaluate per frame, stitched into one tree.
 
@@ -140,7 +196,7 @@ async def capture(page) -> DomSnapshot:
     useful size; frames we cannot evaluate in (rare with Playwright, possible
     on sandboxed/detached frames) become cross_origin leaf nodes.
     """
-    raw = await page.evaluate(discover_js())
+    raw = await _discover_main_frame(page)
     snap = DomSnapshot.from_dict(raw)
 
     # index iframe nodes in the main tree by id/title/src for stitching
@@ -156,11 +212,20 @@ async def capture(page) -> DomSnapshot:
             continue
         if not box or box["width"] < _MIN_FRAME_W or box["height"] < _MIN_FRAME_H:
             continue
-        fid = await handle.get_attribute("id") or await handle.get_attribute("title") or frame.url
+        # fid must be resolvable later by locate._frame_scope (iframe[id|title|src=...]),
+        # so prefer the verbatim src attribute over frame.url for id-less frames
+        fid = (
+            await handle.get_attribute("id")
+            or await handle.get_attribute("title")
+            or await handle.get_attribute("src")
+            or frame.url
+        )
         node = _match_iframe_node(iframe_nodes, fid, frame.url)
         if node is None:
             continue
         try:
+            # plain evaluate: child frames get no `el` listener signal (the
+            # CDP command-line API binds to the main frame's session only)
             child_raw = await frame.evaluate(discover_js())
         except Exception:
             node.cross_origin = True
@@ -180,7 +245,7 @@ def _match_iframe_node(nodes: list[DomNode], fid: str, url: str) -> DomNode | No
         if n.attrs.get("id") == fid or n.attrs.get("ttl") == fid:
             return n
         src = n.attrs.get("src") or ""
-        if src and (url.endswith(src) or src in url):
+        if src and (src == fid or url.endswith(src) or src in url):
             return n
     return None
 

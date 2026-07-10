@@ -19,10 +19,13 @@ def _css_escape(s: str) -> str:
 
 
 def _frame_scope(page, desc: ElementDesc):
-    """Resolve the frame the element lives in (iframe_path from discovery)."""
+    """Resolve the frame the element lives in (iframe_path from discovery).
+    fid is the frame's id, title, or src attribute — whichever capture used
+    (core/snapshot.py) — so try all three."""
     scope = page
     for fid in desc.iframe_path:
-        scope = scope.frame_locator(f'iframe[id="{fid}"], iframe[title="{fid}"]')
+        q = fid.replace("\\", "\\\\").replace('"', '\\"')
+        scope = scope.frame_locator(f'iframe[id="{q}"], iframe[title="{q}"], iframe[src="{q}"]')
     return scope
 
 
@@ -40,14 +43,20 @@ async def resolve(page, desc: ElementDesc):
         candidates.append(scope.get_by_role(desc.role, name=desc.name))
     if desc.placeholder:
         candidates.append(scope.get_by_placeholder(desc.placeholder, exact=True))
+    if desc.role and desc.text_head:
+        # roles like link/menuitem/option/tab take their accessible name from
+        # text content, which discovery stores in text_head rather than name.
+        # MUST come before the href candidates: repeated hrefs ("#", "/cart")
+        # match many links, and nth_hint counts identical DESCRIPTORS, not
+        # href matches — resolving 'Products' as the 0th 'a[href$="#"]' once
+        # hovered the Home link while reporting 'link "Products"'.
+        candidates.append(scope.get_by_role(desc.role, name=desc.text_head, exact=True))
     if desc.href:
-        candidates.append(scope.locator(f'a[href$="{desc.href}"]'))
+        base = scope.locator(f'a[href$="{desc.href}"]')
+        # same wrong-element risk: constrain repeated hrefs by the link text
+        candidates.append(base.filter(has_text=desc.text_head[:60]) if desc.text_head else base)
         if "?" in desc.href:
             candidates.append(scope.locator(f'a[href$="{desc.href.split("?")[0]}"]'))
-    if desc.role and desc.text_head:
-        # roles like menuitem/option/tab take their accessible name from text
-        # content, which discovery stores in text_head rather than name
-        candidates.append(scope.get_by_role(desc.role, name=desc.text_head, exact=True))
     if desc.text_head and desc.tag in ("a", "button", "summary"):
         candidates.append(scope.locator(desc.tag).filter(has_text=desc.text_head[:60]).first)
     if desc.text_head:

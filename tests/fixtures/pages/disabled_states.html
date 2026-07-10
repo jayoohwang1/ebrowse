@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Disabled Control States</title>
+  <style>
+    body { font-family: sans-serif; max-width: 42rem; margin: 2rem auto; }
+    fieldset, section { margin: 1rem 0; padding: 1rem; }
+    label { display: block; margin: 0.5rem 0; }
+    button { margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Checkout</h1>
+  </header>
+  <main>
+    <fieldset id="ship-fields" disabled>
+      <legend>Shipping address</legend>
+      <label>Street <input type="text" name="street"></label>
+      <label>City <input type="text" name="city"></label>
+      <button id="ship-save">Save address</button>
+    </fieldset>
+
+    <label><input type="checkbox" id="unlock"> Ship to a different address</label>
+
+    <section>
+      <button id="place-order" disabled>Place order</button>
+      <label><input type="checkbox" id="tos"> I agree to the terms</label>
+    </section>
+
+    <button id="help-btn">Help</button>
+    <p id="status">Complete the checkout form.</p>
+  </main>
+  <script>
+    const shipFields = document.getElementById('ship-fields');
+    const unlock = document.getElementById('unlock');
+    const placeOrder = document.getElementById('place-order');
+    const tos = document.getElementById('tos');
+    const help = document.getElementById('help-btn');
+    const status = document.getElementById('status');
+
+    unlock.addEventListener('change', () => {
+      shipFields.disabled = !unlock.checked;
+      if (unlock.checked) status.textContent = 'Shipping fields unlocked.';
+    });
+    tos.addEventListener('change', () => {
+      placeOrder.disabled = !tos.checked;
+      if (tos.checked) status.textContent = 'Ready to order.';
+    });
+    placeOrder.addEventListener('click', () => {
+      status.textContent = 'Order placed!';
+    });
+    help.addEventListener('click', () => {
+      status.textContent = 'Help opened.';
+    });
+  </script>
+</body>
+</html>

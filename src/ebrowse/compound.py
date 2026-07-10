@@ -136,7 +136,7 @@ class CompoundMixin(ActionsMixin):
     async def _select_custom(self, element: Element, target: str, value: str) -> str:
         """Custom-dropdown machine: click trigger → diff → match option → click."""
         await self._ensure_browser()
-        begin_state = self._begin_action()
+        begin_state = await self._begin_action()
         steps: list[str] = [f'SELECT {target} ({element.desc.short_desc()}) = "{value}"']
 
         revealed = await self._open_and_reveal(element)
@@ -179,7 +179,7 @@ class CompoundMixin(ActionsMixin):
             raise CommandError(f"{sid} has no form controls — expand it to check", ExitCode.USAGE)
 
         await self._ensure_browser()
-        begin_state = self._begin_action()
+        begin_state = await self._begin_action()
         steps: list[str] = [f"FILL-FORM {sid} ({len(data)} fields)"]
         filled = 0
         for key, value in data.items():
@@ -313,7 +313,7 @@ class CompoundMixin(ActionsMixin):
         else:
             box = self._find_search_box(page_mem)
 
-        begin_state = self._begin_action()
+        begin_state = await self._begin_action()
         steps = [f'SEARCH "{query}"']
 
         if box:

@@ -99,7 +99,25 @@ accessibility tree.
 - Links: `[text (@ref)](→ /path)` — href path-only for same-origin, whole for external.
 - Inputs: `[label (@ref: "value")]` / `empty`, `, required` when set; checkboxes
   `[x]`/`[ ]`; native selects `[label (@ref) ▾ "US" of 24 options]` (options inlined
-  when ≤ 15).
+  when ≤ 15; the total is the REAL option count even when the inline list is
+  truncated at 50; `, multiple` marks `<select multiple>`, whose current
+  selections join as `"A, B"`).
+- **Inner scroll containers**: when a section holds a real scroll container
+  (overflow auto/scroll with hidden content), the expand header carries
+  `(inner scrollable panel: y=0 of 1104px — 'ebrowse scroll s3 down' scrolls
+  it)`. `scroll <sid|@ref> down|up` scrolls inside that container and reports
+  `container div#results scroll y=600/660` (` — at the bottom/top` at the
+  edges); newly mounted lazy/virtualized rows show in the action diff.
+- **Effective state**: disabled controls keep their refs and are marked —
+  `[Place order (@e9) disabled]`, `[Street (@e4: empty, disabled)]` — including
+  fieldset-inherited disabling; elements under `[inert]` are marked ` inert`.
+  Acting on a disabled/inert ref fails fast naming the state (exit 1).
+- **Candidates**: `[Save changes (@e4 ?)]` — the `?` inside the ref parens marks a
+  weak-evidence discovery (a real event listener found by the CDP sweep, an
+  explicit `tabindex`, or role-less ARIA state) rather than a proven control.
+  Candidates are expand-only: they never appear in outline element counts, and
+  their evidence never authorizes proxy activation (ElementState.candidate holds
+  the provenance: `listener` | `focusable` | `aria-state`).
 - Images: `![alt](@i3)` or `![≈caption](@i3)` (VLM caption, cached).
 - List/table sections paginate (default 20 items):
   `… 104 more items — expand s3 --cursor 20`. Tables render as markdown tables with
@@ -153,8 +171,14 @@ Sprite Stasis Ball added. [View cart (@e51)](→ /cart) [Checkout (@e52)](→ /c
   `→ dialog` (not `→ partial change`) and the line is tagged
   `+ s1 [dialog]: [Accept (@e6)], [Reject (@e7)]`, so a coalesced dialog carries
   the same signal as a standalone one.
+- Tracked element state in `~ @ref field:` lines: `value`, `checked` (native and
+  `aria-checked` on role checkbox/radio/switch), `expanded`, `disabled`,
+  `pressed` (`aria-pressed`), `selected` (`aria-selected`).
 - `no change detected` carries the honest caveat (may be a real no-op, or the effect
-  is outside the DOM / slower than the settle window).
+  is outside the DOM / slower than the settle window). Outcome evidence beyond the
+  DOM is reported as notes: `download started: "file.pdf"`, `the document reloaded
+  (same URL) — page state may have reset`, and — only on `no change detected` —
+  `URL fragment changed: now at …#anchor` or `scroll position moved y=A → B`.
 - Notes always surface: `note: native alert auto-accepted: "…"`, new-tab adoption.
 - Occluded clicks fail *before* acting:
   `blocked: @e42 is covered by <dialog "Cookie consent"> — interact with that first` (exit 1).
@@ -212,6 +236,23 @@ QUERY s4 filter="Cold Brew" — matched 2 of 24 items
   matched against each item's *plain text*, never the rendered markdown.
 - Item indices are the original list positions (consistent with `expand --cursor`).
 - Unknown `--cols` exit 2 listing the real column names.
+
+## Diagnose (`ebrowse diagnose <target>`)
+
+Read-only actionability report: a Playwright trial click (no dispatch; may
+scroll the target into view) plus the blocker-diagnosis classification.
+
+```
+DIAGNOSE @e5 (span "Buy plan A")
+actionability: BLOCKED — blocked: @e5 is covered by div#promo-banner "Summer
+sale! …" — dismiss or interact with @e7 (div "Summer sale! …") first
+```
+
+- Line 2 is `actionability: PASS — …` or `actionability: BLOCKED — <the same
+  message a blocked click would raise>`. A hit on label decoration reports PASS
+  (actions route via the associated label).
+- Optional `state:` line lists effective-state facts (disabled `<fieldset>`,
+  `pointer-events: none`, inert region, an open dialog elsewhere).
 
 ## Describe-screen (`ebrowse describe-screen [prompt]`)
 

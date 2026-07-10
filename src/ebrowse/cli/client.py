@@ -112,12 +112,16 @@ def _build_request(args: argparse.Namespace) -> Request | None:
         a = {"target": args.target, "text": args.text, "enter": args.enter}
     elif verb == "press":
         a = {"keys": args.keys}
-    elif verb in ("check", "uncheck"):
+    elif verb in ("check", "uncheck", "diagnose"):
         a = {"target": args.target}
     elif verb == "select":
-        a = {"target": args.target, "value": args.value}
+        a = {"target": args.target, "values": args.value}
+    elif verb == "hover":
+        a = {"target": args.target}
+    elif verb == "drag":
+        a = {"source": args.source, "target": args.to}
     elif verb == "scroll":
-        a = {"direction": args.direction, "pages": args.pages}
+        a = {"direction": args.direction, "pages": args.pages, "inner": args.inner}
     elif verb == "upload":
         a = {"target": args.target, "files": [str(Path(f).resolve()) for f in args.files]}
     elif verb == "eval":

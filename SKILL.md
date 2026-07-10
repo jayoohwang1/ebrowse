@@ -51,6 +51,15 @@ the DOM truth. The `◉` line appears only when a vision sidecar is running.
   site's header search box keeps its ref on every page. Act without re-reading.
 - If a ref stops resolving you get `stale ref @e12 … — run 'ebrowse outline'`
   (exit 2). Just re-outline and re-expand; never guess refs.
+- `disabled` / `inert` after a ref — `[Place order (@e9) disabled]` — means the
+  control exists but can't be used yet: something must enable it first (fill a
+  required field, close a modal). Clicking it fails fast telling you so; when
+  another action enables it, the diff shows `~ @e9 disabled: "true" → "false"`.
+- A `?` inside the ref parens — `[Save changes (@e4 ?)]` — marks a **candidate**:
+  a custom widget discovered from weak evidence (a real JS listener, `tabindex`,
+  or ARIA state) rather than proven control semantics. Click it like any ref,
+  but if nothing changes it may be decorative — don't keep retrying. Candidates
+  show only in expand, never in outline counts.
 - CSS selectors also work anywhere a ref does: `ebrowse click "#submit"`.
 
 ## Actions return diffs — read them, don't re-snapshot
@@ -82,14 +91,32 @@ Diff vocabulary:
 - `→ no change detected` — the action had no visible DOM effect. It may have
   been a real no-op or an animation slower than the settle window. Check
   `ebrowse outline` or a screenshot before retrying.
+- `note: clicked/checked via the associated label (…)` — the control's own
+  click point is covered by decoration inside its `<label>` (restyled
+  radios/checkboxes), so `click`/`check`/`uncheck` was routed through the
+  label — the browser-defined equivalent. The action succeeded normally
+  (`check`/`uncheck` verify the resulting state); nothing to do.
+- `note: pointer route blocked by …; activated via keyboard` — a non-modal
+  overlay covers a native control, so the click completed as trusted
+  focus + Enter/Space (what a keyboard user does; never used when a
+  dialog/inert modal guards the target). The action succeeded — but the
+  overlay is still on screen; deal with it if it also covers what you need
+  next.
 - `note: native alert auto-accepted: "…"` — `alert`/`beforeunload` carry no
   decision, so they're accepted automatically and reported; you never dismiss them.
   `confirm`/`prompt` are yours to decide (see `→ dialog opened` above).
 - `a native confirm dialog is blocking this tab …` (exit 1) — you tried a page
   verb while a dialog is pending. Resolve it with `ebrowse dialog accept|dismiss`,
   or `ebrowse tab <n>` to switch to an unblocked tab.
-- `blocked: @e42 is covered by <dialog "Cookie consent">` (exit 1) — an overlay
-  intercepts the click. Interact with the covering element first.
+- `blocked: @e42 is covered by …` (exit 1) — an overlay intercepts the click.
+  The message names the best next step it could verify:
+  `— dismiss or interact with @eN (…) first` (the cover is itself exposed: act
+  on that ref); `— a dialog is open (…); resolve it first` (use the dialog's
+  controls — run `ebrowse outline` if you haven't seen it); or
+  `…, which has no exposed ref (likely a new overlay)` (re-run
+  `ebrowse outline`; if nothing new appears, try `ebrowse press Escape` or
+  `ebrowse screenshot` to see what's on top). Follow the named step rather
+  than retrying the same click.
 - `blocked: a modal is open ("…") and is intercepting the click` (exit 1) — a
   modal is blocking the page even though it isn't visually over your target
   (native `showModal()` / focus-trap). Don't retry the same click — resolve or
@@ -105,10 +132,18 @@ expand <sid|@ref> [--cursor N] [--all]     lists/tables paginate; follow the
                                            "… N more items — expand s4 --cursor 20" hint
 click <t> [--double|--right|--new-tab]     t = @ref or CSS selector
 fill <t> <text>       clear + type          type <t> <text> [--enter]
+hover <t>             reveal hover menus (mouse stays; click revealed refs next)
+drag <src> <dst>      drag one element onto another (sortables, HTML5 dnd)
 press <keys>          e.g. Enter, Control+a, Escape
-check/uncheck <t>     select <t> <label>    native <select> AND custom dropdowns
-                                            (opens, matches option text, clicks)
-scroll down|up [--pages N] | scroll <sid|@ref>
+check/uncheck <t>     select <t> <label>…   native <select> (several labels for
+                                            <select multiple>) AND custom dropdowns
+scroll down|up [--pages N] | scroll <sid|@ref>          window / bring into view
+scroll <sid|@ref> down|up [--pages N]    scroll INSIDE the panel at/above the
+                                         target (virtualized lists, modal bodies);
+                                         expand marks such panels: "(inner
+                                         scrollable panel: … 'ebrowse scroll s3
+                                         down' scrolls it)"
+diagnose <t>          read-only: would a click land? names the blocker + recovery
 upload <t> <files>    eval <js>             get text|value|attr|html|title|url [t]
 fill-form <sid> --data '{"Field": "value", "Agree": true}'   many fields, one diff
 search <query> [--in @ref] [--pick <text>] [--no-submit]     find box, type, submit

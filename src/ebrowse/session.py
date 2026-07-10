@@ -130,6 +130,7 @@ class Session(CompoundMixin, ActionsMixin):
         # covering the target (native showModal top-layer / aria-modal focus trap);
         # surfaced as a hint only if that click then registers no change
         self._blocking_modal: str | None = None
+        self.nav_events = 0  # main-frame navigations (same-URL reload detection)
         # native confirm/prompt dialogs awaiting an agent decision, keyed by the
         # page they blocked (a dialog on a background tab must not block the active one)
         self._pending_dialogs: dict[Page, PendingDialog] = {}
@@ -191,6 +192,17 @@ class Session(CompoundMixin, ActionsMixin):
         page.set_default_timeout(10_000)
         # bind the page so a dialog is attributed to the tab it blocked
         page.on("dialog", lambda d, p=page: self._on_dialog(d, p))
+        # outcome evidence: a download has no DOM footprint, and a same-URL
+        # reload is invisible to URL comparison — record both for diff notes
+        page.on(
+            "download",
+            lambda d: self._notes.append(f'download started: "{d.suggested_filename}"'),
+        )
+        page.on("framenavigated", lambda fr, p=page: self._on_framenavigated(fr, p))
+
+    def _on_framenavigated(self, frame, page: Page) -> None:
+        if page is self._page and frame is page.main_frame:
+            self.nav_events += 1
 
     def _on_dialog(self, dialog: Dialog, page: Page) -> None:
         # `alert` and `beforeunload` carry no decision, so auto-accept them to

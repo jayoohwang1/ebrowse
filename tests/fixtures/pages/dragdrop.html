@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sortable tasks</title>
+  <style>
+    #tasks { max-width: 20rem; padding: 0; list-style: none; }
+    .task { margin: .4rem 0; padding: .6rem; border: 1px solid #888; cursor: grab; }
+    .task.dragging { opacity: .5; }
+  </style>
+</head>
+<body>
+  <header><h1>Sortable tasks</h1></header>
+  <main>
+    <ul id="tasks">
+      <li class="task" draggable="true" id="task-1">Task One</li>
+      <li class="task" draggable="true" id="task-2">Task Two</li>
+      <li class="task" draggable="true" id="task-3">Task Three</li>
+      <li class="task" draggable="true" id="task-4">Task Four</li>
+    </ul>
+    <p id="status">Ready.</p>
+  </main>
+  <script>
+    const tasks = document.querySelector('#tasks');
+    let dragged;
+    function updateStatus() {
+      const order = [...tasks.querySelectorAll('.task')].map(task => task.textContent);
+      document.querySelector('#status').textContent = 'Order: ' + order.join(', ') + '.';
+    }
+    tasks.addEventListener('dragstart', event => {
+      dragged = event.target.closest('.task');
+      dragged.classList.add('dragging');
+      event.dataTransfer.effectAllowed = 'move';
+    });
+    tasks.addEventListener('dragend', () => { if (dragged) dragged.classList.remove('dragging'); });
+    tasks.addEventListener('dragover', event => {
+      if (event.target.closest('.task')) event.preventDefault();
+    });
+    tasks.addEventListener('drop', event => {
+      event.preventDefault();
+      const target = event.target.closest('.task');
+      if (!dragged || !target || dragged === target) return;
+      const midpoint = target.getBoundingClientRect().top + target.offsetHeight / 2;
+      tasks.insertBefore(dragged, event.clientY < midpoint ? target : target.nextSibling);
+      updateStatus();
+    });
+  </script>
+</body>
+</html>

@@ -22,7 +22,7 @@ from ebrowse.cli.client import _autostart_daemon, _daemon_running, _send
 from ebrowse.daemon.protocol import Request
 
 _ACT_VERBS = [
-    "click", "fill", "type", "press", "check", "uncheck", "select",
+    "click", "fill", "type", "press", "check", "uncheck", "diagnose", "hover", "drag", "select",
     "scroll", "upload", "eval", "back", "forward", "reload",
     "fill-form", "search", "tabs", "tab", "dialog", "close",
 ]  # fmt: skip
@@ -77,10 +77,11 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "browse_act",
         "description": "Perform a browser action; returns a DIFF of what changed (never a "
-        "full snapshot). verb=click/fill/type/press/check/uncheck/select/scroll/upload/"
-        "eval/back/forward/reload/fill-form/search/tabs/tab/dialog/close. target is a @ref or "
-        "CSS selector. text for fill/type; value for select; keys for press; direction for "
-        "scroll; data (JSON object string) for fill-form; query/pick for search. When an "
+        "full snapshot). verb=click/fill/type/press/check/uncheck/diagnose/hover/drag/select/"
+        "scroll/upload/eval/back/forward/reload/fill-form/search/tabs/tab/dialog/close. "
+        "target is a @ref or CSS selector. text for fill/type; value for select; keys for "
+        "press; direction for scroll (or target + inner=down|up to scroll INSIDE a panel); "
+        "to for drag; data (JSON object string) for fill-form; query/pick for search. When an "
         "action opens a native confirm/prompt the page is blocked until you resolve it with "
         "verb=dialog, response=accept|dismiss|status (text = a prompt's answer).",
         "inputSchema": {
@@ -100,6 +101,16 @@ TOOLS: list[dict[str, Any]] = [
                 "pages": _INT,
                 "index": _INT,
                 "js": _STR,
+                "to": {**_STR, "description": "drag: destination @ref/CSS"},
+                "inner": {
+                    **_STR,
+                    "description": "scroll: down|up INSIDE the panel at/above target",
+                },
+                "values": {
+                    "type": "array",
+                    "items": _STR,
+                    "description": "select: several labels for <select multiple>",
+                },
                 "files": {"type": "array", "items": _STR},
             },
             "required": ["verb"],
@@ -221,12 +232,21 @@ def _act(args: dict[str, Any], session: str) -> tuple[bool, str]:
             payload["enter"] = args.get("enter", False)
     elif verb == "press":
         payload = {"keys": args.get("keys", "Enter")}
-    elif verb in ("check", "uncheck"):
+    elif verb in ("check", "uncheck", "diagnose", "hover"):
         payload = {"target": args.get("target")}
+    elif verb == "drag":
+        payload = {"source": args.get("target"), "target": args.get("to", "")}
     elif verb == "select":
-        payload = {"target": args.get("target"), "value": args.get("value", "")}
+        payload = {"target": args.get("target"),
+                   "values": args.get("values") or [args.get("value", "")]}  # fmt: skip
     elif verb == "scroll":
-        payload = {"direction": args.get("direction", "down"), "pages": args.get("pages", 1)}
+        payload = {
+            # nested scroll targets (sid/@ref) ride in `direction`; accept
+            # `target` too — it's what agents naturally pass with inner=
+            "direction": args.get("direction") or args.get("target") or "down",
+            "pages": args.get("pages", 1),
+            "inner": args.get("inner"),
+        }
     elif verb == "upload":
         payload = {"target": args.get("target"), "files": args.get("files", [])}
     elif verb == "eval":

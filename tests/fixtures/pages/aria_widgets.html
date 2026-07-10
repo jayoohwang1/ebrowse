@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Settings — ARIA Widgets</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; background: #f5f7fa; color: #24313d; }
+    header { background: #284b63; color: #fff; padding: 12px 24px; }
+    header a { color: #fff; }
+    main { max-width: 640px; margin: 0 auto; padding: 24px; }
+    section { margin: 16px 0; padding: 16px; border: 1px solid #d9e0e6; background: #fff; }
+    [role=checkbox], [role=switch], [role=radio] { cursor: pointer; margin: 8px 0; padding: 8px; }
+    [role=checkbox][aria-checked=true], [role=switch][aria-checked=true], [role=radio][aria-checked=true] { background: #dceff9; }
+    #promo-wrap { position: relative; width: 240px; }
+    #promo-check { border: 1px solid #789; min-height: 20px; }
+    #promo-icon { position: absolute; z-index: 2; left: 104px; top: 8px; pointer-events: auto; }
+    #status { color: #285b7b; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <header><a href="/">Acme Settings</a></header>
+  <main>
+    <h1>Settings</h1>
+    <section>
+      <h2>Preferences</h2>
+      <div id="tos-check" role="checkbox" tabindex="0" aria-checked="false">Accept the terms of service</div>
+      <div id="wifi-switch" role="switch" tabindex="0" aria-checked="true">Wi-Fi</div>
+    </section>
+    <section>
+      <h2>Plan</h2>
+      <div role="radiogroup" aria-label="Plan">
+        <div id="plan-basic" role="radio" tabindex="0" aria-checked="true">Basic</div>
+        <div id="plan-pro" role="radio" tabindex="0" aria-checked="false">Pro</div>
+        <div id="plan-max" role="radio" tabindex="0" aria-checked="false">Max</div>
+      </div>
+    </section>
+    <section>
+      <h2>Promotions</h2>
+      <div id="promo-wrap">
+        <div id="promo-check" role="checkbox" tabindex="0" aria-checked="false" aria-label="Email me promotions"></div>
+        <i id="promo-icon" aria-hidden="true">✉</i>
+      </div>
+    </section>
+    <p id="status">No settings have changed.</p>
+  </main>
+  <script>
+    const status = document.getElementById('status');
+    function toggle(widget, label) {
+      const on = widget.getAttribute('aria-checked') !== 'true';
+      widget.setAttribute('aria-checked', String(on));
+      status.textContent = label + ': ' + (on ? 'on.' : 'off.');
+      return on;
+    }
+    function wireToggle(id, label, words) {
+      const widget = document.getElementById(id);
+      const change = () => {
+        const on = toggle(widget, label);
+        if (words) status.textContent = label + ': ' + (on ? words[0] : words[1]) + '.';
+      };
+      widget.addEventListener('click', change);
+      widget.addEventListener('keydown', (event) => {
+        if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); change(); }
+      });
+    }
+    wireToggle('tos-check', 'Terms', ['accepted', 'not accepted']);
+    wireToggle('wifi-switch', 'Wi-Fi');
+    const radios = [...document.querySelectorAll('[role=radio]')];
+    function selectPlan(radio) {
+      radios.forEach((item) => item.setAttribute('aria-checked', String(item === radio)));
+      status.textContent = 'Plan: ' + radio.textContent + '.';
+    }
+    radios.forEach((radio) => {
+      radio.addEventListener('click', () => selectPlan(radio));
+      radio.addEventListener('keydown', (event) => {
+        if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); selectPlan(radio); }
+      });
+    });
+    const promo = document.getElementById('promo-check');
+    function togglePromo() { toggle(promo, 'Promotions'); }
+    document.getElementById('promo-wrap').addEventListener('click', togglePromo);
+    promo.addEventListener('keydown', (event) => {
+      if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); togglePromo(); }
+    });
+  </script>
+</body>
+</html>

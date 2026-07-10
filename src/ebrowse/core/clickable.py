@@ -51,6 +51,29 @@ CLICKABLE_ROLES = [
 
 LISTENER_ATTRS = ["onclick", "onmousedown", "onmouseup", "onkeydown", "onkeyup", "jsaction"]
 
+# ARIA state attrs that imply interactivity even without a role (custom
+# framework widgets commonly carry state but no role). Candidate evidence only.
+CANDIDATE_ARIA_ATTRS = [
+    "aria-pressed",
+    "aria-checked",
+    "aria-selected",
+    "aria-expanded",
+    "aria-haspopup",
+]
+
+# Pointer-activation listener types counted by the CDP getEventListeners sweep
+# (keyboard-only listeners are unreachable without focus, so keydown alone
+# does not make a click candidate — tabindex covers that case).
+CANDIDATE_LISTENER_TYPES = [
+    "click",
+    "dblclick",
+    "mousedown",
+    "mouseup",
+    "pointerdown",
+    "pointerup",
+    "touchstart",
+]
+
 SKIP_TAGS = [
     "script",
     "style",
@@ -120,16 +143,45 @@ def render_js_template(js_source: str) -> str:
         .replace("__CLICKABLE_ROLES__", json.dumps(CLICKABLE_ROLES))
         .replace("__LISTENER_ATTRS__", json.dumps(LISTENER_ATTRS))
         .replace("__SKIP_TAGS__", json.dumps(SKIP_TAGS))
+        .replace("__CANDIDATE_ARIA_ATTRS__", json.dumps(CANDIDATE_ARIA_ATTRS))
+        .replace("__CANDIDATE_LISTENER_TYPES__", json.dumps(CANDIDATE_LISTENER_TYPES))
     )
 
 
+_STRONG_SIGNALS = ("tg", "rl", "ls", "cp")
+
+
 def is_clickable(node: DomNode) -> bool:
-    """Final predicate over in-page signals. Gate: rendered + enabled."""
-    if not node.signals:
-        return False
-    if node.attrs.get("dis"):
+    """Final predicate over in-page signals. Gate: rendered.
+    Only STRONG signals qualify — weak candidate signals (el/tb/as) are
+    handled by candidate_evidence() and never drive default behavior.
+    DISABLED controls are still clickable-class (they get refs): an agent
+    must be able to see a grayed-out submit to reason about enabling it —
+    the action layer refuses fast with the disabled state named."""
+    if not any(node.signals.get(s) for s in _STRONG_SIGNALS):
         return False
     return node.bbox_area() > 0
+
+
+def candidate_evidence(node: DomNode) -> str | None:
+    """Weak-evidence interactivity for expand-only candidate refs: a real
+    pointer listener (CDP sweep, signal `el`), an explicit tabindex (`tb`),
+    or role-less ARIA state (`as`). Strong-signal nodes are NOT candidates —
+    they are ordinary clickables. Same gate as is_clickable: rendered+enabled.
+    Evidence label doubles as provenance in ElementState.candidate."""
+    if is_clickable(node):
+        return None
+    if node.attrs.get("dis") or node.bbox_area() <= 0:
+        return None
+    if node.signals.get("el"):
+        return "listener"
+    if node.signals.get("tb"):
+        return "focusable"
+    if node.signals.get("as"):
+        return "aria-state"
+    if node.signals.get("dg"):
+        return "draggable"
+    return None
 
 
 def is_form_control(node: DomNode) -> bool:

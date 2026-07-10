@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Hover menus</title>
+  <style>
+    nav ul { display: flex; gap: 1rem; list-style: none; padding: 0; }
+    .has-menu { position: relative; }
+    .menu { display: none; position: absolute; padding: .5rem; background: white; }
+    .has-menu:hover .menu { display: block; }
+    #account-wrapper { display: inline-block; position: relative; }
+    #account-menu { display: none; position: absolute; padding: .5rem; background: white; }
+  </style>
+</head>
+<body>
+  <header>
+    <nav aria-label="Main navigation">
+      <ul>
+        <li><a href="#">Home</a></li>
+        <li class="has-menu">
+          <a href="#">Products</a>
+          <ul class="menu">
+            <li><a id="coffee-link" href="#">Coffee makers</a></li>
+            <li><a href="#">Grinders</a></li>
+            <li><a href="#">Accessories</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+    <div id="account-wrapper">
+      <button id="account-btn">Account</button>
+      <div id="account-menu"><button id="logout-btn">Log out</button></div>
+    </div>
+  </header>
+  <main>
+    <h1>Hover menus</h1>
+    <p id="status">Ready.</p>
+  </main>
+  <script>
+    const accountWrapper = document.querySelector('#account-wrapper');
+    const accountMenu = document.querySelector('#account-menu');
+    document.querySelector('#account-btn').addEventListener('mouseenter', () => {
+      accountMenu.style.display = 'block';
+    });
+    accountWrapper.addEventListener('mouseleave', () => { accountMenu.style.display = 'none'; });
+    document.querySelector('#coffee-link').addEventListener('click', event => {
+      event.preventDefault();
+      document.querySelector('#status').textContent = 'Navigated: Coffee makers.';
+    });
+    document.querySelector('#logout-btn').addEventListener('click', () => {
+      document.querySelector('#status').textContent = 'Logged out.';
+    });
+  </script>
+</body>
+</html>
