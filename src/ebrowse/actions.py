@@ -311,6 +311,21 @@ class ActionsMixin:
             )
         return None
 
+    async def _arbitrate_cover(self, loc, target: str, cover: str) -> None:
+        """A one-point hit-test mismatch is too weak for a hard refusal; let
+        Playwright's actionability engine (scroll + stability + receives-events,
+        with retries) arbitrate via a trial click. Sustained interception →
+        blocked, with the failure diagnosis naming the recovery step."""
+        try:
+            await loc.click(trial=True, timeout=_TRIAL_TIMEOUT_MS)
+        except Exception as e:
+            err = await self._blocked_error(loc, target)
+            raise err or CommandError(
+                f"blocked: {target} is covered by {cover} — interact "
+                "with that first (run 'ebrowse outline' to see it)",
+                ExitCode.ACTION_FAILED,
+            ) from e
+
     async def _click_via_label(self, loc) -> bool:
         """Click a form control's associated <label> instead of the control
         itself (browser semantics forward label activation to the control).
@@ -442,18 +457,7 @@ class ActionsMixin:
                     )
                     return
             elif info.get("covering"):
-                # one-point mismatch is too weak for a hard refusal; let
-                # Playwright's actionability engine (scroll + stability +
-                # receives-events, with retries) arbitrate via a trial click
-                try:
-                    await loc.click(trial=True, timeout=_TRIAL_TIMEOUT_MS)
-                except Exception as e:
-                    err = await self._blocked_error(loc, target)
-                    raise err or CommandError(
-                        f"blocked: {target} is covered by {info['covering']} — interact "
-                        "with that first (run 'ebrowse outline' to see it)",
-                        ExitCode.ACTION_FAILED,
-                    ) from e
+                await self._arbitrate_cover(loc, target, info["covering"])
             kwargs: dict = {"timeout": _ACTION_TIMEOUT_MS}
             if right:
                 kwargs["button"] = "right"
@@ -494,8 +498,37 @@ class ActionsMixin:
 
     async def verb_set_checked(self, target: str, checked: bool) -> str:
         loc, desc = await self._locator_for(target)
+        want = "checked" if checked else "unchecked"
 
         async def do() -> None:
+            with contextlib.suppress(Exception):
+                await loc.scroll_into_view_if_needed(timeout=2000)
+            info = await self._check_occlusion(loc, target)
+            if info.get("coverInLabel"):
+                # restyled checkbox/radio: the label is the click surface. Label
+                # activation TOGGLES, so only click when the state must change,
+                # and verify the postcondition (set_checked can't — it would
+                # aim at the covered input).
+                try:
+                    if await loc.is_checked(timeout=2000) == checked:
+                        return  # already in the desired state; diff says no change
+                except Exception:
+                    pass  # state unreadable; fall through to the normal path
+                else:
+                    if await self._click_via_label(loc):
+                        if await loc.is_checked(timeout=2000) == checked:
+                            self._notes.append(
+                                f"{want} via the associated label (the control's visible surface)"
+                            )
+                            return
+                        raise CommandError(
+                            f"could not set {target} to {want}: the label click did not "
+                            "change its state — the control may be custom-wired; run "
+                            "'ebrowse outline' and check the diff",
+                            ExitCode.ACTION_FAILED,
+                        )
+            elif info.get("covering"):
+                await self._arbitrate_cover(loc, target, info["covering"])
             await loc.set_checked(checked, timeout=_ACTION_TIMEOUT_MS)
 
         return await self._act(

@@ -59,6 +59,16 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Changed
 
+- **`check`/`uncheck` get the same cover handling as `click`.** The occlusion
+  preflight, label routing, and trial-click arbitration now also protect
+  `set_checked`: a restyled checkbox/radio whose input center is covered by
+  label decoration is toggled via its label — only when the state must change
+  (label clicks toggle), with the resulting state verified — instead of timing
+  out after 8s with a misleading error. The failure diagnosis (diagnose.js)
+  also learned label semantics, so a control's own label decoration is never
+  misreported as "no exposed ref (likely a new overlay)" on any verb.
+  Compound verbs (`search`, custom `select`, `fill-form`) are intentionally
+  untouched pending their rework.
 - **Generic covers are arbitrated by Playwright, not the one-point hit test.**
   Only a cover inside a dialog still fails the click pre-emptively. Any other
   center-point mismatch (partial overlays, sticky headers, transient layers,

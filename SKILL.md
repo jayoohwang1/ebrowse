@@ -87,10 +87,11 @@ Diff vocabulary:
 - `→ no change detected` — the action had no visible DOM effect. It may have
   been a real no-op or an animation slower than the settle window. Check
   `ebrowse outline` or a screenshot before retrying.
-- `note: clicked via the associated label (…)` — the control's own click point
-  is covered by decoration inside its `<label>` (restyled radios/checkboxes),
-  so the click was routed through the label — the browser-defined equivalent.
-  The action succeeded normally; nothing to do.
+- `note: clicked/checked via the associated label (…)` — the control's own
+  click point is covered by decoration inside its `<label>` (restyled
+  radios/checkboxes), so `click`/`check`/`uncheck` was routed through the
+  label — the browser-defined equivalent. The action succeeded normally
+  (`check`/`uncheck` verify the resulting state); nothing to do.
 - `note: native alert auto-accepted: "…"` — `alert`/`beforeunload` carry no
   decision, so they're accepted automatically and reported; you never dismiss them.
   `confirm`/`prompt` are yours to decide (see `→ dialog opened` above).

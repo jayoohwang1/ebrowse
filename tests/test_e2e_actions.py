@@ -274,6 +274,24 @@ def test_fancy_external_label_checkbox(server, env):
     assert re.search(r'checked: "false" → "true"', r.stdout)
 
 
+def test_check_uncheck_via_label_on_fancy_checkbox(server, env):
+    # check/uncheck on a restyled checkbox whose input center is covered by
+    # label decoration: routed through the label with a verified postcondition
+    ebrowse(env, "open", server.url("styled_controls.html"))
+    news = ref_for(env, "s2", r"Subscribe to the deals")
+    r = ebrowse(env, "check", news)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'checked: "false" → "true"', r.stdout)
+    assert "note: checked via the associated label" in r.stdout
+    # already-checked check is a clean no-op, not a toggle
+    r = ebrowse(env, "check", news)
+    assert r.returncode == 0, r.stderr
+    assert "no change detected" in r.stdout
+    r = ebrowse(env, "uncheck", news)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r'checked: "true" → "false"', r.stdout)
+
+
 def test_spa_mutation_and_noop(server, env):
     ebrowse(env, "open", server.url("spa.html"))
     inp = ref_for(env, "s2", r"New task title")

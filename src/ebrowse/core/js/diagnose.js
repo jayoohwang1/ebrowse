@@ -29,6 +29,16 @@
     const r = n.getBoundingClientRect();
     return r.width > 0 && r.height > 0 && getComputedStyle(n).visibility !== "hidden";
   };
+  // browser-defined label activation: decoration inside an associated <label>
+  // is a click surface for the control, never a blocker (mirrors the preflight
+  // in actions.py — without this, a restyled control's own icon would be
+  // misreported as "no exposed ref (likely a new overlay)")
+  const inLabel = (t) => {
+    const labs = el.labels ? Array.from(el.labels) : [];
+    const wrap = el.closest ? el.closest("label") : null;
+    if (wrap && !labs.includes(wrap)) labs.push(wrap);
+    return labs.some((l) => within(l, t));
+  };
 
   const out = {
     cover: null,
@@ -45,7 +55,7 @@
     cy = r.top + r.height / 2;
   if (cx >= 0 && cy >= 0 && cx <= innerWidth && cy <= innerHeight) {
     const t = document.elementFromPoint(cx, cy);
-    if (t && !within(el, t) && !within(t, el)) {
+    if (t && !within(el, t) && !within(t, el) && !inLabel(t)) {
       out.cover = name(t);
       const dlg = t.closest("dialog,[role=dialog],[role=alertdialog]");
       if (dlg) out.coverDialog = name(dlg);
