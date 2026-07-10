@@ -101,6 +101,11 @@ TOOLS: list[dict[str, Any]] = [
                 "index": _INT,
                 "js": _STR,
                 "to": {**_STR, "description": "drag: destination @ref/CSS"},
+                "values": {
+                    "type": "array",
+                    "items": _STR,
+                    "description": "select: several labels for <select multiple>",
+                },
                 "files": {"type": "array", "items": _STR},
             },
             "required": ["verb"],
@@ -227,7 +232,8 @@ def _act(args: dict[str, Any], session: str) -> tuple[bool, str]:
     elif verb == "drag":
         payload = {"source": args.get("target"), "target": args.get("to", "")}
     elif verb == "select":
-        payload = {"target": args.get("target"), "values": [args.get("value", "")]}
+        payload = {"target": args.get("target"),
+                   "values": args.get("values") or [args.get("value", "")]}  # fmt: skip
     elif verb == "scroll":
         payload = {
             "direction": args.get("direction", "down"),
