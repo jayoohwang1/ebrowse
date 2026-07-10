@@ -6,6 +6,17 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ## [Unreleased]
 
+### Added
+
+- **Browse every option of a large `<select>`.** `expand @ref` on a native
+  select lists its options, 50 per page with the usual cursor hints
+  (`… 300 more options — expand @e5 --cursor 50`; `--all` dumps the captured
+  list). The capture cap rose 50 → 350 options, covering country pickers and
+  country+state combos; only timezone-class monsters truncate, and there the
+  tail is honestly absent with the escape hatch named (`'ebrowse select @e5
+  "<label>"' still matches any option by its text` — selection always matches
+  the live DOM). Closes #10.
+
 ### Fixed
 
 - **Refs verified against their descriptor before acting** (#12). When a ref

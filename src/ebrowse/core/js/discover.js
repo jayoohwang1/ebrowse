@@ -147,7 +147,10 @@
       const opts = [];
       for (const o of el.options) {
         opts.push(collapse(o.text).slice(0, 80));
-        if (opts.length >= 50) break;
+        // 350 covers plain country pickers (~250 with territories, e.g. UPS 247);
+        // timezone lists and variant-heavy country lists (USPS: 495) truncate,
+        // with optn keeping the total honest and select matching the live DOM
+        if (opts.length >= 350) break;
       }
       a.opt = opts;
       // honest total when the list is truncated ("of 80 options", not "of 50")
