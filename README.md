@@ -144,6 +144,7 @@ s4 list  32 items, 32 links  ~1.0kt ≈ Espresso gear products with prices and r
 - [AGENTS.md](AGENTS.md) — contributor guide (principles, layout, conventions).
 - [docs/architecture.md](docs/architecture.md) — components, flows, accepted tradeoffs.
 - [docs/output-contracts.md](docs/output-contracts.md) — the frozen output formats.
+- [docs/interaction-reliability-assessment.md](docs/interaction-reliability-assessment.md) — exploratory assessment of interaction edge cases and design tradeoffs.
 - [docs/configuration.md](docs/configuration.md) — every config key.
 - [docs/adr/](docs/adr/README.md) — records of non-obvious design decisions.
 - [CHANGELOG.md](CHANGELOG.md) — what shipped, per release.
