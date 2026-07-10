@@ -904,7 +904,7 @@ class Session(CompoundMixin, ActionsMixin):
         _, element = found
         from ebrowse.core.locate import resolve
 
-        return await resolve(self.page, element.desc)
+        return await resolve(self.page, element.desc, ref=element.ref)
 
 
 def _first_line(e: Exception) -> str:

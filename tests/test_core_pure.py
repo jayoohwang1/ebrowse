@@ -320,3 +320,42 @@ def test_registry_nth_disambiguation():
     assert registry.assign(descs2) == ["@e1", "@e2"]
     # one disappears: survivor keeps first slot (strict order-based matching)
     assert registry.assign([ElementDesc(tag="a", href="/same")]) == ["@e1"]
+
+
+def test_identity_mismatch_rules():
+    from ebrowse.core.locate import identity_mismatch
+    from ebrowse.model import ElementDesc
+
+    btn = ElementDesc(tag="button", role="button", text_head="Remove", id="rm-3")
+    ok = {"tag": "button", "id": "rm-3", "testid": None, "text": "Remove"}
+    assert identity_mismatch(btn, ok) is None
+    # strong facts are strict: tag, and id/testid when the descriptor has them
+    assert identity_mismatch(btn, {**ok, "tag": "a"})
+    assert identity_mismatch(btn, {**ok, "id": "rm-0"})
+    assert identity_mismatch(btn, {**ok, "id": None})
+    tid = ElementDesc(tag="button", text_head="Remove", testid="cart-rm")
+    assert identity_mismatch(tid, {"tag": "button", "testid": "other", "text": "Remove"})
+    # descriptor without id/testid doesn't care what the live element carries
+    anon = ElementDesc(tag="button", role="button", text_head="Remove")
+    assert identity_mismatch(anon, ok) is None
+    # text: lenient to truncation/extension, whitespace, and case...
+    long = ElementDesc(tag="a", text_head="Read the full story about the thing"[:20])
+    assert (
+        identity_mismatch(long, {"tag": "a", "text": "Read the full story about the thing"}) is None
+    )
+    assert identity_mismatch(anon, {"tag": "button", "text": "  REMOVE\nitem "}) is None
+    # ...and to a live element we can't read text from
+    assert identity_mismatch(anon, {"tag": "button", "text": ""}) is None
+    # ...but clearly different text means a different sibling -> refuse
+    r = identity_mismatch(
+        ElementDesc(tag="button", text_head="Dismiss notice B"),
+        {"tag": "button", "text": "Dismiss notice A"},
+    )
+    assert r and "text" in r
+    # in doubt, refuse: a full in-place relabel also mismatches (ADR 0003)
+    assert identity_mismatch(
+        ElementDesc(tag="button", text_head="Add to cart"), {"tag": "button", "text": "Added"}
+    )
+    # form controls: rendered text is state, not identity
+    sel = ElementDesc(tag="select", text_head="Red Green Blue")
+    assert identity_mismatch(sel, {"tag": "select", "text": "Green"}) is None
