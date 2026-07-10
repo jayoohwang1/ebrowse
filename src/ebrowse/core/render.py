@@ -223,6 +223,38 @@ def _element_md(node: DomNode) -> str:
     return f"[{_clip(text, 80)} ({ref}){state}]"
 
 
+_SELECT_OPTIONS_PAGE = 50
+
+
+def render_select_options(node: DomNode, cursor: int = 0, show_all: bool = False) -> str:
+    """Paginated option list of ONE captured <select> (expand @ref on a select).
+    Same pagination vocabulary as list sections; past the capture cap the tail
+    is honestly absent but `select` still matches any option by live label."""
+    a = node.attrs
+    label = a.get("nm") or "select"
+    opts = a.get("opt") or []
+    total = a.get("optn") or len(opts)
+    multi = ", multiple" if a.get("mul") else ""
+    sel = a.get("sel", "")
+    lines = [f'SELECT {label} ({node.ref}) ▾ "{sel}" — {total} options{multi}']
+    window = opts if show_all else opts[cursor : cursor + _SELECT_OPTIONS_PAGE]
+    if not show_all and cursor:
+        lines.append(f"(options {cursor + 1}–{min(cursor + len(window), len(opts))} of {total})")
+    for i, opt in enumerate(window, start=cursor + 1):
+        lines.append(f"{i}. {opt}")
+    shown_end = len(opts) if show_all else min(cursor + len(window), len(opts))
+    if shown_end < len(opts):
+        lines.append(
+            f"… {len(opts) - shown_end} more options — expand {node.ref} --cursor {shown_end}"
+        )
+    elif len(opts) < total:
+        lines.append(
+            f"(options beyond {len(opts)} were not captured — "
+            f"'ebrowse select {node.ref} \"<label>\"' still matches any option by its text)"
+        )
+    return "\n".join(lines)
+
+
 def _clip(s: str | None, n: int) -> str:
     s = (s or "").strip()
     return s if len(s) <= n else s[: n - 1].rstrip() + "…"

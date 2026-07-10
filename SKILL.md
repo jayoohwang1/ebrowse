@@ -129,7 +129,9 @@ open <url>            navigate (alias goto); back / forward / reload  → landin
 outline [--no-summaries|--no-glance|--refresh]   read the page (table of contents)
 describe-screen [prompt]                   ask the local vision model about the screen
 expand <sid|@ref> [--cursor N] [--all]     lists/tables paginate; follow the
-                                           "… N more items — expand s4 --cursor 20" hint
+                                           "… N more items — expand s4 --cursor 20" hint;
+                                           on a <select> ref: pages through ITS options
+                                           ("… 300 more options — expand @e5 --cursor 50")
 click <t> [--double|--right|--new-tab]     t = @ref or CSS selector
 fill <t> <text>       clear + type          type <t> <text> [--enter]
 hover <t>             reveal hover menus (mouse stays; click revealed refs next)

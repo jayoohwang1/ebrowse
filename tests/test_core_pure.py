@@ -293,6 +293,42 @@ def test_candidate_evidence_ladder():
     assert candidate_evidence(mk({})) is None
 
 
+def _select_node(n_opts: int, total: int | None = None, multi: bool = False):
+    from ebrowse.core.snapshot import DomNode
+
+    attrs = {"nm": "Country", "opt": [f"Opt {i}" for i in range(1, n_opts + 1)], "sel": "Opt 1"}
+    if total:
+        attrs["optn"] = total
+    if multi:
+        attrs["mul"] = 1
+    node = DomNode(tag="select", rect=(0, 0, 200, 30), attrs=attrs)
+    node.ref = "@e5"
+    return node
+
+
+def test_render_select_options_pagination():
+    out = render.render_select_options(_select_node(120))
+    assert out.startswith('SELECT Country (@e5) ▾ "Opt 1" — 120 options')
+    assert "1. Opt 1" in out and "50. Opt 50" in out and "51. Opt 51" not in out
+    assert "… 70 more options — expand @e5 --cursor 50" in out
+    out = render.render_select_options(_select_node(120), cursor=100)
+    assert "(options 101–120 of 120)" in out
+    assert "120. Opt 120" in out and "more options" not in out
+    out = render.render_select_options(_select_node(120), show_all=True)
+    assert "120. Opt 120" in out and "more options" not in out
+
+
+def test_render_select_options_truncated_capture_and_multiple():
+    # tail past the capture cap: honestly absent, live-match escape hatch named
+    out = render.render_select_options(_select_node(350, total=400), cursor=300)
+    assert "— 400 options" in out
+    assert "(options 301–350 of 400)" in out
+    assert "options beyond 350 were not captured" in out
+    out = render.render_select_options(_select_node(8, multi=True))
+    assert "— 8 options, multiple" in out
+    assert "8. Opt 8" in out and "not captured" not in out
+
+
 def test_normalize_class_strips_state():
     assert normalize_class("btn btn-primary is-active css-1x2y3z open") == "btn btn-primary"
     assert normalize_class("menu selected hover") == "menu"
