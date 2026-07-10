@@ -6,6 +6,18 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ## [Unreleased]
 
+### Changed
+
+- **Diff new-text extraction: status messages no longer lose to bulk content**
+  (#11). `added_text()` now ranks short fragments (≤ 100 chars — status
+  messages, validation errors) ahead of bulk insertions, caps each fragment so
+  one long insertion can't consume the budget, elides over-cap fragments as
+  `start … end` instead of a bare prefix, pads replaced words with one word of
+  context per side (`20` → `30` quotes as `Showing 30 results.`), and raises
+  the overall budget from 160 to 500 chars. Sections the agent has `expand`ed
+  on the current page get an 8000-char budget — verbose text diffs where the
+  agent is actively reading.
+
 ### Added
 
 - **Browse every option of a large `<select>`.** `expand @ref` on a native

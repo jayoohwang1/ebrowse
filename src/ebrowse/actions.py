@@ -84,6 +84,7 @@ class ActionsMixin(InteractionMixin):
         async def _observe_page(self) -> None: ...
         async def _nav_landing(self, action_line: str) -> str: ...
         def _no_baseline_landing(self, action_line: str) -> str: ...
+        def _expanded_now(self) -> set[str]: ...
         async def _ensure_browser(self) -> None: ...
         def _require_page_mem(self) -> PageMem: ...
         def _get_section(self, sid: str) -> Section: ...
@@ -136,8 +137,10 @@ class ActionsMixin(InteractionMixin):
         return await resolve(self.page, element.desc, ref=element.ref), desc
 
     def _section_texts(self) -> dict[str, str]:
+        # per-node cap must be able to carry diff.EXPANDED_TEXT_BUDGET worth of
+        # text, or a single-node section could never fill the expanded quote budget
         return {
-            sid: " ".join(n.subtree_text(cap=4000) for n in raw.all_nodes())
+            sid: " ".join(n.subtree_text(cap=8000) for n in raw.all_nodes())
             for sid, raw in self.raw_by_sid.items()
         }
 
@@ -188,7 +191,7 @@ class ActionsMixin(InteractionMixin):
         if prev is None:
             # acted (via CSS) before any outline: no baseline to diff against
             return self._no_baseline_landing(action_line)
-        diff = diff_pages(prev, new, begin_state.texts, self._section_texts())
+        diff = diff_pages(prev, new, begin_state.texts, self._section_texts(), self._expanded_now())
         diff.notes = list(self._notes)
         # Outcome evidence the DOM diff can't see: a same-URL reload (form
         # resubmit, meta refresh) and — only when nothing else changed —
