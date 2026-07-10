@@ -33,6 +33,18 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- **Candidate discovery: weak-evidence custom widgets get expand-only refs.**
+  Elements with no strong clickable signal but real interactivity evidence — a
+  live pointer listener (found via one CDP `getEventListeners` sweep, chromium
+  main frame, single round trip), an explicit `tabindex`, or role-less ARIA
+  state — now become `?`-marked refs in `expand`: `[Save changes (@e4 ?)]`.
+  ElementState gains an optional `candidate` provenance field
+  (`listener`/`focusable`/`aria-state`). Outline counts, default outline
+  output, and action policy are unchanged: candidates are excluded from
+  counts, and candidate evidence never authorizes proxy activation. A
+  candidate containing (or inside) a strong element is suppressed — the
+  native control is the real target. Zero-signal decorative nodes still get
+  no ref. Fixture: `custom_widgets.html`.
 - **Failure-only blocker diagnostics.** When a click is refused (trial-click
   failure, or Playwright "intercepts pointer events" on any pointer verb), one
   diagnostic probe (`core/js/diagnose.js`, exposed via

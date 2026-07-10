@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 from ebrowse.config import ObserveConfig
 from ebrowse.core import render
 from ebrowse.core.clickable import (
+    candidate_evidence,
     implicit_role,
     is_clickable,
     is_container_widget,
@@ -76,7 +77,12 @@ def _state_for(node: DomNode) -> ElementState:
         disabled=bool(a.get("dis")),
         expanded=expanded,
         options=a.get("opt"),
+        candidate=node.candidate,
     )
+
+
+def _contains_clickable(node: DomNode) -> bool:
+    return any(is_clickable(d) for d in node.walk() if d is not node)
 
 
 def extract_element_nodes(raw: RawSection) -> list[DomNode]:
@@ -84,6 +90,12 @@ def extract_element_nodes(raw: RawSection) -> list[DomNode]:
 
     A descendant of an <a>/<button> is not its own element unless it is a form
     control (adapted from WebChallenger contained_in logic).
+
+    Weak-evidence CANDIDATES (clickable.candidate_evidence: real listener,
+    tabindex, role-less ARIA state) are also extracted, annotated via
+    node.candidate, but suppressed when they contain or sit inside a strong
+    clickable — the strong element is the real target and duplicate refs are
+    the main cost of recall (e.g. a tabindex wrapper around native buttons).
     """
     out: list[DomNode] = []
 
@@ -97,6 +109,11 @@ def extract_element_nodes(raw: RawSection) -> list[DomNode]:
                 inside_widget = True
         elif node.tag in ("a", "button") and not inside_widget:
             inside_widget = clickable
+        elif not inside_widget:
+            evidence = candidate_evidence(node)
+            if evidence and not _contains_clickable(node):
+                node.candidate = evidence
+                out.append(node)
         for c in node.children:
             rec(c, inside_widget)
 

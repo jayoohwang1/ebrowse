@@ -120,6 +120,10 @@ class ElementState:
     disabled: bool = False
     expanded: bool | None = None  # aria-expanded
     options: list[str] | None = None  # native <select> only
+    # weak-evidence discovery provenance ("listener" | "focusable" |
+    # "aria-state"); None = strong signal. Candidates render only in expand
+    # (marked '?') and are excluded from outline counts.
+    candidate: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -168,9 +172,12 @@ class Section:
     cross_origin: bool = False  # iframe sections we cannot enter
 
     def counts_desc(self) -> str:
-        """Deterministic element-count phrase for outline lines."""
+        """Deterministic element-count phrase for outline lines. Candidates
+        (weak-evidence discoveries) are expand-only detail, not outline noise."""
         counts: dict[str, int] = {}
         for el in self.elements:
+            if el.state.candidate:
+                continue
             k = _count_bucket(el.desc)
             counts[k] = counts.get(k, 0) + 1
 

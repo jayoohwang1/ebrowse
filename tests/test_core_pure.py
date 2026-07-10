@@ -22,7 +22,10 @@ from ebrowse.core.snapshot import DomSnapshot
 
 SNAPSHOT_DIR = Path(__file__).parent / "fixtures" / "domsnapshots"
 GOLDEN_DIR = Path(__file__).parent / "golden"
-PAGES = ["article", "form", "list", "table", "dropdown", "spa", "dialogs", "iframe", "huge"]
+PAGES = [
+    "article", "form", "list", "table", "dropdown", "spa", "dialogs", "iframe", "huge",
+    "custom_widgets",
+]  # fmt: skip
 
 
 def load_snapshot(name: str) -> DomSnapshot:
@@ -64,12 +67,12 @@ def test_build_invariants(name: str):
             assert e.ref not in seen_refs, f"duplicate ref {e.ref}"
             seen_refs.add(e.ref)
 
-    # every clickable node with area ends up as exactly one element
+    # every clickable/candidate node with area ends up as exactly one element
     total_clickable = 0
     for sid, raw in raw_by_sid.items():
         del sid
         for n in raw.iter_walk():
-            if is_clickable(n) and n.ref:
+            if (is_clickable(n) or n.candidate) and n.ref:
                 total_clickable += 1
     assert total_clickable == len(seen_refs)
 
@@ -172,6 +175,32 @@ def test_table_items_counted():
     assert tables and tables[0].item_count == 25
 
 
+def test_candidate_discovery_semantics():
+    """Weak-evidence candidates: exposed with provenance in expand, excluded
+    from outline counts, suppressed around strong elements, decoys dropped."""
+    page, raw_by_sid = build("custom_widgets")
+    s2 = page.section("s2")
+    assert s2 is not None
+    # every custom widget on this page has a real listener, and "listener" is
+    # the top of the evidence ladder, so all candidates carry that provenance
+    by_id = {e.desc.id: e for e in s2.elements if e.state.candidate}
+    assert set(by_id) == {"save-action", "plan-card", "dark-toggle", "notif-expander"}
+    assert all(e.state.candidate == "listener" for e in by_id.values())
+    texts = {e.desc.text_head for e in s2.elements}
+    assert any("Save changes" in t for t in texts)
+    # decoy with zero signals never becomes an element
+    assert not any(t == "Settings saved automatically" for t in texts)
+    # the tabindex wrapper around native buttons is suppressed; buttons stay
+    strong = [e for e in s2.elements if not e.state.candidate]
+    assert {e.desc.text_head for e in strong} == {"−", "+"}
+    # outline counts ignore candidates entirely
+    assert s2.counts_desc() == "2 buttons"
+    # expand renders the '?' provenance marker, outline never does
+    md = render.render_section_markdown(s2, raw_by_sid["s2"], ObserveConfig(), cursor=0)
+    assert "(@e4 ?)" in md
+    assert "?" not in render.render_outline(page)
+
+
 def test_section_fingerprints_stable_and_distinct():
     page1, _ = build("article")
     page2, _ = build("article")
@@ -222,7 +251,7 @@ def test_outline_preview_appends_text_to_summary():
 @pytest.mark.parametrize(
     ("name", "sid", "cursor"),
     [("article", "s2", 0), ("form", "s2", 0), ("list", "s4", 0), ("list", "s4", 20),
-     ("table", "s4", 0), ("dropdown", "s2", 0)],
+     ("table", "s4", 0), ("dropdown", "s2", 0), ("custom_widgets", "s2", 0)],
 )  # fmt: skip
 def test_golden_expand(name: str, sid: str, cursor: int):
     page, raw_by_sid = build(name)
@@ -233,6 +262,23 @@ def test_golden_expand(name: str, sid: str, cursor: int):
 
 
 # ------------------------------------------------------------------ units ----
+
+
+def test_candidate_evidence_ladder():
+    from ebrowse.core.clickable import candidate_evidence
+    from ebrowse.core.snapshot import DomNode
+
+    def mk(signals, attrs=None):
+        return DomNode(tag="div", rect=(0, 0, 100, 30), attrs=attrs or {}, signals=signals)
+
+    assert candidate_evidence(mk({"el": 1})) == "listener"
+    assert candidate_evidence(mk({"tb": 1})) == "focusable"
+    assert candidate_evidence(mk({"as": 1})) == "aria-state"
+    assert candidate_evidence(mk({"el": 1, "tb": 1, "as": 1})) == "listener"
+    assert candidate_evidence(mk({"tg": 1})) is None  # strong signal: not a candidate
+    assert candidate_evidence(mk({"el": 1}, {"dis": 1})) is None  # disabled gate
+    assert candidate_evidence(mk({"el": 1, "cp": 1})) is None  # strong wins
+    assert candidate_evidence(mk({})) is None
 
 
 def test_normalize_class_strips_state():

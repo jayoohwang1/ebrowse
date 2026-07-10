@@ -1,0 +1,383 @@
+{
+ "url": "http://127.0.0.1:8901/custom_widgets.html",
+ "title": "Workspace Settings \u2014 Custom Widgets",
+ "vw": 1280,
+ "vh": 1280,
+ "scrollY": 0,
+ "docH": 1280,
+ "truncated": false,
+ "root": {
+  "t": "body",
+  "r": [
+   0,
+   0,
+   1280,
+   934
+  ],
+  "c": [
+   {
+    "t": "header",
+    "r": [
+     0,
+     0,
+     1280,
+     60
+    ],
+    "c": [
+     {
+      "t": "a",
+      "r": [
+       24,
+       12,
+       125,
+       17
+      ],
+      "a": {
+       "href": "/"
+      },
+      "x": "Acme Workspace",
+      "k": {
+       "tg": 1,
+       "cp": 1
+      }
+     },
+     {
+      "t": "nav",
+      "r": [
+       24,
+       30,
+       1232,
+       18
+      ],
+      "a": {
+       "nm": "Main"
+      },
+      "c": [
+       {
+        "t": "a",
+        "r": [
+         24,
+         30,
+         78,
+         17
+        ],
+        "a": {
+         "href": "/dashboard.html"
+        },
+        "x": "Dashboard",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       },
+       {
+        "t": "a",
+        "r": [
+         121,
+         30,
+         33,
+         17
+        ],
+        "a": {
+         "href": "/help.html"
+        },
+        "x": "Help",
+        "k": {
+         "tg": 1,
+         "cp": 1
+        }
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "t": "main",
+    "r": [
+     296,
+     60,
+     688,
+     874
+    ],
+    "c": [
+     {
+      "t": "h1",
+      "r": [
+       320,
+       105,
+       640,
+       37
+      ],
+      "x": "Workspace settings"
+     },
+     {
+      "t": "p",
+      "r": [
+       320,
+       164,
+       640,
+       18
+      ],
+      "x": "Adjust how your team workspace behaves."
+     },
+     {
+      "t": "section",
+      "r": [
+       320,
+       198,
+       640,
+       154
+      ],
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         339,
+         237,
+         602,
+         28
+        ],
+        "x": "Changes"
+       },
+       {
+        "t": "div",
+        "r": [
+         339,
+         291,
+         127,
+         36
+        ],
+        "a": {
+         "id": "save-action",
+         "cls": "btn-like"
+        },
+        "x": "Save changes",
+        "k": {
+         "el": 1
+        }
+       },
+       {
+        "t": "div",
+        "r": [
+         479,
+         291,
+         229,
+         36
+        ],
+        "a": {
+         "id": "inert-deco",
+         "cls": "btn-like"
+        },
+        "x": "Settings saved automatically"
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       320,
+       368,
+       640,
+       174
+      ],
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         339,
+         407,
+         602,
+         28
+        ],
+        "x": "Plan"
+       },
+       {
+        "t": "div",
+        "r": [
+         339,
+         455,
+         602,
+         68
+        ],
+        "a": {
+         "id": "plan-card"
+        },
+        "x": "Shared projects and priority support.",
+        "k": {
+         "tb": 1,
+         "el": 1
+        },
+        "c": [
+         {
+          "t": "strong",
+          "r": [
+           355,
+           471,
+           78,
+           17
+          ],
+          "x": "Team plan"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       320,
+       558,
+       640,
+       154
+      ],
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         339,
+         596,
+         602,
+         28
+        ],
+        "x": "Appearance and alerts"
+       },
+       {
+        "t": "div",
+        "r": [
+         339,
+         650,
+         179,
+         36
+        ],
+        "a": {
+         "id": "dark-toggle",
+         "cls": "toggle-like"
+        },
+        "x": "Use dark appearance",
+        "k": {
+         "as": 1,
+         "el": 1
+        }
+       },
+       {
+        "t": "div",
+        "r": [
+         530,
+         650,
+         194,
+         36
+        ],
+        "a": {
+         "id": "notif-expander",
+         "cls": "toggle-like",
+         "exp": 0
+        },
+        "x": "Notification preferences",
+        "k": {
+         "as": 1,
+         "el": 1
+        }
+       }
+      ]
+     },
+     {
+      "t": "section",
+      "r": [
+       320,
+       727,
+       640,
+       133
+      ],
+      "c": [
+       {
+        "t": "h2",
+        "r": [
+         339,
+         766,
+         602,
+         28
+        ],
+        "x": "Default quantity"
+       },
+       {
+        "t": "div",
+        "r": [
+         339,
+         814,
+         602,
+         27
+        ],
+        "a": {
+         "id": "quantity-row"
+        },
+        "k": {
+         "tb": 1
+        },
+        "c": [
+         {
+          "t": "button",
+          "r": [
+           339,
+           814,
+           32,
+           27
+          ],
+          "a": {
+           "id": "qty-down"
+          },
+          "x": "\u2212",
+          "k": {
+           "tg": 1
+          }
+         },
+         {
+          "t": "span",
+          "r": [
+           381,
+           819,
+           9,
+           18
+          ],
+          "a": {
+           "id": "qty"
+          },
+          "x": "1"
+         },
+         {
+          "t": "button",
+          "r": [
+           400,
+           814,
+           32,
+           27
+          ],
+          "a": {
+           "id": "qty-up"
+          },
+          "x": "+",
+          "k": {
+           "tg": 1
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "t": "p",
+      "r": [
+       320,
+       876,
+       640,
+       18
+      ],
+      "a": {
+       "id": "status"
+      },
+      "x": "No settings have changed."
+     }
+    ]
+   }
+  ]
+ }
+}

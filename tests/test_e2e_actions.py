@@ -214,6 +214,27 @@ def test_blocked_click_honest_about_unexposed_cover(server, env):
     assert "partial change" in r.stdout  # the previously-blocked click now lands
 
 
+def test_candidate_widgets_discovered_and_clickable(server, env):
+    # signal-less custom widgets (addEventListener-only, tabindex, role-less
+    # aria state) get '?'-marked candidate refs in expand and are clickable;
+    # the zero-signal decoy stays ref-less
+    ebrowse(env, "open", server.url("custom_widgets.html"))
+    out = ebrowse(env, "expand", "s2", "--all").stdout
+    assert re.search(r"\[Save changes \(@e\d+ \?\)\]", out), out
+    assert not re.search(r"Settings saved automatically \(@e", out)
+    save = ref_for(env, "s2", r"\[Save changes")
+    r = ebrowse(env, "click", save)
+    assert r.returncode == 0, r.stderr
+    assert "Changes saved" in r.stdout
+    # the aria-expanded flip on a candidate is a tracked state change, and the
+    # revealed links appear with fresh refs
+    toggle = ref_for(env, "s2", r"Notification preferences")
+    r = ebrowse(env, "click", toggle)
+    assert r.returncode == 0, r.stderr
+    assert re.search(r"expanded: \"false\" → \"true\"", r.stdout)
+    assert "Manage alerts" in r.stdout
+
+
 def test_full_page_veil_exposed_and_named_when_blocking(server, env):
     # a full-viewport childless clickable overlay must get a ref of its own
     # (splitter: oversized childless nodes are terminal), so a blocked click

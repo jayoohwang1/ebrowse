@@ -1,0 +1,19 @@
+## s2 content — Workspace settings
+Adjust how your team workspace behaves.
+
+### Changes
+
+[Save changes (@e4 ?)] Settings saved automatically
+
+### Plan
+
+[Shared projects and priority support. Team plan (@e5 ?)]
+
+### Appearance and alerts
+
+[Use dark appearance (@e6 ?)] [Notification preferences (@e7 ?) collapsed]
+
+### Default quantity
+
+[− (@e8)] 1 [+ (@e9)]
+No settings have changed.

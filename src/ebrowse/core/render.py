@@ -153,9 +153,11 @@ def _table_header(table: DomNode) -> list[str]:
 
 
 def _element_md(node: DomNode) -> str:
-    """Inline markdown for a node that carries a ref (an interactive element)."""
+    """Inline markdown for a node that carries a ref (an interactive element).
+    Weak-evidence candidates get a trailing '?' provenance marker inside the
+    ref parens (docs/output-contracts.md): likely interactive, not proven."""
     a = node.attrs
-    ref = node.ref
+    ref = f"{node.ref} ?" if node.candidate else node.ref
     tag = node.tag
     if tag == "a" or (a.get("role") == "link"):
         text = a.get("nm") or node.subtree_text(cap=120) or a.get("href", "link")

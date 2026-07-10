@@ -100,6 +100,12 @@ accessibility tree.
 - Inputs: `[label (@ref: "value")]` / `empty`, `, required` when set; checkboxes
   `[x]`/`[ ]`; native selects `[label (@ref) ▾ "US" of 24 options]` (options inlined
   when ≤ 15).
+- **Candidates**: `[Save changes (@e4 ?)]` — the `?` inside the ref parens marks a
+  weak-evidence discovery (a real event listener found by the CDP sweep, an
+  explicit `tabindex`, or role-less ARIA state) rather than a proven control.
+  Candidates are expand-only: they never appear in outline element counts, and
+  their evidence never authorizes proxy activation (ElementState.candidate holds
+  the provenance: `listener` | `focusable` | `aria-state`).
 - Images: `![alt](@i3)` or `![≈caption](@i3)` (VLM caption, cached).
 - List/table sections paginate (default 20 items):
   `… 104 more items — expand s3 --cursor 20`. Tables render as markdown tables with

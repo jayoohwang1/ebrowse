@@ -51,6 +51,11 @@ the DOM truth. The `◉` line appears only when a vision sidecar is running.
   site's header search box keeps its ref on every page. Act without re-reading.
 - If a ref stops resolving you get `stale ref @e12 … — run 'ebrowse outline'`
   (exit 2). Just re-outline and re-expand; never guess refs.
+- A `?` inside the ref parens — `[Save changes (@e4 ?)]` — marks a **candidate**:
+  a custom widget discovered from weak evidence (a real JS listener, `tabindex`,
+  or ARIA state) rather than proven control semantics. Click it like any ref,
+  but if nothing changes it may be decorative — don't keep retrying. Candidates
+  show only in expand, never in outline counts.
 - CSS selectors also work anywhere a ref does: `ebrowse click "#submit"`.
 
 ## Actions return diffs — read them, don't re-snapshot

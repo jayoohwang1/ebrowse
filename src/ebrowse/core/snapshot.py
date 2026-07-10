@@ -50,6 +50,7 @@ class DomNode:
     # runtime annotations (not serialized): set during element extraction
     ref: str | None = None
     is_list_group: bool = False  # synthetic node wrapping grouped siblings
+    candidate: str | None = None  # weak-evidence provenance (clickable.candidate_evidence)
 
     def bbox_area(self) -> int:
         return max(0, self.rect[2]) * max(0, self.rect[3])
@@ -146,6 +147,33 @@ class DomSnapshot:
 _MIN_FRAME_W, _MIN_FRAME_H = 100, 60
 
 
+async def _discover_main_frame(page) -> dict[str, Any]:
+    """Run discover.js in the main frame, preferring one CDP Runtime.evaluate
+    with includeCommandLineAPI so the walk can use the devtools
+    getEventListeners() API (weak `el` candidate signal) — still a single
+    round trip, per architecture principle 3. Chromium-only; any failure
+    degrades to a plain evaluate with no listener signals."""
+    try:
+        cdp = await page.context.new_cdp_session(page)
+        try:
+            r = await cdp.send(
+                "Runtime.evaluate",
+                {
+                    "expression": f"({discover_js()})()",
+                    "includeCommandLineAPI": True,
+                    "returnByValue": True,
+                },
+            )
+            value = r.get("result", {}).get("value")
+            if isinstance(value, dict) and value.get("root"):
+                return value
+        finally:
+            await cdp.detach()
+    except Exception:
+        pass
+    return await page.evaluate(discover_js())
+
+
 async def capture(page) -> DomSnapshot:
     """Snapshot the page: one evaluate per frame, stitched into one tree.
 
@@ -153,7 +181,7 @@ async def capture(page) -> DomSnapshot:
     useful size; frames we cannot evaluate in (rare with Playwright, possible
     on sandboxed/detached frames) become cross_origin leaf nodes.
     """
-    raw = await page.evaluate(discover_js())
+    raw = await _discover_main_frame(page)
     snap = DomSnapshot.from_dict(raw)
 
     # index iframe nodes in the main tree by id/title/src for stitching
@@ -181,6 +209,8 @@ async def capture(page) -> DomSnapshot:
         if node is None:
             continue
         try:
+            # plain evaluate: child frames get no `el` listener signal (the
+            # CDP command-line API binds to the main frame's session only)
             child_raw = await frame.evaluate(discover_js())
         except Exception:
             node.cross_origin = True

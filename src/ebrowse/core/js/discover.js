@@ -9,7 +9,8 @@
 //   t: tag (lowercase)          a: curated attrs (only when present)
 //   r: [x, y, w, h] absolute page CSS px (rounded)
 //   x: own text (direct text-node children, whitespace-collapsed)
-//   c: children                 k: clickable signals {tg,rl,ls,cp} (only when any)
+//   c: children                 k: clickable signals (only when any):
+//                                  strong {tg,rl,ls,cp} | weak candidate {el,tb,as}
 //   sh: 1 if children include a shadow root's content
 //
 // Attr keys in `a`: id, cls, role, nm (resolved accessible name), tid (testid),
@@ -26,8 +27,24 @@
   const CLICKABLE_ROLES = new Set(__CLICKABLE_ROLES__);
   const LISTENER_ATTRS = __LISTENER_ATTRS__;
   const SKIP_TAGS = new Set(__SKIP_TAGS__);
+  const CANDIDATE_ARIA_ATTRS = __CANDIDATE_ARIA_ATTRS__;
+  const CANDIDATE_LISTENER_TYPES = __CANDIDATE_LISTENER_TYPES__;
   const MAX_NODES = 15000;
   const TEXT_CAP = 4000;
+
+  // getEventListeners is the devtools command-line API: present only when this
+  // script runs via CDP Runtime.evaluate with includeCommandLineAPI (main
+  // frame; see core/snapshot.py). Absent under plain evaluate — degrade to
+  // no `el` signals rather than fail.
+  const canSniffListeners = typeof getEventListeners === "function";
+  function hasPointerListener(el) {
+    if (!canSniffListeners) return false;
+    try {
+      const ls = getEventListeners(el);
+      for (const t of CANDIDATE_LISTENER_TYPES) if (ls[t] && ls[t].length) return true;
+    } catch (e) { /* cross-origin node or API hiccup */ }
+    return false;
+  }
 
   let nodeCount = 0;
   let truncated = false;
@@ -157,7 +174,7 @@
     const a = curatedAttrs(el, tag);
     if (Object.keys(a).length) node.a = a;
 
-    // clickable signals
+    // clickable signals (strong tier: tg/rl/ls/cp)
     const cursorPointer = style.cursor === "pointer";
     const k = {};
     if (CLICKABLE_TAGS.has(tag)) k.tg = 1;
@@ -171,6 +188,20 @@
     }
     if (cursorPointer && !parentCursorPointer) k.cp = 1;
     if (a.con) k.tg = 1; // contenteditable acts as an input
+    // candidate signals (weak tier: el/tb/as) — only sniffed when no strong
+    // signal exists; they yield expand-only '?' refs, never default behavior
+    if (!Object.keys(k).length) {
+      if (el.hasAttribute("tabindex") && (parseInt(el.getAttribute("tabindex"), 10) || 0) >= 0) {
+        k.tb = 1;
+      }
+      for (const aa of CANDIDATE_ARIA_ATTRS) {
+        if (el.hasAttribute(aa)) {
+          k.as = 1;
+          break;
+        }
+      }
+      if (hasPointerListener(el)) k.el = 1;
+    }
     if (Object.keys(k).length) node.k = k;
 
     // own text (direct text-node children only)
