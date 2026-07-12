@@ -24,6 +24,11 @@ you ask.
 the page — run `outline` to read it. This keeps the (LLM-backed) outline opt-in
 and lets the page finish loading first. Your `@refs` still work across the jump.
 
+Use `expand <sid|@ref> --ax` for hierarchy-heavy widgets (menus, trees, tab
+panels), role/state debugging, or when you reason better over accessibility trees.
+Avoid it for list/table sections: it usually costs MORE tokens than default
+markdown expansion.
+
 Example outline:
 
 ```

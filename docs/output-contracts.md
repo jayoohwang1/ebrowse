@@ -163,6 +163,60 @@ SELECT Country (@e5) ▾ "Country 1" — 400 options
   DOM, captured or not.
 - `expand @ref` on any non-select element still expands its section.
 
+## Expand ax view (`ebrowse expand s2 --ax`)
+
+An opt-in, deterministic accessibility-tree rendering of one section, rather
+than the default markdown expand. The default expand is unchanged, and the
+outline's `~Nt` estimate remains coupled to that default markdown output.
+`expand @ref --ax` resolves the ref to its enclosing section, including native
+selects (so `--ax` overrides select option paging). No summarizer or captions
+participate.
+
+```
+## s2 form — Filter sidebar (ax)
+- form "Filter sidebar"
+  - heading "Brand" [level=3]
+  - checkbox "Sony" (@e31) [unchecked]
+  - checkbox "JBL" (@e33) [checked]
+  - textbox "min price" (@e34) [value=""]
+  - button "Go" (@e36)
+  - text: "Prices update automatically."
+```
+
+- The header is the markdown expand header plus ` (ax)`; an inner-scrollable
+  panel note is unchanged. A cross-origin iframe returns the same one-line
+  notice as markdown expand, with no ax body.
+- Nodes are `- role "name" (@eN) [state, state]`; name, ref, and states are
+  omitted when empty (no `""` or `[]`). An explicit `role` wins; otherwise a
+  data-driven HTML-AAM mapping applies: `a[href]` link; `button` button;
+  text/email/url/tel/no-type inputs and `textarea` textbox; search input
+  searchbox; checkbox/radio/range/number inputs checkbox/radio/slider/spinbutton;
+  `select` combobox (listbox when `multiple` or `size>1`), `option` option;
+  `h1`–`h6` heading; `ul`/`ol` list; `li` listitem; `table` table; `tr` row;
+  `td` cell; `th` columnheader; `img` img; `nav` navigation; `main` main;
+  `header` banner; `footer` contentinfo; `aside` complementary; `form` form;
+  `article` article; named `section` region; `fieldset`/`details` group;
+  `summary` button; `dialog` dialog; `hr` separator; `progress` progressbar;
+  `figure` figure; `p` paragraph; and `blockquote` blockquote.
+- An unmapped/generic container with no explicit role, ref, or accessible name
+  is pruned and its children promote to its depth; its own text still surfaces
+  as `text:`. Name is resolved `nm`, else own text, clipped to 80 chars.
+- Refs are matched by RawSection node identity to `section.elements`; weak
+  candidates render `(@eN ?)` and image refs render `(@iN)`.
+- States appear only when set/applicable: checked/unchecked (checkbox, radio,
+  switch); disabled; expanded/collapsed when `aria-expanded` is present; pressed;
+  selected; required; inert; `value="…"` (60 chars; passwords `value="•••"`); heading
+  `level=N`; and native selects `value="US" of 24 options` (`, multiple` when
+  applicable).
+- Own text not used as the name is a child `- text: "…"`, clipped to
+  `observe.preview_chars`; consecutive text at one depth is space-joined before
+  clipping. There are no blank body lines or trailing whitespace.
+- List/table paging uses the markdown expand window (`observe.list_page_size`)
+  with unchanged item indices and tail `… N more items — expand s3 --ax --cursor 20`.
+  Output is bounded by `observe.max_section_tokens`, ending at a node boundary
+  with `… (truncated at token budget — use --cursor or --all)`; `--all` bypasses
+  page size as it does for markdown.
+
 ## Navigation result (`open`, `back`, `forward`, `reload`, `tab`, navigating actions)
 
 Navigation does NOT dump the page. It returns a terse landing line naming the

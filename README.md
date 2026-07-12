@@ -56,7 +56,7 @@ Navigation (`open`/`back`/click-throughs) returns a one-line landing, not the
 page — run `outline` to read it (your `@refs` survive the jump).
 
 **Working verbs:** `open/goto, back, forward, reload, outline, describe-screen,
-expand, screenshot, get, tabs, tab, dialog, connect, close, daemon status|stop, doctor`;
+expand [--ax], screenshot, get, tabs, tab, dialog, connect, close, daemon status|stop, doctor`;
 actions `click, fill, type, press, check, uncheck, select, scroll, upload,
 eval, hover, drag`; `diagnose <target>` (read-only: why a click would or wouldn't land);
 compound verbs `fill-form, search` (and `select` handles custom
