@@ -27,6 +27,11 @@ IMPLICIT_ROLES: dict[str, str] = {
     "input:radio": "radio",
     "input:range": "slider",
     "input:number": "spinbutton",
+    "input:submit": "button",
+    "input:button": "button",
+    "input:reset": "button",
+    "input:image": "button",
+    "input:file": "button",
     "textarea": "textbox",
     "select": "combobox",
     "select:multiple": "listbox",
@@ -150,15 +155,30 @@ def _render_node(
         return
 
     role = node.attrs.get("role") or forced_role or implicit_role(node)
+    # role=presentation/none is an explicit "no semantics" claim — prune like a
+    # generic wrapper (decorative svg wrappers are the common case).
+    if role in ("presentation", "none") and not node.ref:
+        role = None
     name = _name(node)
     # Plain wrappers do not acquire an accessible name merely by containing
     # direct text.  Prune them and retain that text as an explicit text child.
+    # <label> text is suppressed outright: it already lives on the associated
+    # control's accessible name (mirrors the markdown renderer).
     generic = role is None and not node.ref and not node.attrs.get("nm")
     if generic:
-        _append_text(lines, depth, node.text, observe.preview_chars)
+        if node.tag != "label":
+            _append_text(lines, depth, node.text, observe.preview_chars)
         for child in node.children:
             _render_node(child, depth, lines, observe, excluded_items)
         return
+
+    # Name-from-content (HTML-AAM): a nameless link/button/heading/… whose
+    # subtree is pure text takes that text as its name and renders as one line
+    # (the consumed descendants are not repeated as text: children).
+    consumed_subtree = False
+    if not name and role in _NAME_FROM_CONTENT and _text_only_subtree(node):
+        name = node.subtree_text(cap=80)
+        consumed_subtree = bool(name)
 
     if role is None:
         role = "generic"
@@ -174,6 +194,8 @@ def _render_node(
         parts.append(" [" + ", ".join(states) + "]")
     lines.append("".join(parts))
 
+    if consumed_subtree:
+        return
     # Text used as the accessible name is not duplicated as a child.  nm is
     # authoritative, so different own text remains visible.
     if node.text and (not name or node.attrs.get("nm") or _clip(node.text, 80) != name):
@@ -189,8 +211,37 @@ def _render_node(
         )
 
 
+# Roles whose accessible name may come from their contents (HTML-AAM subset).
+_NAME_FROM_CONTENT = frozenset(
+    {"link", "button", "heading", "option", "menuitem", "tab", "cell", "columnheader", "rowheader"}
+)
+
+
+def _text_only_subtree(node: DomNode) -> bool:
+    """True when every descendant is a text-bearing generic/presentational
+    wrapper — nothing with its own ref, name, image, or non-presentational role."""
+    for child in node.children:
+        a = child.attrs
+        if child.ref or child.tag == "img" or a.get("nm"):
+            return False
+        role = a.get("role")
+        if role and role not in ("presentation", "none"):
+            return False
+        if role is None and implicit_role(child) is not None:
+            return False
+        if not _text_only_subtree(child):
+            return False
+    return True
+
+
 def _name(node: DomNode) -> str:
-    return str(node.attrs.get("nm") or node.text or "").strip()
+    name = str(node.attrs.get("nm") or node.text or "").strip()
+    # An <input type=submit|button|reset> is named by its value attribute.
+    if not name and node.tag == "input":
+        typ = str(node.attrs.get("typ", "")).lower()
+        if typ in ("submit", "button", "reset"):
+            name = str(node.attrs.get("val") or "").strip() or typ.capitalize()
+    return name
 
 
 def _ref(node: DomNode) -> str | None:
@@ -216,7 +267,7 @@ def _states(node: DomNode, role: str) -> list[str]:
         out.append("required")
     if a.get("inr"):
         out.append("inert")
-    if node.tag in ("input", "textarea") and role not in ("checkbox", "radio"):
+    if node.tag in ("input", "textarea") and role not in ("checkbox", "radio", "button"):
         value = (
             "•••"
             if str(a.get("typ", "")).lower() == "password"
