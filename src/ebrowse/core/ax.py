@@ -159,7 +159,7 @@ def _render_node(
     # generic wrapper (decorative svg wrappers are the common case).
     if role in ("presentation", "none") and not node.ref:
         role = None
-    name = _name(node)
+    name = _name(node, role)
     # Plain wrappers do not acquire an accessible name merely by containing
     # direct text.  Prune them and retain that text as an explicit text child.
     # <label> text is suppressed outright: it already lives on the associated
@@ -172,13 +172,19 @@ def _render_node(
             _render_node(child, depth, lines, observe, excluded_items)
         return
 
-    # Name-from-content (HTML-AAM): a nameless link/button/heading/… whose
-    # subtree is pure text takes that text as its name and renders as one line
-    # (the consumed descendants are not repeated as text: children).
+    # A nameless node whose subtree is pure text renders as one line: for
+    # name-from-content roles (HTML-AAM) the text becomes the accessible name;
+    # for structural roles (paragraph, listitem, …) it folds after a colon as
+    # content — `- paragraph: "$19.99"` — never promoted to a name.
     consumed_subtree = False
-    if not name and role in _NAME_FROM_CONTENT and _text_only_subtree(node):
-        name = node.subtree_text(cap=80)
-        consumed_subtree = bool(name)
+    content = ""
+    if not name and _text_only_subtree(node):
+        if role in _NAME_FROM_CONTENT:
+            name = node.subtree_text(cap=80)
+            consumed_subtree = bool(name)
+        else:
+            content = node.subtree_text(cap=observe.preview_chars)
+            consumed_subtree = bool(content)
 
     if role is None:
         role = "generic"
@@ -192,13 +198,15 @@ def _render_node(
     states = _states(node, role)
     if states:
         parts.append(" [" + ", ".join(states) + "]")
+    if content:
+        parts.append(f': "{_quote(content)}"')
     lines.append("".join(parts))
 
     if consumed_subtree:
         return
     # Text used as the accessible name is not duplicated as a child.  nm is
     # authoritative, so different own text remains visible.
-    if node.text and (not name or node.attrs.get("nm") or _clip(node.text, 80) != name):
+    if node.text and (not name or node.attrs.get("nm") or node.text != name):
         _append_text(lines, depth + 1, node.text, observe.preview_chars)
     for child in node.children:
         _render_node(
@@ -234,8 +242,13 @@ def _text_only_subtree(node: DomNode) -> bool:
     return True
 
 
-def _name(node: DomNode) -> str:
-    name = str(node.attrs.get("nm") or node.text or "").strip()
+def _name(node: DomNode, role: str | None) -> str:
+    name = str(node.attrs.get("nm") or "").strip()
+    # Own text names a node only where HTML-AAM allows name-from-content, or on
+    # a ref-bearing node (an anonymous actionable ref would be useless).
+    # Structural roles (paragraph, list, region, …) keep text as text: children.
+    if not name and (role in _NAME_FROM_CONTENT or node.ref):
+        name = str(node.text or "").strip()
     # An <input type=submit|button|reset> is named by its value attribute.
     if not name and node.tag == "input":
         typ = str(node.attrs.get("typ", "")).lower()

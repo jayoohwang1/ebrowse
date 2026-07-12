@@ -4,83 +4,83 @@
     - img "DeLonghi Portafilter Pro"
     - heading [level=3]
       - link "DeLonghi Portafilter Pro" (@e54)
-    - paragraph "$293.99"
-    - paragraph "3.0★ (2,752)"
+    - paragraph: "$293.99"
+    - paragraph: "3.0★ (2,752)"
     - button "Add to cart" (@e55)
   - listitem
     - img "Flair Tamper Classic"
     - heading [level=3]
       - link "Flair Tamper Classic" (@e56)
-    - paragraph "$307.69"
-    - paragraph "3.7★ (2,889)"
+    - paragraph: "$307.69"
+    - paragraph: "3.7★ (2,889)"
     - button "Add to cart" (@e57)
   - listitem
     - img "Cuisinart Tamper Mini"
     - heading [level=3]
       - link "Cuisinart Tamper Mini" (@e58)
-    - paragraph "$321.39"
-    - paragraph "4.4★ (3,026)"
+    - paragraph: "$321.39"
+    - paragraph: "4.4★ (3,026)"
     - button "Add to cart" (@e59)
   - listitem
     - img "Krups Tamper Max"
     - heading [level=3]
       - link "Krups Tamper Max" (@e60)
-    - paragraph "$335.09"
-    - paragraph "3.1★ (3,163)"
+    - paragraph: "$335.09"
+    - paragraph: "3.1★ (3,163)"
     - button "Add to cart" (@e61)
   - listitem
     - img "Bella Espresso Machine Pro"
     - heading [level=3]
       - link "Bella Espresso Machine Pro" (@e62)
-    - paragraph "$348.79"
-    - paragraph "3.8★ (3,300)"
+    - paragraph: "$348.79"
+    - paragraph: "3.8★ (3,300)"
     - button "Add to cart" (@e63)
   - listitem
     - img "Breville Espresso Machine Classic"
     - heading [level=3]
       - link "Breville Espresso Machine Classic" (@e64)
-    - paragraph "$362.49"
-    - paragraph "4.5★ (3,437)"
+    - paragraph: "$362.49"
+    - paragraph: "4.5★ (3,437)"
     - button "Add to cart" (@e65)
   - listitem
     - img "Gaggia Espresso Machine Mini"
     - heading [level=3]
       - link "Gaggia Espresso Machine Mini" (@e66)
-    - paragraph "$376.19"
-    - paragraph "3.2★ (3,574)"
+    - paragraph: "$376.19"
+    - paragraph: "3.2★ (3,574)"
     - button "Add to cart" (@e67)
   - listitem
     - img "Rancilio Moka Pot Max"
     - heading [level=3]
       - link "Rancilio Moka Pot Max" (@e68)
-    - paragraph "$389.89"
-    - paragraph "3.9★ (3,711)"
+    - paragraph: "$389.89"
+    - paragraph: "3.9★ (3,711)"
     - button "Add to cart" (@e69)
   - listitem
     - img "DeLonghi Moka Pot Pro"
     - heading [level=3]
       - link "DeLonghi Moka Pot Pro" (@e70)
-    - paragraph "$23.59"
-    - paragraph "4.6★ (3,848)"
+    - paragraph: "$23.59"
+    - paragraph: "4.6★ (3,848)"
     - button "Add to cart" (@e71)
   - listitem
     - img "Flair Moka Pot Classic"
     - heading [level=3]
       - link "Flair Moka Pot Classic" (@e72)
-    - paragraph "$37.29"
-    - paragraph "3.3★ (3,985)"
+    - paragraph: "$37.29"
+    - paragraph: "3.3★ (3,985)"
     - button "Add to cart" (@e73)
   - listitem
     - img "Cuisinart Burr Grinder Mini"
     - heading [level=3]
       - link "Cuisinart Burr Grinder Mini" (@e74)
-    - paragraph "$50.99"
-    - paragraph "4.0★ (4,122)"
+    - paragraph: "$50.99"
+    - paragraph: "4.0★ (4,122)"
     - button "Add to cart" (@e75)
   - listitem
     - img "Krups Burr Grinder Max"
     - heading [level=3]
       - link "Krups Burr Grinder Max" (@e76)
-    - paragraph "$64.69"
-    - paragraph "4.7★ (59)"
+    - paragraph: "$64.69"
+    - paragraph: "4.7★ (59)"
     - button "Add to cart" (@e77)

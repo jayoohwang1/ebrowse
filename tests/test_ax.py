@@ -226,3 +226,18 @@ def test_input_submit_is_button_named_by_value() -> None:
         render_section_ax(_section(), raw, ObserveConfig())
         == '## s1 content (ax)\n- button "Save changes" (@e1)'
     )
+
+
+def test_structural_role_folds_text_as_content_not_name() -> None:
+    raw = RawSection(
+        node=DomNode(
+            tag="p",
+            rect=(0, 0, 100, 20),
+            children=[DomNode(tag="span", rect=(0, 0, 50, 20), text="$19.99")],
+        ),
+        parent_tags=(),
+    )
+    assert (
+        render_section_ax(_section(), raw, ObserveConfig())
+        == '## s1 content (ax)\n- paragraph: "$19.99"'
+    )
