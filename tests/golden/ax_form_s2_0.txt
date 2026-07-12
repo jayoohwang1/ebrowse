@@ -1,0 +1,25 @@
+## s2 form — Create your account (ax)
+- main
+  - heading "Create your account" [level=1]
+  - form
+    - text: "Full name"
+    - textbox "Full name" (@e5) [required, value=""]
+    - text: "Email address"
+    - textbox "Email address" (@e6) [required, value=""]
+    - text: "Password"
+    - textbox "Password" (@e7) [required, value="•••"]
+    - text: "Country"
+    - combobox "Country" (@e8) [value="Choose a country" of 7 options]
+    - group
+      - text: "Account type Personal"
+      - radio "Personal" (@e9) [checked]
+      - text: "Business"
+      - radio "Business" (@e10) [unchecked]
+    - text: "About you (optional)"
+    - textbox "About you (optional)" (@e11) [value=""]
+    - text: "Send me the weekly newsletter"
+    - checkbox "Send me the weekly newsletter" (@e12) [unchecked]
+    - text: "I agree to the"
+    - checkbox "I agree to the Terms of Service" (@e13) [unchecked, required]
+    - link "Terms of Service" (@e14)
+    - button "Create account" (@e15)
