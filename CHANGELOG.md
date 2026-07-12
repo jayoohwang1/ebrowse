@@ -35,6 +35,8 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- **Opt-in accessibility-tree expansion.** `ebrowse expand <target> --ax` renders
+  an actionable, deterministic accessibility-tree outline with inline durable refs.
 - **Browse every option of a large `<select>`.** `expand @ref` on a native
   select lists its options, 50 per page with the usual cursor hints
   (`… 300 more options — expand @e5 --cursor 50`; `--all` dumps the captured

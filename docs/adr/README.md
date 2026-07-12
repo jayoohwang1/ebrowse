@@ -21,3 +21,4 @@ ADRs 0001–0006 were backfilled from the v1 implementation log (see git history
 | [0009](0009-label-activation-and-trial-click-arbitration.md) | Label activation + Playwright trial-click arbitration in the click pre-check |
 | [0010](0010-interaction-plan-and-keyboard-fallback.md) | InteractionPlan routing + keyboard-activation fallback for non-modal covers |
 | [0011](0011-lossless-budgeted-section-partitioning.md) | Lossless budgeted section partitioning |
+| [0012](0012-ax-view-derived-from-dom-snapshot.md) | Ax view is derived from DomSnapshot, not the native accessibility tree |
