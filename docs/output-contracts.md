@@ -202,10 +202,14 @@ participate.
   is pruned and its children promote to its depth; its own text still surfaces
   as `text:`. `role=presentation`/`none` prunes the same way. `<label>` text is
   suppressed outright — it already lives on the control's accessible name (as
-  in markdown expand). Name is resolved `nm`, else own text, clipped to 80
-  chars; a nameless link/button/heading/option/menuitem/tab/cell whose subtree
-  is pure text takes that text as its name (HTML-AAM name-from-content) and
-  renders as one line, without repeating the consumed text as children.
+  in markdown expand). Name is the resolved `nm`; own text names a node only
+  for HTML-AAM name-from-content roles (link, button, heading, option,
+  menuitem, tab, cell, columnheader, rowheader) or ref-bearing nodes, clipped
+  to 80 chars. A nameless name-from-content node whose subtree is pure text
+  takes that text as its name and renders as one line; a structural role
+  (paragraph, listitem, …) in the same position folds it as content instead —
+  `- paragraph: "$19.99"` (clipped to `observe.preview_chars`) — never
+  promoted to a name. Consumed text is not repeated as children.
 - Refs are matched by RawSection node identity to `section.elements`; weak
   candidates render `(@eN ?)` and image refs render `(@iN)`.
 - States appear only when set/applicable: checked/unchecked (checkbox, radio,
