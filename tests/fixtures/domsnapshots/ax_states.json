@@ -1,0 +1,21 @@
+{
+  "url": "http://fixture.test/ax-states.html",
+  "title": "AX states",
+  "vw": 1280,
+  "vh": 800,
+  "scrollY": 0,
+  "docH": 800,
+  "truncated": false,
+  "root": {
+    "t": "body", "r": [0, 0, 1280, 800],
+    "c": [{
+      "t": "form", "r": [10, 10, 500, 300], "a": {"nm": "Preferences"},
+      "c": [
+        {"t": "input", "r": [10, 40, 20, 20], "a": {"typ": "checkbox", "nm": "Email updates", "chk": 1, "dis": 1}, "k": {"tg": 1}},
+        {"t": "select", "r": [10, 70, 200, 30], "a": {"nm": "Countries", "mul": 1, "sel": "US", "opt": ["US", "CA", "JP"]}, "k": {"tg": 1}},
+        {"t": "button", "r": [10, 110, 100, 30], "a": {"exp": 0, "prs": 1}, "x": "More options", "k": {"tg": 1}},
+        {"t": "div", "r": [10, 150, 150, 30], "a": {"nm": "Experimental control", "asel": 1}, "k": {"el": 1}}
+      ]
+    }]
+  }
+}

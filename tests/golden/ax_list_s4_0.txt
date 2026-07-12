@@ -1,0 +1,143 @@
+## s4 list (ax)
+- list
+  - listitem
+    - img "Bella Espresso Machine Pro"
+    - heading [level=3]
+      - link "Bella Espresso Machine Pro" (@e14)
+    - paragraph: "$19.99"
+    - paragraph: "3.0★ (12)"
+    - button "Add to cart" (@e15)
+  - listitem
+    - img "Breville Espresso Machine Classic"
+    - heading [level=3]
+      - link "Breville Espresso Machine Classic" (@e16)
+    - paragraph: "$33.69"
+    - paragraph: "3.7★ (149)"
+    - button "Add to cart" (@e17)
+  - listitem
+    - img "Gaggia Espresso Machine Mini"
+    - heading [level=3]
+      - link "Gaggia Espresso Machine Mini" (@e18)
+    - paragraph: "$47.39"
+    - paragraph: "4.4★ (286)"
+    - button "Add to cart" (@e19)
+  - listitem
+    - img "Rancilio Moka Pot Max"
+    - heading [level=3]
+      - link "Rancilio Moka Pot Max" (@e20)
+    - paragraph: "$61.09"
+    - paragraph: "3.1★ (423)"
+    - button "Add to cart" (@e21)
+  - listitem
+    - img "DeLonghi Moka Pot Pro"
+    - heading [level=3]
+      - link "DeLonghi Moka Pot Pro" (@e22)
+    - paragraph: "$74.79"
+    - paragraph: "3.8★ (560)"
+    - button "Add to cart" (@e23)
+  - listitem
+    - img "Flair Moka Pot Classic"
+    - heading [level=3]
+      - link "Flair Moka Pot Classic" (@e24)
+    - paragraph: "$88.49"
+    - paragraph: "4.5★ (697)"
+    - button "Add to cart" (@e25)
+  - listitem
+    - img "Cuisinart Burr Grinder Mini"
+    - heading [level=3]
+      - link "Cuisinart Burr Grinder Mini" (@e26)
+    - paragraph: "$102.19"
+    - paragraph: "3.2★ (834)"
+    - button "Add to cart" (@e27)
+  - listitem
+    - img "Krups Burr Grinder Max"
+    - heading [level=3]
+      - link "Krups Burr Grinder Max" (@e28)
+    - paragraph: "$115.89"
+    - paragraph: "3.9★ (971)"
+    - button "Add to cart" (@e29)
+  - listitem
+    - img "Bella Burr Grinder Pro"
+    - heading [level=3]
+      - link "Bella Burr Grinder Pro" (@e30)
+    - paragraph: "$129.59"
+    - paragraph: "4.6★ (1,108)"
+    - button "Add to cart" (@e31)
+  - listitem
+    - img "Breville Milk Frother Classic"
+    - heading [level=3]
+      - link "Breville Milk Frother Classic" (@e32)
+    - paragraph: "$143.29"
+    - paragraph: "3.3★ (1,245)"
+    - button "Add to cart" (@e33)
+  - listitem
+    - img "Gaggia Milk Frother Mini"
+    - heading [level=3]
+      - link "Gaggia Milk Frother Mini" (@e34)
+    - paragraph: "$156.99"
+    - paragraph: "4.0★ (1,382)"
+    - button "Add to cart" (@e35)
+  - listitem
+    - img "Rancilio Milk Frother Max"
+    - heading [level=3]
+      - link "Rancilio Milk Frother Max" (@e36)
+    - paragraph: "$170.69"
+    - paragraph: "4.7★ (1,519)"
+    - button "Add to cart" (@e37)
+  - listitem
+    - img "DeLonghi Scale Pro"
+    - heading [level=3]
+      - link "DeLonghi Scale Pro" (@e38)
+    - paragraph: "$184.39"
+    - paragraph: "3.4★ (1,656)"
+    - button "Add to cart" (@e39)
+  - listitem
+    - img "Flair Scale Classic"
+    - heading [level=3]
+      - link "Flair Scale Classic" (@e40)
+    - paragraph: "$198.09"
+    - paragraph: "4.1★ (1,793)"
+    - button "Add to cart" (@e41)
+  - listitem
+    - img "Cuisinart Scale Mini"
+    - heading [level=3]
+      - link "Cuisinart Scale Mini" (@e42)
+    - paragraph: "$211.79"
+    - paragraph: "4.8★ (1,930)"
+    - button "Add to cart" (@e43)
+  - listitem
+    - img "Krups Kettle Max"
+    - heading [level=3]
+      - link "Krups Kettle Max" (@e44)
+    - paragraph: "$225.49"
+    - paragraph: "3.5★ (2,067)"
+    - button "Add to cart" (@e45)
+  - listitem
+    - img "Bella Kettle Pro"
+    - heading [level=3]
+      - link "Bella Kettle Pro" (@e46)
+    - paragraph: "$239.19"
+    - paragraph: "4.2★ (2,204)"
+    - button "Add to cart" (@e47)
+  - listitem
+    - img "Breville Kettle Classic"
+    - heading [level=3]
+      - link "Breville Kettle Classic" (@e48)
+    - paragraph: "$252.89"
+    - paragraph: "4.9★ (2,341)"
+    - button "Add to cart" (@e49)
+  - listitem
+    - img "Gaggia Portafilter Mini"
+    - heading [level=3]
+      - link "Gaggia Portafilter Mini" (@e50)
+    - paragraph: "$266.59"
+    - paragraph: "3.6★ (2,478)"
+    - button "Add to cart" (@e51)
+  - listitem
+    - img "Rancilio Portafilter Max"
+    - heading [level=3]
+      - link "Rancilio Portafilter Max" (@e52)
+    - paragraph: "$280.29"
+    - paragraph: "4.3★ (2,615)"
+    - button "Add to cart" (@e53)
+… 12 more items — expand s4 --ax --cursor 20

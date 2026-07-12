@@ -1,0 +1,6 @@
+## s1 form — Preferences (ax)
+- form "Preferences"
+  - checkbox "Email updates" (@e1) [checked, disabled]
+  - listbox "Countries" (@e2) [value="US" of 3 options, multiple]
+  - button "More options" (@e3) [collapsed, pressed]
+  - generic "Experimental control" (@e4 ?) [selected]

@@ -1,0 +1,214 @@
+## s4 table (ax)
+- table
+  - row
+    - columnheader
+      - button "ID ▲" (@e8)
+    - columnheader
+      - button "Description" (@e9)
+    - columnheader
+      - button "Date" (@e10)
+    - columnheader
+      - button "Total" (@e11)
+    - columnheader "Status"
+    - columnheader "Actions"
+  - row
+    - cell "#4400"
+    - cell
+      - link "Order from Turin" (@e12)
+    - cell "1 Jun 2026"
+    - cell "$24.50"
+    - cell "Open"
+    - cell
+      - button "Ship" (@e13)
+      - button "Cancel" (@e14)
+  - row
+    - cell "#4401"
+    - cell
+      - link "Order from Milan" (@e15)
+    - cell "4 Jun 2026"
+    - cell "$55.80"
+    - cell "Closed"
+    - cell
+      - button "Ship" (@e16)
+      - button "Cancel" (@e17)
+  - row
+    - cell "#4402"
+    - cell
+      - link "Order from Naples" (@e18)
+    - cell "7 Jun 2026"
+    - cell "$87.10"
+    - cell "Pending"
+    - cell
+      - button "Ship" (@e19)
+      - button "Cancel" (@e20)
+  - row
+    - cell "#4403"
+    - cell
+      - link "Order from Seoul" (@e21)
+    - cell "10 Jun 2026"
+    - cell "$118.40"
+    - cell "Open"
+    - cell
+      - button "Ship" (@e22)
+      - button "Cancel" (@e23)
+  - row
+    - cell "#4404"
+    - cell
+      - link "Order from Portland" (@e24)
+    - cell "13 Jun 2026"
+    - cell "$149.70"
+    - cell "Closed"
+    - cell
+      - button "Ship" (@e25)
+      - button "Cancel" (@e26)
+  - row
+    - cell "#4405"
+    - cell
+      - link "Order from Vienna" (@e27)
+    - cell "16 Jun 2026"
+    - cell "$181.00"
+    - cell "Pending"
+    - cell
+      - button "Ship" (@e28)
+      - button "Cancel" (@e29)
+  - row
+    - cell "#4406"
+    - cell
+      - link "Order from Melbourne" (@e30)
+    - cell "19 Jun 2026"
+    - cell "$212.30"
+    - cell "Open"
+    - cell
+      - button "Ship" (@e31)
+      - button "Cancel" (@e32)
+  - row
+    - cell "#4407"
+    - cell
+      - link "Order from Osaka" (@e33)
+    - cell "22 Jun 2026"
+    - cell "$243.60"
+    - cell "Closed"
+    - cell
+      - button "Ship" (@e34)
+      - button "Cancel" (@e35)
+  - row
+    - cell "#4408"
+    - cell
+      - link "Order from Lisbon" (@e36)
+    - cell "25 Jun 2026"
+    - cell "$274.90"
+    - cell "Pending"
+    - cell
+      - button "Ship" (@e37)
+      - button "Cancel" (@e38)
+  - row
+    - cell "#4409"
+    - cell
+      - link "Order from Oslo" (@e39)
+    - cell "28 Jun 2026"
+    - cell "$306.20"
+    - cell "Open"
+    - cell
+      - button "Ship" (@e40)
+      - button "Cancel" (@e41)
+  - row
+    - cell "#4410"
+    - cell
+      - link "Order from Turin" (@e42)
+    - cell "3 Jun 2026"
+    - cell "$337.50"
+    - cell "Closed"
+    - cell
+      - button "Ship" (@e43)
+      - button "Cancel" (@e44)
+  - row
+    - cell "#4411"
+    - cell
+      - link "Order from Milan" (@e45)
+    - cell "6 Jun 2026"
+    - cell "$368.80"
+    - cell "Pending"
+    - cell
+      - button "Ship" (@e46)
+      - button "Cancel" (@e47)
+  - row
+    - cell "#4412"
+    - cell
+      - link "Order from Naples" (@e48)
+    - cell "9 Jun 2026"
+    - cell "$400.10"
+    - cell "Open"
+    - cell
+      - button "Ship" (@e49)
+      - button "Cancel" (@e50)
+  - row
+    - cell "#4413"
+    - cell
+      - link "Order from Seoul" (@e51)
+    - cell "12 Jun 2026"
+    - cell "$431.40"
+    - cell "Closed"
+    - cell
+      - button "Ship" (@e52)
+      - button "Cancel" (@e53)
+  - row
+    - cell "#4414"
+    - cell
+      - link "Order from Portland" (@e54)
+    - cell "15 Jun 2026"
+    - cell "$462.70"
+    - cell "Pending"
+    - cell
+      - button "Ship" (@e55)
+      - button "Cancel" (@e56)
+  - row
+    - cell "#4415"
+    - cell
+      - link "Order from Vienna" (@e57)
+    - cell "18 Jun 2026"
+    - cell "$494.00"
+    - cell "Open"
+    - cell
+      - button "Ship" (@e58)
+      - button "Cancel" (@e59)
+  - row
+    - cell "#4416"
+    - cell
+      - link "Order from Melbourne" (@e60)
+    - cell "21 Jun 2026"
+    - cell "$525.30"
+    - cell "Closed"
+    - cell
+      - button "Ship" (@e61)
+      - button "Cancel" (@e62)
+  - row
+    - cell "#4417"
+    - cell
+      - link "Order from Osaka" (@e63)
+    - cell "24 Jun 2026"
+    - cell "$556.60"
+    - cell "Pending"
+    - cell
+      - button "Ship" (@e64)
+      - button "Cancel" (@e65)
+  - row
+    - cell "#4418"
+    - cell
+      - link "Order from Lisbon" (@e66)
+    - cell "27 Jun 2026"
+    - cell "$587.90"
+    - cell "Open"
+    - cell
+      - button "Ship" (@e67)
+      - button "Cancel" (@e68)
+  - row
+    - cell "#4419"
+    - cell
+      - link "Order from Oslo" (@e69)
+    - cell "2 Jun 2026"
+    - cell "$619.20"
+    - cell "Closed"
+    - cell
+      - button "Ship" (@e70)
+      - button "Cancel" (@e71)
+… 5 more items — expand s4 --ax --cursor 20
