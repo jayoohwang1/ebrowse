@@ -621,6 +621,23 @@ def test_expand_select_ref_pages_through_options(server, env):
     assert "more options" not in r.stdout and "not captured" not in r.stdout
 
 
+def test_expand_ax_renders_tree_and_select_ref_enclosing_section(server, env):
+    ebrowse(env, "open", server.url("list.html"))
+    r = ebrowse(env, "expand", "s2", "--ax")
+    assert r.returncode == 0, r.stderr
+    assert re.search(r"^## s2 form .* \(ax\)$", r.stdout, re.M), r.stdout
+    assert re.search(r"^\s*- [a-z]+ .*\(@e\d+", r.stdout, re.M), r.stdout
+
+    ebrowse(env, "open", server.url("multi_select.html"))
+    country = ref_anywhere(env, r"\[Country")
+
+    r = ebrowse(env, "expand", country, "--ax")
+    assert r.returncode == 0, r.stderr
+    assert "SELECT Country" not in r.stdout, r.stdout
+    assert "(ax)" in r.stdout and f"({country})" in r.stdout, r.stdout
+    assert "- combobox" in r.stdout, r.stdout
+
+
 def test_nested_scroll_lazy_loading_panel(server, env):
     # an inner scroll container is annotated in expand, and 'scroll <sid> down'
     # scrolls INSIDE it — mounting virtualized/lazy content the window scroll

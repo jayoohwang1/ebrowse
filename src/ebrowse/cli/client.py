@@ -78,7 +78,7 @@ def _build_request(args: argparse.Namespace) -> Request | None:
     elif verb == "describe-screen":
         a = {"prompt": args.prompt, "refresh": args.refresh}
     elif verb == "expand":
-        a = {"target": args.target, "cursor": args.cursor, "all": args.all}
+        a = {"target": args.target, "cursor": args.cursor, "all": args.all, "ax": args.ax}
     elif verb == "screenshot":
         a = {"output": args.output, "section": args.section, "ref": args.ref, "full": args.full}
     elif verb == "get":
