@@ -102,6 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("target", help="section id (s3) or element ref (@e5)")
     v.add_argument("--cursor", type=int, default=0, help="list offset for long sections")
     v.add_argument("--all", action="store_true", help="no pagination (may be large)")
+    v.add_argument("--ax", action="store_true", help="accessibility-tree view of the section")
 
     v = verb("screenshot", "PNG of viewport/section/element. ex: ebrowse screenshot --section s3")
     v.add_argument("-o", "--output", default=None, help="output path (default: temp file)")

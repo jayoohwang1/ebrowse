@@ -19,6 +19,7 @@ from pathlib import Path
 
 from ebrowse.config import load_config
 from ebrowse.core import render
+from ebrowse.core.ax import render_section_ax
 from ebrowse.core.fingerprint import RefRegistry
 from ebrowse.core.pipeline import build_page
 from ebrowse.core.snapshot import capture
@@ -61,7 +62,7 @@ async def _with_page(url: str):
     return pw, browser, page
 
 
-async def run(url: str, cmd: str, arg: str | None, cursor: int) -> int:
+async def run(url: str, cmd: str, arg: str | None, cursor: int, ax: bool = False) -> int:
     cfg = load_config()
     pw, browser, page = await _with_page(url)
     try:
@@ -89,7 +90,10 @@ async def run(url: str, cmd: str, arg: str | None, cursor: int) -> int:
                     file=sys.stderr,
                 )
                 return 2
-            print(render.render_section_markdown(section, raw_by_sid[arg], cfg.observe, cursor))
+            if ax:
+                print(render_section_ax(section, raw_by_sid[arg], cfg.observe, cursor=cursor))
+            else:
+                print(render.render_section_markdown(section, raw_by_sid[arg], cfg.observe, cursor))
         elif cmd == "stats":
             outline = render.render_outline(pagemem)
             aria = await page.locator("body").aria_snapshot()
@@ -116,9 +120,10 @@ def main() -> int:
     ap.add_argument("cmd", choices=["outline", "expand", "capture", "stats"])
     ap.add_argument("arg", nargs="?", help="section id (expand) or output path (capture)")
     ap.add_argument("--cursor", type=int, default=0)
+    ap.add_argument("--ax", action="store_true", help="accessibility-tree view of the section")
     args = ap.parse_args()
     url = args.url if "://" in args.url else f"https://{args.url}"
-    return asyncio.run(run(url, args.cmd, args.arg, args.cursor))
+    return asyncio.run(run(url, args.cmd, args.arg, args.cursor, args.ax))
 
 
 if __name__ == "__main__":

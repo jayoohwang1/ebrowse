@@ -204,7 +204,10 @@ class Daemon:
             )
         if verb == "expand":
             return await session.verb_expand(
-                args["target"], cursor=args.get("cursor", 0), show_all=args.get("all", False)
+                args["target"],
+                cursor=args.get("cursor", 0),
+                show_all=args.get("all", False),
+                ax=args.get("ax", False),
             )
         if verb == "screenshot":
             return await session.verb_screenshot(

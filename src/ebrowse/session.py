@@ -28,6 +28,7 @@ from ebrowse.actions import ActionsMixin
 from ebrowse.compound import CompoundMixin
 from ebrowse.config import Config, cache_dir
 from ebrowse.core import render
+from ebrowse.core.ax import render_section_ax
 from ebrowse.core.fingerprint import RefRegistry
 from ebrowse.core.pipeline import build_page
 from ebrowse.core.snapshot import capture
@@ -640,7 +641,9 @@ class Session(CompoundMixin, ActionsMixin):
             raise CommandError("no page open — run 'ebrowse open <url>' first", ExitCode.USAGE)
         return await self.observe(no_summaries=no_summaries, no_glance=no_glance, preview=preview)
 
-    async def verb_expand(self, target: str, cursor: int = 0, show_all: bool = False) -> str:
+    async def verb_expand(
+        self, target: str, cursor: int = 0, show_all: bool = False, ax: bool = False
+    ) -> str:
         page_mem = self._require_page_mem()
         sid = target
         if target.startswith("@"):
@@ -651,15 +654,19 @@ class Session(CompoundMixin, ActionsMixin):
                     ExitCode.USAGE,
                 )
             sid = found[0].sid
-            # expanding a <select> ref lists ITS options (paginated), not the
-            # section — the only way to browse past the 15-option inline limit
-            if found[1].desc.tag == "select":
+            # The AX tree always renders the enclosing section. Markdown
+            # expansion of a <select> ref instead lists its options.
+            if not ax and found[1].desc.tag == "select":
                 raw = self.raw_by_sid.get(sid)
                 node = next((n for n in raw.iter_walk() if n.ref == target), None) if raw else None
                 if node is not None and node.attrs.get("opt"):
                     return render.render_select_options(node, cursor=cursor, show_all=show_all)
         section = self._get_section(sid)
         self._expanded_fps[section.fingerprint] = self.nav_id
+        if ax:
+            return render_section_ax(
+                section, self.raw_by_sid[sid], self.cfg.observe, cursor=cursor, show_all=show_all
+            )
         await self._caption_section_images(sid)
         return render.render_section_markdown(
             section, self.raw_by_sid[sid], self.cfg.observe, cursor=cursor, show_all=show_all

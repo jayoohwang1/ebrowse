@@ -70,7 +70,7 @@ TOOLS: list[dict[str, Any]] = [
         "(e.g. [Add to cart (@e15)]). Lists/tables paginate via cursor.",
         "inputSchema": {
             "type": "object",
-            "properties": {"target": _STR, "cursor": _INT, "all": _BOOL},
+            "properties": {"target": _STR, "cursor": _INT, "all": _BOOL, "ax": _BOOL},
             "required": ["target"],
         },
     },
@@ -180,6 +180,7 @@ def _tool_call(name: str, args: dict[str, Any], session: str) -> list[dict[str, 
                 "target": args["target"],
                 "cursor": args.get("cursor", 0),
                 "all": args.get("all", False),
+                "ax": args.get("ax", False),
             },
             session,
         )

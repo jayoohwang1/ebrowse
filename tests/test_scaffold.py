@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import urllib.request
 
+from ebrowse.cli.client import _build_request
 from ebrowse.cli.main import build_parser, main
 from ebrowse.config import Config, load_config
+from ebrowse.daemon.protocol import Request
 from ebrowse.model import (
     BBox,
     Diff,
@@ -130,7 +132,7 @@ def test_cli_parses_all_verbs():
     for argv in [
         ["open", "http://x"],
         ["outline", "--no-summaries"],
-        ["expand", "s3", "--cursor", "20"],
+        ["expand", "s3", "--cursor", "20", "--ax"],
         ["click", "@e1", "--double"],
         ["fill", "@e2", "hi"],
         ["type", "@e2", "hi", "--enter"],
@@ -146,6 +148,15 @@ def test_cli_parses_all_verbs():
     ]:
         args = parser.parse_args(argv)
         assert args.verb
+
+
+def test_expand_ax_request_round_trip():
+    """The opt-in renderer flag survives argparse and the daemon wire format."""
+    args = build_parser().parse_args(["expand", "s3", "--cursor", "20", "--all", "--ax"])
+    request = _build_request(args)
+    assert request is not None
+    assert request.args == {"target": "s3", "cursor": 20, "all": True, "ax": True}
+    assert Request.decode(request.encode()).args == request.args
 
 
 def test_cli_unknown_verb_exits_2(capsys):
