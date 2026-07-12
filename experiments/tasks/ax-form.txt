@@ -1,0 +1,6 @@
+Open http://127.0.0.1:8196/form.html. Read the signup form section using the
+accessibility-tree view (`ebrowse expand <sid> --ax`), then use what it shows to
+fill the form: name "Ada Lovelace", email "ada@example.com", country "Canada",
+account type Business, agree to the terms, and submit. Report the confirmation
+text the page shows and the roles the ax view reported for the country field and
+the submit control.
