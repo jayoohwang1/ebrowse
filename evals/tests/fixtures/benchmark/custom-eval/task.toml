@@ -1,0 +1,4 @@
+[task]
+prompt = "Open http://127.0.0.1:8196/list.html, expand the product list, and open the first product."
+url = "http://127.0.0.1:8196/list.html"
+tags = ["fixture", "read-only", "process"]

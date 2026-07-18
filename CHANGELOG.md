@@ -6,6 +6,16 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ## [Unreleased]
 
+### Added
+
+- **`evals/` workspace package (`ebrowse-evals`)** — foundation of the evaluation
+  harness. Trace schema v1 (typed JSONL records + content-addressed blob store,
+  forward-compatible by construction; see `evals/docs/trace-schema.md`), the
+  task/benchmark model with optional per-task `eval.py` evaluators receiving the
+  full trace (`evals/docs/tasks.md`), an `ebrowse-eval` CLI (`validate`, `tasks`),
+  and a committed generated sample trace for building viewers/inspection tools
+  against. Runner/capture/viewer land next; `experiments/` is unchanged until parity.
+
 ### Changed
 
 - **Section splitting is now lossless and expansion-budgeted.** Oversized semantic

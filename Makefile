@@ -14,12 +14,12 @@ test-all:
 	uv run pytest -q
 
 lint:
-	uv run ruff check src tests
-	uv run ruff format --check src tests
+	uv run ruff check src tests evals/src evals/tests
+	uv run ruff format --check src tests evals/src evals/tests
 
 fmt:
-	uv run ruff format src tests
-	uv run ruff check --fix src tests
+	uv run ruff format src tests evals/src evals/tests
+	uv run ruff check --fix src tests evals/src evals/tests
 
 typecheck:
 	uv run pyright
