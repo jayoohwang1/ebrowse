@@ -46,7 +46,22 @@ max_section_tokens = 16384      # ordinary expansion ceiling; collection page bu
 
 [security]
 allowed_domains = []            # empty = all; subdomains of listed domains allowed
+
+[debug]
+log = ""                        # JSONL debug-event log path; "" = off (default, zero overhead)
 ```
+
+## Debug event log
+
+`[debug] log` (env: `EBROWSE_DEBUG_LOG`) enables the tier-1 structured event
+channel: every daemon request appends its internal events (phase timings,
+snapshot/diff/locate facts, anomalies) as JSONL to the given path — one object
+per line, shape `{request_id, module, event, level, fields, ts, mono}`. A
+literal `{session}` in the path is replaced with the session name. Off by
+default: no file is created and instrumentation costs nothing. The per-call env
+var `EBROWSE_REQUEST_ID` (read by the CLI when building a request) lets a
+harness choose the request id echoed in the response and stamped on the events.
+See docs/architecture.md ("Debug event channel") and ADR 0013.
 
 ## Filesystem locations
 

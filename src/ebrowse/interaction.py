@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from ebrowse.model import Element, PageMem
     from ebrowse.session import PendingDialog
 
+from ebrowse import debug
 from ebrowse.core.snapshot import probe_blocker, probe_cover_above
 from ebrowse.errors import CommandError, ExitCode
 
@@ -80,6 +81,7 @@ class InteractionMixin:
             )
         info = await self._check_occlusion(loc, target)  # raises on dialog cover
         if info.get("coverInLabel") and plain:
+            debug.emit("interaction", "plan", target=target, route="label")
             return InteractionPlan(route="label")
         if info.get("covering"):
             # one-point mismatch is too weak for a hard refusal; let
@@ -99,7 +101,13 @@ class InteractionMixin:
                 )
                 if modal_context or not plain:
                     raise blocked from e
+                debug.emit("interaction", "plan", target=target, route="obstructed",
+                           cover=info["covering"], trial_retry=True)  # fmt: skip
                 return InteractionPlan(route="obstructed", cover=info["covering"], blocked=blocked)
+            debug.emit("interaction", "plan", target=target, route="direct",
+                       cover=info["covering"], trial_retry=True)  # fmt: skip
+            return InteractionPlan(route="direct")
+        debug.emit("interaction", "plan", target=target, route="direct")
         return InteractionPlan(route="direct")
 
     async def _check_occlusion(self, loc, target: str) -> dict:

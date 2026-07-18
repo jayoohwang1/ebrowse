@@ -35,6 +35,14 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- **Structured debug-event channel (tier 1).** `EBROWSE_DEBUG_LOG=<path>` /
+  config `[debug] log` streams per-request JSONL events (`{request_id, module,
+  event, level, fields, ts, mono}`): phase timings, snapshot/ref/diff/locate
+  facts, and anomaly events (`ref_rebound`, `ref_gone`, `snapshot_truncated`,
+  `element_moved`, `wait_timeout`, `section_reshaped`). Off by default — zero
+  overhead, no file, byte-identical output. `EBROWSE_REQUEST_ID` lets a harness
+  set the request id joined across CLI response and events (ADR 0013).
+
 - **Opt-in accessibility-tree expansion.** `ebrowse expand <target> --ax` renders
   an actionable, deterministic accessibility-tree outline with inline durable refs.
 - **Browse every option of a large `<select>`.** `expand @ref` on a native

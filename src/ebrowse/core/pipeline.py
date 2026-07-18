@@ -10,6 +10,7 @@ from __future__ import annotations
 import time
 from urllib.parse import urlsplit
 
+from ebrowse import debug
 from ebrowse.config import ObserveConfig
 from ebrowse.core import render
 from ebrowse.core.clickable import (
@@ -137,17 +138,27 @@ def build_page(
 ) -> tuple[PageMem, dict[str, RawSection]]:
     """Build a PageMem. Also returns sid -> RawSection so callers (expand,
     screenshots) can reach the underlying DOM subtree of each section."""
-    raws = split_page(
-        snapshot,
-        max_sections=observe.max_sections,
-        max_section_tokens=observe.max_section_tokens,
-    )
+    with debug.timed("split", "split"):
+        raws = split_page(
+            snapshot,
+            max_sections=observe.max_sections,
+            max_section_tokens=observe.max_section_tokens,
+        )
+    debug.emit("split", "sections", count=len(raws))
 
     # 1) extract all element nodes page-wide (document order matters for refs)
     section_nodes: list[list[DomNode]] = [extract_element_nodes(r) for r in raws]
     all_nodes = [n for nodes in section_nodes for n in nodes]
     descs = [_desc_for(n, snapshot.url) for n in all_nodes]
+    minted_before = len(registry)
     refs = registry.assign(descs)
+    debug.emit(
+        "fingerprint",
+        "refs_assigned",
+        total=len(refs),
+        minted=len(registry) - minted_before,
+        reused=len(refs) - (len(registry) - minted_before),
+    )
     for node, ref in zip(all_nodes, refs, strict=True):
         node.ref = ref  # annotate for the markdown renderer
 

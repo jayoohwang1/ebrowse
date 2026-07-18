@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from urllib.parse import urldefrag
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from ebrowse.core.split import RawSection
     from ebrowse.model import Section
 
+from ebrowse import debug
 from ebrowse.core import render
 from ebrowse.core.diff import diff_pages
 from ebrowse.core.locate import resolve
@@ -96,14 +98,63 @@ class ActionsMixin(InteractionMixin):
 
     async def _quiesce(self) -> None:
         ob = self.cfg.observe
+        args = [ob.quiescence_ms, ob.quiescence_max_ms]
         with contextlib.suppress(Exception):
             # throws if a navigation destroys the execution context mid-wait;
             # in that case wait for the new document instead
-            await self.page.evaluate(_QUIESCE_JS, [ob.quiescence_ms, ob.quiescence_max_ms])
+            self._emit_quiesce(await self.page.evaluate(_QUIESCE_JS, args), ob.quiescence_max_ms)
             return
         with contextlib.suppress(Exception):
             await self.page.wait_for_load_state("domcontentloaded", timeout=ob.quiescence_max_ms)
-            await self.page.evaluate(_QUIESCE_JS, [ob.quiescence_ms, ob.quiescence_max_ms])
+            self._emit_quiesce(await self.page.evaluate(_QUIESCE_JS, args), ob.quiescence_max_ms)
+
+    @staticmethod
+    def _emit_quiesce(elapsed: object, cap_ms: int) -> None:
+        """Debug-channel only: record how long the post-action DOM-quiet wait
+        ran, and flag the anomaly when it hit the cap (never went quiet)."""
+        if not debug.enabled() or not isinstance(elapsed, (int, float)):
+            return
+        capped = elapsed >= cap_ms
+        debug.emit("interaction", "quiesce", dur_ms=round(float(elapsed), 1), capped=capped)
+        if capped:
+            debug.emit("interaction", "wait_timeout", level="warn",
+                       condition="quiesce", cap_ms=cap_ms)  # fmt: skip
+
+    async def _emit_target_facts(self, loc, target: str) -> None:
+        """Debug-channel only (guarded by the caller): the resolved target's
+        live geometry at action time vs its bbox at snapshot time. A material
+        move means the observation the agent acted on was stale geometry —
+        the element_moved anomaly."""
+        if loc is None or not target.startswith("@") or self.page_mem is None:
+            return
+        found = self.page_mem.find_element(target)
+        if found is None:
+            return
+        snap = found[1].state.bbox
+        try:
+            box = await loc.bounding_box()
+            sx, sy = await self.page.evaluate(
+                "() => [Math.round(window.scrollX), Math.round(window.scrollY)]"
+            )
+        except Exception:
+            return
+        if not box:
+            return
+        # bounding_box is viewport-relative; snapshot bboxes are absolute page px
+        live_x, live_y = box["x"] + sx, box["y"] + sy
+        cx, cy = live_x + box["width"] / 2, live_y + box["height"] / 2
+        debug.emit(
+            "interaction",
+            "target_facts",
+            ref=target,
+            snap_bbox=[round(snap.x), round(snap.y), round(snap.width), round(snap.height)],
+            live_bbox=[round(live_x), round(live_y), round(box["width"]), round(box["height"])],
+            click_point=[round(cx), round(cy)],
+        )
+        scx, scy = snap.center()
+        if abs(cx - scx) > 8 or abs(cy - scy) > 8:
+            debug.emit("interaction", "element_moved", level="warn", ref=target,
+                       dx=round(cx - scx), dy=round(cy - scy))  # fmt: skip
 
     def _element_for(self, target: str) -> tuple[Element | None, str]:
         """target -> (Element from current PageMem or None for CSS, description)."""
@@ -193,7 +244,10 @@ class ActionsMixin(InteractionMixin):
         if prev is None:
             # acted (via CSS) before any outline: no baseline to diff against
             return self._no_baseline_landing(action_line)
-        diff = diff_pages(prev, new, begin_state.texts, self._section_texts(), self._expanded_now())
+        with debug.timed("diff", "diff"):
+            diff = diff_pages(
+                prev, new, begin_state.texts, self._section_texts(), self._expanded_now()
+            )
         diff.notes = list(self._notes)
         if diff.kind == "no_change" and self._hover_delivery_suspect:
             diff.notes.append(
@@ -236,6 +290,9 @@ class ActionsMixin(InteractionMixin):
         interception failure is enriched with the blocker diagnosis."""
         await self._ensure_browser()
         begin_state = await self._begin_action()
+        if debug.enabled():  # extra round trips (bbox + scroll) only when recording
+            await self._emit_target_facts(loc, target)
+        t_act = time.monotonic()
         try:
             await fn()
         except CommandError:
@@ -261,6 +318,9 @@ class ActionsMixin(InteractionMixin):
                     if err is not None:
                         raise err from e
                 raise _map_playwright_error(e) from e
+        debug.emit("interaction", "phase", phase="act",
+                   action=action_line.partition("\n")[0][:80],
+                   dur_ms=round((time.monotonic() - t_act) * 1000, 1))  # fmt: skip
         return await self._finish_action(action_line, begin_state)
 
     # --------------------------------------------------------------- verbs ----
