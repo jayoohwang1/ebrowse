@@ -15,6 +15,16 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   full trace (`evals/docs/tasks.md`), an `ebrowse-eval` CLI (`validate`, `tasks`),
   and a committed generated sample trace for building viewers/inspection tools
   against. Runner/capture/viewer land next; `experiments/` is unchanged until parity.
+- **`ebrowse-eval run` — the eval runner.** Ports `experiments/run-agent.sh` into
+  the package: task selection (`--task` globs / `--tag` / `--sample --seed`),
+  config layering (harness defaults → benchmark → task → CLI flags) persisted
+  fully resolved into `run_meta` alongside git sha/dirty + ebrowse version/mode,
+  a generic `AgentHarness` protocol with a `PiHarness` implementation (tool-guide
+  prepending, `experiments/.env` defaults, JSON event + pi session capture,
+  isolated per-run workdir, `--worktree` PATH shim with daemon stop), and one
+  Step trace record per agent tool-call with a `StepCapture` hook for the
+  browser-state capture layer. Per-task `eval.py` (or declarative `expected`)
+  results land in `run_end`.
 
 ### Changed
 
