@@ -6,12 +6,15 @@ them — as a human (two-lane trace viewer) or as an LLM (canned queries).
 
 A uv workspace member sharing the repo venv; `make setup` installs it.
 Everything is a thin reader/writer of the **trace schema** —
-[docs/trace-schema.md](docs/trace-schema.md) is the contract, and
-[docs/tasks.md](docs/tasks.md) covers task/benchmark definition.
+[docs/trace-schema.md](docs/trace-schema.md) is the contract,
+[docs/tasks.md](docs/tasks.md) covers task/benchmark definition, and
+[docs/inspect.md](docs/inspect.md) documents the inspection queries.
 
 Status: Phase 1 — schema, task model, `ebrowse-eval validate`/`tasks`, the
 runner (`ebrowse-eval run` drives the pi harness over a benchmark or single
-task and writes a trace per run), and the per-step capture layer (below).
+task and writes a trace per run), the per-step capture layer (below), the
+`view` trace viewer, and the inspection queries (`overview`, `anomalies`,
+`errors`, `step`, `trace-ref`, `trace-section`, `timing`, `grep`, `replay`).
 The legacy scripts in `../experiments/` keep working until this reaches parity.
 
 ## Per-step capture (`ebrowse_evals.capture`)
@@ -35,6 +38,8 @@ uv run ebrowse-eval tasks evals/tests/fixtures/benchmark --tag fixture
 # run tasks through pi (provider/model from flags, $PI_PROVIDER/$PI_MODEL, or experiments/.env)
 uv run ebrowse-eval run evals/tests/fixtures/benchmark --task 'list-*' --worktree
 uv run ebrowse-eval view evals/tests/fixtures/sample-trace --open
+uv run ebrowse-eval overview evals/tests/fixtures/sample-trace
+uv run ebrowse-eval trace-ref evals/tests/fixtures/sample-trace @e1
 ```
 
 `run` selects tasks (`--task` globs OR, `--tag` AND, `--sample N --seed S`),

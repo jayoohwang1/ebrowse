@@ -17,6 +17,7 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   against. Runner/capture/viewer land next; `experiments/` is unchanged until parity.
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 - **`ebrowse-eval run` — the eval runner.** Ports `experiments/run-agent.sh` into
   the package: task selection (`--task` globs / `--tag` / `--sample --seed`),
   config layering (harness defaults → benchmark → task → CLI flags) persisted
@@ -47,6 +48,14 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   the anomaly list linking to steps; degrades gracefully on missing blobs, torn
   tails, and unknown record types. See `evals/docs/viewer.md`.
 >>>>>>> worktree-agent-aa020f4e483813fed
+=======
+- **`ebrowse-eval` inspection queries** — canned entity-centric queries over a
+  trace run directory (`overview`, `anomalies`, `errors` with recovery-hint
+  followed/ignored joins, `step`, `trace-ref`, `trace-section`, `timing`,
+  `grep`, and `replay --step N` regenerating tier-2 detail by running the
+  stored DomSnapshot blob through pure core). Concise deterministic plain text,
+  `--json` everywhere; documented in `evals/docs/inspect.md`.
+>>>>>>> worktree-agent-ad344ffd87febc590
 
 ### Changed
 
