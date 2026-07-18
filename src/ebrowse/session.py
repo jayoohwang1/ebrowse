@@ -10,6 +10,7 @@ import asyncio
 import base64
 import contextlib
 import hashlib
+import json
 import tempfile
 import time
 from dataclasses import dataclass
@@ -32,7 +33,7 @@ from ebrowse.core import render
 from ebrowse.core.ax import render_section_ax
 from ebrowse.core.fingerprint import RefRegistry
 from ebrowse.core.pipeline import build_page
-from ebrowse.core.snapshot import capture
+from ebrowse.core.snapshot import DomSnapshot, capture
 from ebrowse.core.split import RawSection
 from ebrowse.errors import CommandError, ExitCode
 from ebrowse.model import PageMem, Section
@@ -149,6 +150,16 @@ class Session(CompoundMixin, ActionsMixin):
         # a slow/dead sidecar degrades outlines to deterministic labels.
         self._summarizer = SummarizerClient(cfg.summarizer)
         self._cache: SummaryCache | None = None
+        # --- debug-capture support (optional; used by external harnesses) ---
+        # page events (console/network_failure/navigation/dialog) accumulated
+        # since the last 'debug-capture' drain; capped so an event-storm page
+        # cannot grow memory unboundedly between captures
+        self._capture_events: list[dict[str, Any]] = []
+        # last DomSnapshot from _observe_page, reused by debug-capture when
+        # still fresh (no possibly-mutating verb ran since it was taken)
+        self.last_snapshot: DomSnapshot | None = None
+        self.cmd_seq = 0  # bumped by the daemon per possibly-mutating verb
+        self._snapshot_cmd_seq = -1
 
     # ------------------------------------------------------------ browser ----
 
@@ -235,6 +246,21 @@ class Session(CompoundMixin, ActionsMixin):
         )
         page.on("framenavigated", lambda fr, p=page: self._on_framenavigated(fr, p))
         page.on("close", lambda p=page: self._on_page_closed(p))
+        # debug-capture event feed: console output and failed requests are
+        # unrecoverable if not recorded live; cheap no-ops when nothing drains them
+        page.on(
+            "console",
+            lambda m: self._capture_event("console", level=m.type, text=m.text[:500]),
+        )
+        page.on(
+            "requestfailed",
+            lambda r: self._capture_event(
+                "network_failure",
+                url=r.url[:300],
+                method=r.method,
+                failure=(r.failure or "")[:200],
+            ),
+        )
 
     def _on_page_closed(self, page: Page) -> None:
         """Recover when an adopted popup/tab closes behind the agent's back."""
@@ -253,6 +279,7 @@ class Session(CompoundMixin, ActionsMixin):
             return
         fallback = live[0]
         self._activate_page(fallback)
+        self.last_snapshot = None
         self.page_mem = None
         self.raw_by_sid = {}
         self.nav_id += 1
@@ -264,6 +291,7 @@ class Session(CompoundMixin, ActionsMixin):
     def _on_framenavigated(self, frame, page: Page) -> None:
         if page is self._page and frame is page.main_frame:
             self.nav_events += 1
+            self._capture_event("navigation", url=frame.url[:300])
 
     def _on_dialog(self, dialog: Dialog, page: Page) -> None:
         # `alert` and `beforeunload` carry no decision, so auto-accept them to
@@ -272,6 +300,7 @@ class Session(CompoundMixin, ActionsMixin):
         # the agent decides via 'dialog accept|dismiss'. A registered handler that
         # does not resolve keeps the dialog up (blocking the page) — exactly what
         # we want. See docs/adr/0007-agent-resolves-native-dialogs.md.
+        self._capture_event("dialog", dialog_type=dialog.type, message=dialog.message[:300])
         if dialog.type not in DECISION_DIALOG_TYPES:
             self._notes.append(f'native {dialog.type} auto-accepted: "{dialog.message[:100]}"')
             task = asyncio.ensure_future(dialog.accept())
@@ -324,6 +353,7 @@ class Session(CompoundMixin, ActionsMixin):
         self._page_mru = []
         self._wired_pages = set()
         self.page_mem = None
+        self.last_snapshot = None
         self.raw_by_sid = {}
         self._pending_dialogs = {}
         with contextlib.suppress(Exception):
@@ -348,6 +378,10 @@ class Session(CompoundMixin, ActionsMixin):
         self._check_url_allowed(self.page.url, landed=True)
         with debug.timed("snapshot", "capture"):
             snap = await capture(self.page)
+        # retained for debug-capture reuse: fresh as long as no possibly-mutating
+        # verb runs after this observation (cmd_seq check in verb_debug_capture)
+        self.last_snapshot = snap
+        self._snapshot_cmd_seq = self.cmd_seq
         if debug.enabled():  # node counting is O(n); only walk when recording
             iframes = [n for n in snap.root.walk() if n.tag == "iframe"]
             skipped = sum(1 for n in iframes if n.cross_origin)
@@ -949,6 +983,84 @@ class Session(CompoundMixin, ActionsMixin):
         if d.action_line is not None and d.begin_state is not None:
             return f"{outcome}\n{await self._finish_action(d.action_line, d.begin_state)}"
         return f"{outcome}\n{await self.observe()}"
+
+    _MAX_CAPTURE_EVENTS = 300
+
+    def _capture_event(self, kind: str, **data: Any) -> None:
+        """Record a page event for the next 'debug-capture' drain (harness
+        tracing). Capped so an event storm can't grow memory between drains."""
+        if len(self._capture_events) < self._MAX_CAPTURE_EVENTS:
+            self._capture_events.append({"kind": kind, "ts": time.time(), "data": data})
+
+    async def verb_debug_capture(self) -> str:
+        """Machine-readable post-action state dump for external harnesses (eval
+        tracing): browser state, viewport screenshot (base64 png), the
+        DomSnapshot dict, and page events drained since the previous capture.
+        Best-effort by design — each part degrades independently into
+        payload['errors'] rather than failing the request, because a tracing
+        capture must never break the run it is observing."""
+        payload: dict[str, Any] = {
+            "events": self._capture_events,
+            "browser": {},
+            "screenshot_b64": None,
+            "dom_snapshot": None,
+            "snapshot_reused": False,
+            "errors": {},
+        }
+        self._capture_events = []
+        errors: dict[str, str] = payload["errors"]
+        page = self._page
+        if self._context is None or page is None or page.is_closed():
+            errors["browser"] = "no page open"
+            return json.dumps(payload)
+
+        browser: dict[str, Any] = {"url": page.url}
+        payload["browser"] = browser
+        blocked = self._active_dialog()
+        if blocked is not None:
+            # a native confirm/prompt freezes the renderer: title()/evaluate()/
+            # screenshot() on this tab would hang, so report state-only
+            browser["tabs"] = [
+                {"index": i, "url": p.url[:300], "active": p is page}
+                for i, p in enumerate(self._context.pages)
+            ]
+            browser["dialog"] = {"type": blocked.type, "message": blocked.message[:300]}
+            errors["snapshot"] = "native dialog blocking the page"
+            errors["screenshot"] = "native dialog blocking the page"
+            return json.dumps(payload)
+
+        with contextlib.suppress(Exception):
+            browser["title"] = (await page.title())[:200]
+        # tab titles are skipped for background tabs: one round trip per tab
+        # per step is exactly the per-element chatter the architecture forbids
+        browser["tabs"] = [
+            {"index": i, "url": p.url[:300], "active": p is page}
+            for i, p in enumerate(self._context.pages)
+        ]
+
+        snap = self.last_snapshot
+        if snap is not None and self._snapshot_cmd_seq == self.cmd_seq:
+            payload["snapshot_reused"] = True  # nothing possibly-mutating ran since
+        else:
+            try:
+                snap = await capture(page)
+                self.last_snapshot = snap
+                self._snapshot_cmd_seq = self.cmd_seq
+            except Exception as e:
+                snap = None
+                errors["snapshot"] = _first_line(e)
+        if snap is not None:
+            payload["dom_snapshot"] = snap.to_dict()
+            browser["viewport"] = {"width": snap.viewport[0], "height": snap.viewport[1]}
+            browser["scroll_y"] = snap.scroll_y
+            browser["doc_height"] = snap.doc_height
+
+        try:
+            png = await page.screenshot(full_page=False, timeout=10_000)
+            payload["screenshot_b64"] = base64.b64encode(png).decode()
+        except Exception as e:
+            errors["screenshot"] = _first_line(e)
+        return json.dumps(payload)
 
     async def verb_connect(self, target: str) -> str:
         url = target if "://" in target else f"http://127.0.0.1:{target}"

@@ -15,6 +15,7 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   full trace (`evals/docs/tasks.md`), an `ebrowse-eval` CLI (`validate`, `tasks`),
   and a committed generated sample trace for building viewers/inspection tools
   against. Runner/capture/viewer land next; `experiments/` is unchanged until parity.
+<<<<<<< HEAD
 - **`ebrowse-eval run` — the eval runner.** Ports `experiments/run-agent.sh` into
   the package: task selection (`--task` globs / `--tag` / `--sample --seed`),
   config layering (harness defaults → benchmark → task → CLI flags) persisted
@@ -25,6 +26,16 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   Step trace record per agent tool-call with a `StepCapture` hook for the
   browser-state capture layer. Per-task `eval.py` (or declarative `expected`)
   results land in `run_end`.
+=======
+- **Per-step capture layer (`ebrowse_evals.capture`)** — `StepCapture` fills each
+  Step record's browser state, screenshot, and DomSnapshot blobs and appends
+  `browser_event` records (console, failed requests, navigations, dialogs)
+  unconditionally after every agent tool-call, degrading to a partial step plus an
+  `anomaly` record on any failure (capture never breaks a run). Backed by a new
+  additive daemon verb `debug-capture` that reuses the session's own snapshot
+  machinery — including the snapshot already taken for the previous verb's
+  observation when no possibly-mutating verb ran since.
+>>>>>>> worktree-agent-adb1660d31a259bcc
 
 ### Changed
 
