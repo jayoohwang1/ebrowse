@@ -16,6 +16,7 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   and a committed generated sample trace for building viewers/inspection tools
   against. Runner/capture/viewer land next; `experiments/` is unchanged until parity.
 <<<<<<< HEAD
+<<<<<<< HEAD
 - **`ebrowse-eval run` — the eval runner.** Ports `experiments/run-agent.sh` into
   the package: task selection (`--task` globs / `--tag` / `--sample --seed`),
   config layering (harness defaults → benchmark → task → CLI flags) persisted
@@ -36,6 +37,16 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   machinery — including the snapshot already taken for the previous verb's
   observation when no possibly-mutating verb ran since.
 >>>>>>> worktree-agent-adb1660d31a259bcc
+=======
+- **`ebrowse-eval view <run-dir>`** — human trace viewer rendering a run into one
+  self-contained HTML file (assets inlined, no CDN). Two-lane step log: right lane
+  is what the agent saw (command, verbatim output, tokens/latency); left lane is
+  ground truth + internals (screenshot filmstrip, URL/title, timing bar, anomaly
+  badges, with browser events / ebrowse_log / browser state / DomSnapshot JSON
+  behind a per-step expander). Header carries run metadata, outcome/totals, and
+  the anomaly list linking to steps; degrades gracefully on missing blobs, torn
+  tails, and unknown record types. See `evals/docs/viewer.md`.
+>>>>>>> worktree-agent-aa020f4e483813fed
 
 ### Changed
 

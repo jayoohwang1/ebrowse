@@ -34,6 +34,7 @@ uv run ebrowse-eval validate evals/tests/fixtures/sample-trace
 uv run ebrowse-eval tasks evals/tests/fixtures/benchmark --tag fixture
 # run tasks through pi (provider/model from flags, $PI_PROVIDER/$PI_MODEL, or experiments/.env)
 uv run ebrowse-eval run evals/tests/fixtures/benchmark --task 'list-*' --worktree
+uv run ebrowse-eval view evals/tests/fixtures/sample-trace --open
 ```
 
 `run` selects tasks (`--task` globs OR, `--tag` AND, `--sample N --seed S`),
@@ -43,3 +44,8 @@ each run's `run_meta`. `--worktree` is the port of `run-agent.sh -w`: it shims
 `ebrowse` to this checkout's `.venv` and stops any running daemon first. The
 agent boundary is the `AgentHarness` protocol (`harness.py`); `runner.StepCapture`
 is the hook where the capture layer enriches each step.
+
+`view` renders a run into a single self-contained HTML page — a two-lane
+step log (right: what the agent saw; left: screenshot filmstrip + internals
+behind expanders) with the anomaly list up top. See
+[docs/viewer.md](docs/viewer.md).
