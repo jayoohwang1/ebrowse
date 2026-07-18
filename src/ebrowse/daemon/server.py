@@ -37,7 +37,14 @@ def _verb_timeout(verb: str) -> int:
 # Verbs allowed while a native dialog blocks the current tab: resolve it, or
 # escape to another tab / re-attach / close. Everything else would touch the
 # frozen page and is refused with a recovery hint.
-_DIALOG_SAFE_VERBS = frozenset({"dialog", "tabs", "tab", "connect", "close"})
+_DIALOG_SAFE_VERBS = frozenset({"dialog", "tabs", "tab", "connect", "close", "debug-capture"})
+
+# Verbs that cannot change page state. Used for debug-capture snapshot
+# freshness: a snapshot taken during the last command stays reusable across
+# read-only verbs (debug-capture itself must not invalidate what it observes).
+_READ_ONLY_VERBS = frozenset(
+    {"debug-capture", "outline", "expand", "query", "get", "screenshot", "describe-screen", "tabs"}
+)
 
 
 class Daemon:
@@ -183,6 +190,10 @@ class Daemon:
             and (warn := session.dialog_block_warning(verb)) is not None
         ):
             raise CommandError(warn, ExitCode.ACTION_FAILED)
+        if verb not in _READ_ONLY_VERBS:
+            session.cmd_seq += 1  # possibly mutating: invalidates debug-capture reuse
+        if verb == "debug-capture":
+            return await session.verb_debug_capture()
         if verb in ("open", "goto"):
             return await session.verb_open(args["url"])
         if verb == "reload":
