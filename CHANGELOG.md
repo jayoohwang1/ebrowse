@@ -15,6 +15,14 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   full trace (`evals/docs/tasks.md`), an `ebrowse-eval` CLI (`validate`, `tasks`),
   and a committed generated sample trace for building viewers/inspection tools
   against. Runner/capture/viewer land next; `experiments/` is unchanged until parity.
+- **`ebrowse-eval view <run-dir>`** — human trace viewer rendering a run into one
+  self-contained HTML file (assets inlined, no CDN). Two-lane step log: right lane
+  is what the agent saw (command, verbatim output, tokens/latency); left lane is
+  ground truth + internals (screenshot filmstrip, URL/title, timing bar, anomaly
+  badges, with browser events / ebrowse_log / browser state / DomSnapshot JSON
+  behind a per-step expander). Header carries run metadata, outcome/totals, and
+  the anomaly list linking to steps; degrades gracefully on missing blobs, torn
+  tails, and unknown record types. See `evals/docs/viewer.md`.
 
 ### Changed
 

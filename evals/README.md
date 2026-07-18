@@ -16,4 +16,10 @@ scripts in `../experiments/` keep working until this reaches parity.
 ```bash
 uv run ebrowse-eval validate evals/tests/fixtures/sample-trace
 uv run ebrowse-eval tasks evals/tests/fixtures/benchmark --tag fixture
+uv run ebrowse-eval view evals/tests/fixtures/sample-trace --open
 ```
+
+`view` renders a run into a single self-contained HTML page — a two-lane
+step log (right: what the agent saw; left: screenshot filmstrip + internals
+behind expanders) with the anomaly list up top. See
+[docs/viewer.md](docs/viewer.md).

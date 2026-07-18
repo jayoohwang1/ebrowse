@@ -51,6 +51,25 @@ def _cmd_tasks(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_view(args: argparse.Namespace) -> int:
+    from ebrowse_evals.viewer import render_run
+
+    run_dir = Path(args.run_dir)
+    try:
+        html = render_run(run_dir)
+    except FileNotFoundError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    out = Path(args.output) if args.output else run_dir / "trace.html"
+    out.write_text(html, encoding="utf-8")
+    print(f"wrote {out}")
+    if args.open:
+        import webbrowser
+
+        webbrowser.open(out.resolve().as_uri())
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ebrowse-eval", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -64,6 +83,12 @@ def main(argv: list[str] | None = None) -> int:
     p_tasks.add_argument("--task", action="append", help="task-id glob (repeatable, OR)")
     p_tasks.add_argument("--tag", action="append", help="required tag (repeatable, AND)")
     p_tasks.set_defaults(func=_cmd_tasks)
+
+    p_view = sub.add_parser("view", help="render a run directory to a self-contained HTML page")
+    p_view.add_argument("run_dir")
+    p_view.add_argument("-o", "--output", help="output path (default: <run-dir>/trace.html)")
+    p_view.add_argument("--open", action="store_true", help="open the page in a browser")
+    p_view.set_defaults(func=_cmd_view)
 
     args = parser.parse_args(argv)
     return args.func(args)
