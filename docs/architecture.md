@@ -126,6 +126,31 @@ tests/
 scripts/smoke_real_sites.py  # manual real-site outline quality check
 ```
 
+## Debug event channel (tier 1)
+
+`src/ebrowse/debug.py` — a structured, per-request event stream for eval
+harnesses and postmortems. **OFF by default; zero overhead and zero behavior
+change when off** (a single contextvar check per emit; expensive fields are
+computed only when recording). Enable with `EBROWSE_DEBUG_LOG=<path>` or config
+`[debug] log` (a literal `{session}` in the path yields per-session files). See
+[ADR 0013](adr/0013-debug-event-channel.md).
+
+- Every daemon request carries an id (minted by the CLI, overridable via
+  `EBROWSE_REQUEST_ID`), echoed in the response and stamped on every event — a
+  harness joins one CLI call to its internal events by `request_id`.
+- The daemon installs an in-memory recorder (contextvar) per request; code
+  anywhere — including pure `core/` — appends plain events via `debug.emit()`
+  (no I/O at emit time, so core stays pure). The daemon flushes JSONL after the
+  response: one object per line, shape
+  `{request_id, module, event, level, fields, ts, mono}`.
+- Tier 1 records per-phase timings (navigate/settle/capture/split/build/act/
+  quiesce/diff), snapshot facts (nodes, iframes, truncation), ref economics
+  (minted/reused), per-section diff verdicts, locate/interaction routing facts,
+  and **anomalies** (`level=warn`): `ref_rebound`, `ref_gone`,
+  `snapshot_truncated`, `element_moved`, `wait_timeout`, `section_reshaped` —
+  rare and surprising by design. Full decision traces are out of scope (replay
+  tooling, not logging).
+
 ## Accepted risks & tradeoffs
 
 | Risk | Stance |

@@ -12,6 +12,7 @@ Response: {"id": str, "ok": bool, "output": str, "error": str|null, "exit_code":
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -26,7 +27,12 @@ class Request:
     verb: str
     session: str = "default"
     args: dict[str, Any] = field(default_factory=dict)
-    id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    # The id is echoed in the Response and stamped on every debug-channel event
+    # (request_id), so a harness can join a CLI call to the daemon's internal
+    # events. EBROWSE_REQUEST_ID lets the harness supply its own id per call.
+    id: str = field(
+        default_factory=lambda: os.environ.get("EBROWSE_REQUEST_ID") or uuid.uuid4().hex[:12]
+    )
 
     def encode(self) -> bytes:
         return (

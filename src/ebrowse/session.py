@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
     from ebrowse.actions import ActionSnapshot
 
+from ebrowse import debug
 from ebrowse.actions import ActionsMixin
 from ebrowse.compound import CompoundMixin
 from ebrowse.config import Config, cache_dir
@@ -345,10 +346,26 @@ class Session(CompoundMixin, ActionsMixin):
         # enforce allowed_domains on the *landed* URL too — link clicks and
         # redirects can leave the domain even when the opened URL was allowed
         self._check_url_allowed(self.page.url, landed=True)
-        snap = await capture(self.page)
-        self.page_mem, self.raw_by_sid = build_page(
-            snap, self.registry, self.cfg.observe, nav_id=self.nav_id
-        )
+        with debug.timed("snapshot", "capture"):
+            snap = await capture(self.page)
+        if debug.enabled():  # node counting is O(n); only walk when recording
+            iframes = [n for n in snap.root.walk() if n.tag == "iframe"]
+            skipped = sum(1 for n in iframes if n.cross_origin)
+            debug.emit(
+                "snapshot",
+                "captured",
+                nodes=sum(1 for _ in snap.root.walk()),
+                truncated=snap.truncated,
+                iframes=len(iframes),
+                iframes_captured=sum(1 for n in iframes if n.children),
+                iframes_skipped=skipped,
+            )
+            if snap.truncated:
+                debug.emit("snapshot", "snapshot_truncated", level="warn", url=snap.url)
+        with debug.timed("pipeline", "build_page"):
+            self.page_mem, self.raw_by_sid = build_page(
+                snap, self.registry, self.cfg.observe, nav_id=self.nav_id
+            )
 
     async def observe(
         self, no_summaries: bool = False, no_glance: bool = False, preview: bool = False
@@ -590,7 +607,8 @@ class Session(CompoundMixin, ActionsMixin):
         await self._ensure_browser()
         self._notes = []
         try:
-            await self.page.goto(url, wait_until="domcontentloaded", timeout=GOTO_TIMEOUT_MS)
+            with debug.timed("session", "navigate", url=url[:200]):
+                await self.page.goto(url, wait_until="domcontentloaded", timeout=GOTO_TIMEOUT_MS)
         except Exception as e:
             raise CommandError(
                 f"navigation failed: {_first_line(e)}", ExitCode.ACTION_FAILED
@@ -946,8 +964,15 @@ class Session(CompoundMixin, ActionsMixin):
     # ------------------------------------------------------------ helpers ----
 
     async def _settle(self) -> None:
+        t0 = time.monotonic()
+        fired = False
         with contextlib.suppress(Exception):
             await self.page.wait_for_load_state("networkidle", timeout=3000)
+            fired = True
+        # not firing within the 3s cap is routine on busy pages (level=info,
+        # not the wait_timeout anomaly — that one is for the quiesce cap)
+        debug.emit("session", "wait", condition="networkidle", fired=fired,
+                   dur_ms=round((time.monotonic() - t0) * 1000, 1))  # fmt: skip
 
     def _check_url_allowed(self, url: str, landed: bool = False) -> None:
         allowed = self.cfg.security.allowed_domains
