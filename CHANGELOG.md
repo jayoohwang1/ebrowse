@@ -15,6 +15,12 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   full trace (`evals/docs/tasks.md`), an `ebrowse-eval` CLI (`validate`, `tasks`),
   and a committed generated sample trace for building viewers/inspection tools
   against. Runner/capture/viewer land next; `experiments/` is unchanged until parity.
+- **`ebrowse-eval` inspection queries** — canned entity-centric queries over a
+  trace run directory (`overview`, `anomalies`, `errors` with recovery-hint
+  followed/ignored joins, `step`, `trace-ref`, `trace-section`, `timing`,
+  `grep`, and `replay --step N` regenerating tier-2 detail by running the
+  stored DomSnapshot blob through pure core). Concise deterministic plain text,
+  `--json` everywhere; documented in `evals/docs/inspect.md`.
 
 ### Changed
 
