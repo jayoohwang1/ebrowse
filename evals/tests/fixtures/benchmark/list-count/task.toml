@@ -5,4 +5,4 @@ tags = ["fixture", "read-only"]
 timeout_s = 120
 
 [task.expected]
-contains = "24"
+contains = "32"

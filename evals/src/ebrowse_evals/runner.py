@@ -129,6 +129,7 @@ def run_task(
 ) -> RunResult:
     """Execute one task through the harness and write a complete trace."""
     repo_root = repo_root or Path.cwd()
+    run_dir = run_dir.resolve()  # see run_tasks: paths embed in shim + subprocess args
     writer = TraceWriter(run_dir)
     git_sha, git_dirty = _git_state(repo_root)
     writer.write(
@@ -213,6 +214,10 @@ def run_tasks(
 ) -> list[RunResult]:
     """Run each selected task in its own run directory under runs_root."""
     results: list[RunResult] = []
+    # Absolute: run_dir paths get embedded in the shim script and passed to the
+    # agent subprocess (--session-dir, EBROWSE_DEBUG_LOG), whose cwd is the
+    # run's workdir — a relative runs_root would scatter artifacts under it.
+    runs_root = runs_root.resolve()
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     for task in tasks:
         config = resolve_config(benchmark.config if benchmark else None, task.config, cli_config)

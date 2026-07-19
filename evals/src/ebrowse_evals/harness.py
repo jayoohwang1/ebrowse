@@ -89,6 +89,8 @@ def _text(content: Any) -> str:
 
 
 def _ts(value: Any) -> float | None:
+    if isinstance(value, (int, float)):  # pi v3 sessions: epoch milliseconds
+        return float(value) / 1000.0 if value > 1e11 else float(value)
     if not isinstance(value, str):
         return None
     try:
@@ -151,6 +153,24 @@ def parse_pi_session(entries: list[dict[str, Any]]) -> HarnessResult:
         "peak_context": peak,
     }
     return result
+
+
+def _jsonl(path: Path) -> list[dict[str, Any]]:
+    """Best-effort JSONL: skips blank/torn lines (timeout kills mid-write)."""
+    out: list[dict[str, Any]] = []
+    if not path.is_file():
+        return out
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            out.append(obj)
+    return out
 
 
 # -- pi harness --------------------------------------------------------------
@@ -309,36 +329,45 @@ class PiHarness:
             full_prompt,
         ]
         timed_out = False
-        try:
-            proc = subprocess.run(
-                cmd,
-                cwd=workdir,
-                env=full_env,
-                capture_output=True,
-                text=True,
-                timeout=timeout_s,
-                check=False,
-            )
-            stdout, stderr, exit_code = proc.stdout, proc.stderr, proc.returncode
-        except subprocess.TimeoutExpired as e:
-            timed_out = True
-            stdout = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
-            stderr = e.stderr.decode() if isinstance(e.stderr, bytes) else (e.stderr or "")
-            exit_code = -1
-        (run_dir / PI_EVENTS_FILE).write_text(stdout, encoding="utf-8")
-        (run_dir / STDERR_FILE).write_text(stderr, encoding="utf-8")
-        # The session file (written by pi itself) is the ground truth for steps.
+        # Stream stdout/stderr straight to files: a timeout kill then loses
+        # nothing (subprocess capture buffers would), and the event stream
+        # doubles as the step source when pi never got to write its session.
+        events_path = run_dir / PI_EVENTS_FILE
+        with (
+            events_path.open("wb") as out_f,
+            (run_dir / STDERR_FILE).open("wb") as err_f,
+        ):
+            try:
+                proc = subprocess.run(
+                    cmd,
+                    cwd=workdir,
+                    env=full_env,
+                    stdout=out_f,
+                    stderr=err_f,
+                    timeout=timeout_s,
+                    check=False,
+                )
+                exit_code = proc.returncode
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                exit_code = -1
+        # The session file (written by pi at exit) is the ground truth for
+        # steps; on timeout it never lands, so fall back to the live event
+        # stream's message_end records (same message payloads).
         sessions = sorted(session_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
+        entries: list[dict[str, Any]] = []
+        session_path: Path | None = None
         if sessions:
+            session_path = sessions[-1]
+            entries = _jsonl(session_path)
+        if not any(e.get("type") == "message" for e in entries):
             entries = [
-                json.loads(line)
-                for line in sessions[-1].read_text(encoding="utf-8").splitlines()
-                if line.strip()
+                {"type": "message", "message": e["message"]}
+                for e in _jsonl(events_path)
+                if e.get("type") == "message_end" and isinstance(e.get("message"), dict)
             ]
-            result = parse_pi_session(entries)
-            result.session_path = sessions[-1]
-        else:
-            result = HarnessResult()
+        result = parse_pi_session(entries)
+        result.session_path = session_path
         result.exit_code = exit_code
         result.timed_out = timed_out
         return result

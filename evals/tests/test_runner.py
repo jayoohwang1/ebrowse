@@ -35,9 +35,9 @@ class FakeHarness:
                     tokens={"input": 100, "output": 20},
                     latency_s=1.0,
                 ),
-                ParsedStep(command="ebrowse expand s1", output="24 products", is_error=False),
+                ParsedStep(command="ebrowse expand s1", output="32 products", is_error=False),
             ],
-            final_answer="There are 24 products.",
+            final_answer="There are 32 products.",
             totals={"output_tokens": 30, "input_tokens": 250, "peak_context": 280},
         )
         self.calls: list[dict] = []
@@ -112,7 +112,7 @@ def test_run_task_emits_valid_trace(tmp_path):
     assert steps[0].screenshot is None and steps[0].dom_snapshot is None  # capture layer's job
     end = reader.end()
     assert end is not None
-    assert end.outcome == "success"  # default_eval: "24" in final answer
+    assert end.outcome == "success"  # default_eval: "32" in final answer
     assert end.steps == 2
     assert end.totals["output_tokens"] == 30
     assert end.eval == {"success": True, "score": None, "details": {}}

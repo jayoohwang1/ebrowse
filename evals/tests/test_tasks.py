@@ -29,7 +29,7 @@ def test_selection():
 def test_default_eval_expected_contains():
     task = load_task(BENCH / "list-count")
     assert task.load_evaluator() is None
-    assert task.default_eval("There are 24 products.").success is True
+    assert task.default_eval("There are 32 products.").success is True
     assert task.default_eval("There are 23 products.").success is False
 
 
