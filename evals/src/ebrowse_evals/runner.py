@@ -29,6 +29,7 @@ HARNESS_DEFAULTS: dict[str, Any] = {
     "tool": "ebrowse",
     "worktree": False,
     "timeout_s": 600.0,
+    "capture": True,  # instrument the ebrowse shim (spool + debug log); ebrowse-only
 }
 
 
@@ -148,8 +149,8 @@ def run_task(
     workdir = run_dir / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
     result = harness.run(task.prompt, workdir=workdir, env={}, timeout_s=timeout_s, run_dir=run_dir)
-    for i, ps in enumerate(result.steps, 1):
-        step = Step(
+    steps = [
+        Step(
             step=i,
             command=ps.command,
             output=ps.output,
@@ -158,7 +159,22 @@ def run_task(
             latency_s=ps.latency_s,
             error={"class": "tool_error"} if ps.is_error else None,
         )
-        if capture is not None:
+        for i, ps in enumerate(result.steps, 1)
+    ]
+    # Instrumented-shim artifacts (harness.py): per-call capture payloads and
+    # the daemon's tier-1 debug log, joined to steps by shim call number.
+    # Both attachers mutate the Step records, so they run before the write.
+    from ebrowse_evals import ingest
+    from ebrowse_evals.harness import DEBUG_LOG_FILE, SPOOL_DIR
+
+    spool_dir = run_dir / SPOOL_DIR
+    if spool_dir.is_dir() and any(spool_dir.glob("*.json")):
+        ingest.attach_spool(writer, steps, spool_dir)
+    debug_log = run_dir / DEBUG_LOG_FILE
+    if debug_log.is_file():
+        ingest.attach_debug_log(writer, steps, debug_log)
+    for step in steps:
+        if capture is not None:  # live hook for harnesses that support it
             capture.on_step(writer, step)
         writer.write(step)
     evaluator = task.load_evaluator()

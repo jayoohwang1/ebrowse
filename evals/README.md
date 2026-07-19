@@ -32,6 +32,17 @@ the previous verb's observation when no possibly-mutating verb ran since. Any
 capture failure degrades to a partial step plus an `anomaly` record; it never
 raises into the runner. Details in `src/ebrowse_evals/capture.py`.
 
+For pi runs the capture moment is the **instrumented shim**: `run` (unless
+`--no-capture`; ebrowse-only) wraps the `ebrowse` command so each invocation
+is numbered, stamped with `EBROWSE_REQUEST_ID=call-<n>`, and followed
+synchronously by a debug-capture spool to `capture/<n>.json`; the shim env also
+enables the daemon's tier-1 debug log (`ebrowse-debug.jsonl`). After the run,
+`ingest.py` joins both back to trace steps *ordinally* (the n-th
+ebrowse-invoking step is call n — no timestamp heuristics; mismatches surface
+as a `join_mismatch` anomaly), fills each step's browser/screenshot/DomSnapshot
+fields, re-emits daemon events as `ebrowse_log` records, promotes warn-level
+anomaly events to `anomaly` records, and rolls phase timings into `step.timing`.
+
 ```bash
 uv run ebrowse-eval validate evals/tests/fixtures/sample-trace
 uv run ebrowse-eval tasks evals/tests/fixtures/benchmark --tag fixture

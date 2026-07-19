@@ -19,6 +19,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +29,8 @@ PROMPT_FILE = "prompt.txt"
 PI_EVENTS_FILE = "pi-events.jsonl"
 STDERR_FILE = "stderr.log"
 SESSION_DIR = "session"
+SPOOL_DIR = "capture"  # per-call debug-capture payloads: capture/<n>.json
+DEBUG_LOG_FILE = "ebrowse-debug.jsonl"  # daemon tier-1 events (EBROWSE_DEBUG_LOG)
 
 
 @dataclass(slots=True)
@@ -176,7 +179,9 @@ class PiHarness:
     tool: str = "none"  # "ebrowse" | "agent-browser" | "none"
     repo_root: Path = Path(".")
     worktree: bool = False  # shim `ebrowse` to repo_root/.venv (run-agent.sh -w)
+    capture: bool = False  # instrument each ebrowse call (spool + debug log)
     pi_bin: str = "pi"
+    ebrowse_bin: str | None = None  # explicit target for the shim (tests)
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -205,21 +210,68 @@ class PiHarness:
             return ""
         raise ValueError(f"unknown tool: {self.tool} (want ebrowse|agent-browser|none)")
 
-    def _worktree_shim(self, run_dir: Path, env: dict[str, str]) -> None:
-        """Point `ebrowse` at this checkout's venv; daemon restarts on local code."""
-        venv_py = self.repo_root / ".venv" / "bin" / "python"
-        if not venv_py.exists():
+    def _shim_target(self) -> str:
+        """The real ebrowse invocation the shim wraps (quoted shell fragment)."""
+        if self.worktree:
+            venv_py = self.repo_root / ".venv" / "bin" / "python"
+            if not venv_py.exists():
+                raise FileNotFoundError(
+                    f"no venv at {venv_py} — run 'uv sync' in {self.repo_root} first"
+                )
+            return f'"{venv_py}" -m ebrowse.cli.main'
+        real = self.ebrowse_bin or shutil.which("ebrowse")
+        if real is None:
             raise FileNotFoundError(
-                f"no venv at {venv_py} — run 'uv sync' in {self.repo_root} first"
+                "no `ebrowse` on PATH to instrument — install it (uv tool install) "
+                "or pass --worktree to use this checkout's venv"
             )
+        return f'"{real}"'
+
+    def _install_shim(self, run_dir: Path, env: dict[str, str]) -> None:
+        """Wrap `ebrowse` for worktree redirection and/or per-call capture.
+
+        The shim is the ONE place in the whole harness that runs at exactly the
+        right moment for post-action state: synchronously after each ebrowse
+        call, before the agent's next turn. With capture on it (a) numbers the
+        call, (b) exports EBROWSE_REQUEST_ID=call-<n> so the daemon's debug
+        events join deterministically to this call, and (c) spools a
+        debug-capture payload to capture/<n>.json. EBROWSE_EVAL_NOHOOK skips
+        the instrumentation (used for our own setup calls below)."""
+        target = self._shim_target()
         shim_dir = run_dir / "bin"
         shim_dir.mkdir(parents=True, exist_ok=True)
         shim = shim_dir / "ebrowse"
-        shim.write_text(f'#!/usr/bin/env bash\nexec "{venv_py}" -m ebrowse.cli.main "$@"\n')
+        if self.capture:
+            spool = run_dir / SPOOL_DIR
+            spool.mkdir(parents=True, exist_ok=True)
+            # The agent drives commands serially, so the naive counter file is
+            # race-free in practice; a torn read only skips a spool slot.
+            shim.write_text(
+                "#!/usr/bin/env bash\n"
+                f'if [ -n "$EBROWSE_EVAL_NOHOOK" ]; then exec {target} "$@"; fi\n'
+                f'ctr="{spool}/seq"\n'
+                'n=$(( $(cat "$ctr" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$ctr"\n'
+                'export EBROWSE_REQUEST_ID="call-$n"\n'
+                f'{target} "$@"\n'
+                "rc=$?\n"
+                f'"{sys.executable}" -m ebrowse_evals.capture_hook "{spool}/$n.json" || true\n'
+                "exit $rc\n"
+            )
+            # The daemon reads its config env at startup; it inherits ours via
+            # the first shimmed call (we stop any old daemon below).
+            env["EBROWSE_DEBUG_LOG"] = str(run_dir / DEBUG_LOG_FILE)
+        else:
+            shim.write_text(f'#!/usr/bin/env bash\nexec {target} "$@"\n')
         shim.chmod(0o755)
         env["PATH"] = f"{shim_dir}{os.pathsep}{env.get('PATH', os.defpath)}"
-        # Free the socket so the agent's first call restarts the daemon on local code.
-        subprocess.run([str(shim), "daemon", "stop"], env=env, capture_output=True, check=False)
+        # Free the socket so the agent's first call restarts the daemon on the
+        # shimmed code/env (local venv and/or EBROWSE_DEBUG_LOG).
+        subprocess.run(
+            [str(shim), "daemon", "stop"],
+            env={**env, "EBROWSE_EVAL_NOHOOK": "1"},
+            capture_output=True,
+            check=False,
+        )
 
     def run(
         self,
@@ -234,8 +286,8 @@ class PiHarness:
                 f"'{self.pi_bin}' not on PATH — npm i -g @earendil-works/pi-coding-agent"
             )
         full_env = {**os.environ, **env}
-        if self.worktree:
-            self._worktree_shim(run_dir, full_env)
+        if self.worktree or self.capture:
+            self._install_shim(run_dir, full_env)
         full_prompt = f"{self.tool_preamble()}\n# Task\n{prompt}"
         (run_dir / PROMPT_FILE).write_text(full_prompt, encoding="utf-8")
         workdir.mkdir(parents=True, exist_ok=True)

@@ -47,6 +47,13 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   `grep`, and `replay --step N` regenerating tier-2 detail by running the
   stored DomSnapshot blob through pure core). Concise deterministic plain text,
   `--json` everywhere; documented in `evals/docs/inspect.md`.
+- **Phase 2 wiring: capture + debug log flow into `ebrowse-eval run` traces.**
+  The runner's ebrowse shim now instruments every call (on by default for
+  ebrowse runs; `--no-capture` to disable): per-call `EBROWSE_REQUEST_ID=call-<n>`,
+  a synchronous post-call debug-capture spool, and the daemon debug log enabled
+  via env. `ebrowse_evals.ingest` joins both back to steps ordinally after the
+  run — capture fields onto each ebrowse step, daemon events as `ebrowse_log`
+  records, anomaly promotion, and phase timings rolled into `step.timing`.
 - **Structured debug-event channel (tier 1).** `EBROWSE_DEBUG_LOG=<path>` /
   config `[debug] log` streams per-request JSONL events (`{request_id, module,
   event, level, fields, ts, mono}`): phase timings, snapshot/ref/diff/locate

@@ -99,16 +99,23 @@ def _cmd_run(args: argparse.Namespace) -> int:
         "tool": args.tool,
         "worktree": True if args.worktree else None,
         "timeout_s": args.timeout,
+        "capture": False if args.no_capture else None,
     }
     # Harness identity (provider/model/tool/worktree) is run-level, not per-task,
     # so resolve it once from harness defaults + benchmark config + flags.
     base = resolve_config(bench.config if bench else None, cli_config)
+    tool = str(base.get("tool", "none"))
+    # Capture instruments the ebrowse shim, so it only applies to ebrowse runs;
+    # default on there (rich traces are the point) unless explicitly disabled.
+    capture = bool(base.get("capture", True)) and tool == "ebrowse"
+    cli_config["capture"] = capture
     harness = PiHarness(
         provider=str(base["provider"]),
         model=str(base["model"]),
-        tool=str(base.get("tool", "none")),
+        tool=tool,
         repo_root=REPO_ROOT,
         worktree=bool(base.get("worktree")),
+        capture=capture,
     )
     results = run_tasks(
         tasks,
@@ -181,6 +188,11 @@ def main(argv: list[str] | None = None) -> int:
         help="shim `ebrowse` to this checkout's .venv (stops any running daemon first)",
     )
     p_run.add_argument("--timeout", type=float, help="per-task timeout in seconds")
+    p_run.add_argument(
+        "--no-capture",
+        action="store_true",
+        help="skip per-step browser-state capture + ebrowse debug-log ingestion",
+    )
     p_run.add_argument("--runs-dir", default="runs", help="where run directories go")
     p_run.add_argument("--name", help="run-name prefix (default: <task-id>-<utc timestamp>)")
     p_run.set_defaults(func=_cmd_run)

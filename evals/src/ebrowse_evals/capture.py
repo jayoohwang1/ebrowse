@@ -140,40 +140,7 @@ class StepCapture:
     def _ingest(
         self, writer: TraceWriter, step_id: int, payload: dict[str, Any], fields: dict[str, Any]
     ) -> None:
-        browser = payload.get("browser")
-        if isinstance(browser, dict):
-            fields["browser"] = browser
-
-        for ev in payload.get("events") or []:
-            if not isinstance(ev, dict):
-                continue
-            writer.write(
-                BrowserEvent(
-                    step=step_id,
-                    ts=ev.get("ts"),
-                    kind=str(ev.get("kind", "")),
-                    data=ev.get("data") or {},
-                )
-            )
-
-        shot_b64 = payload.get("screenshot_b64")
-        if shot_b64:
-            try:
-                fields["screenshot"] = writer.put_blob(base64.b64decode(shot_b64), ".png")
-            except Exception as e:  # noqa: BLE001
-                self._anomaly(writer, step_id, "capture_partial", f"screenshot blob failed: {e}")
-
-        snap = payload.get("dom_snapshot")
-        if snap is not None:
-            # canonical serialization so identical snapshots across steps hash
-            # to the same blob (the store dedupes by content)
-            data = json.dumps(snap, sort_keys=True, separators=(",", ":")).encode()
-            fields["dom_snapshot"] = writer.put_blob(data, ".json")
-
-        errors = payload.get("errors") or {}
-        if errors:
-            msg = "; ".join(f"{k}: {v}" for k, v in sorted(errors.items()))
-            self._anomaly(writer, step_id, "capture_partial", msg, fields=dict(errors))
+        ingest_payload(writer, step_id, payload, fields)
 
     def _anomaly(
         self,
@@ -183,6 +150,66 @@ class StepCapture:
         message: str,
         fields: dict[str, Any] | None = None,
     ) -> None:
-        # even a trace-write failure stays contained — capture never raises
-        with contextlib.suppress(Exception):
-            writer.write(Anomaly(step=step_id, kind=kind, message=message, fields=fields or {}))
+        write_capture_anomaly(writer, step_id, kind, message, fields)
+
+
+def ingest_payload(
+    writer: TraceWriter,
+    step_id: int,
+    payload: dict[str, Any],
+    fields: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Turn one debug-capture payload into trace state: fills (and returns)
+    the Step fields dict and appends BrowserEvent/Anomaly records. Shared by
+    the live ``StepCapture`` hook and the post-run spool ingest (ingest.py)."""
+    if fields is None:
+        fields = {"browser": {}, "screenshot": None, "dom_snapshot": None}
+    browser = payload.get("browser")
+    if isinstance(browser, dict):
+        fields["browser"] = browser
+
+    for ev in payload.get("events") or []:
+        if not isinstance(ev, dict):
+            continue
+        writer.write(
+            BrowserEvent(
+                step=step_id,
+                ts=ev.get("ts"),
+                kind=str(ev.get("kind", "")),
+                data=ev.get("data") or {},
+            )
+        )
+
+    shot_b64 = payload.get("screenshot_b64")
+    if shot_b64:
+        try:
+            fields["screenshot"] = writer.put_blob(base64.b64decode(shot_b64), ".png")
+        except Exception as e:  # noqa: BLE001
+            write_capture_anomaly(
+                writer, step_id, "capture_partial", f"screenshot blob failed: {e}"
+            )
+
+    snap = payload.get("dom_snapshot")
+    if snap is not None:
+        # canonical serialization so identical snapshots across steps hash
+        # to the same blob (the store dedupes by content)
+        data = json.dumps(snap, sort_keys=True, separators=(",", ":")).encode()
+        fields["dom_snapshot"] = writer.put_blob(data, ".json")
+
+    errors = payload.get("errors") or {}
+    if errors:
+        msg = "; ".join(f"{k}: {v}" for k, v in sorted(errors.items()))
+        write_capture_anomaly(writer, step_id, "capture_partial", msg, fields=dict(errors))
+    return fields
+
+
+def write_capture_anomaly(
+    writer: TraceWriter,
+    step_id: int | None,
+    kind: str,
+    message: str,
+    fields: dict[str, Any] | None = None,
+) -> None:
+    """Contained anomaly write — even a trace-write failure never raises."""
+    with contextlib.suppress(Exception):
+        writer.write(Anomaly(step=step_id, kind=kind, message=message, fields=fields or {}))

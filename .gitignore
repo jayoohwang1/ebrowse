@@ -16,3 +16,6 @@ build/
 # Local runtime artifacts
 *.log
 .DS_Store
+
+# Eval runs (large, local-only)
+runs/
