@@ -23,3 +23,4 @@ ADRs 0001–0006 were backfilled from the v1 implementation log (see git history
 | [0011](0011-lossless-budgeted-section-partitioning.md) | Lossless budgeted section partitioning |
 | [0012](0012-ax-view-derived-from-dom-snapshot.md) | Ax view is derived from DomSnapshot, not the native accessibility tree |
 | [0013](0013-debug-event-channel.md) | Contextvar debug-event channel with request-id join |
+| [0014](0014-eval-harness-design.md) | Eval harness: in-repo package, replay over logging, ordinal shim join |

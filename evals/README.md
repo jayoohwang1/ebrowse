@@ -10,12 +10,16 @@ Everything is a thin reader/writer of the **trace schema** —
 [docs/tasks.md](docs/tasks.md) covers task/benchmark definition, and
 [docs/inspect.md](docs/inspect.md) documents the inspection queries.
 
-Status: Phase 1 — schema, task model, `ebrowse-eval validate`/`tasks`, the
-runner (`ebrowse-eval run` drives the pi harness over a benchmark or single
-task and writes a trace per run), the per-step capture layer (below), the
-`view` trace viewer, and the inspection queries (`overview`, `anomalies`,
-`errors`, `step`, `trace-ref`, `trace-section`, `timing`, `grep`, `replay`).
-The legacy scripts in `../experiments/` keep working until this reaches parity.
+Status: working end to end (validated live on the fixture site and
+traderjoes.com; design record in
+[ADR 0014](../docs/adr/0014-eval-harness-design.md)) — schema, task model,
+`ebrowse-eval validate`/`tasks`, the runner (`ebrowse-eval run` drives the pi
+harness over a benchmark or single task and writes a fully-joined trace per
+run), the per-step capture layer (below), the `view` trace viewer, and the
+inspection queries (`overview`, `anomalies`, `errors`, `step`, `trace-ref`,
+`trace-section`, `timing`, `grep`, `replay`). The legacy scripts in
+`../experiments/` still cover one gap — `summarize-run.py`'s side-by-side
+token comparison — and retire once that's ported.
 
 ## Per-step capture (`ebrowse_evals.capture`)
 
