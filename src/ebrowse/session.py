@@ -377,7 +377,7 @@ class Session(CompoundMixin, ActionsMixin):
         # redirects can leave the domain even when the opened URL was allowed
         self._check_url_allowed(self.page.url, landed=True)
         with debug.timed("snapshot", "capture"):
-            snap = await capture(self.page)
+            snap = await capture(self.page, self.cfg.browser.capture_engine)
         # retained for debug-capture reuse: fresh as long as no possibly-mutating
         # verb runs after this observation (cmd_seq check in verb_debug_capture)
         self.last_snapshot = snap
@@ -1043,7 +1043,7 @@ class Session(CompoundMixin, ActionsMixin):
             payload["snapshot_reused"] = True  # nothing possibly-mutating ran since
         else:
             try:
-                snap = await capture(page)
+                snap = await capture(page, self.cfg.browser.capture_engine)
                 self.last_snapshot = snap
                 self._snapshot_cmd_seq = self.cmd_seq
             except Exception as e:

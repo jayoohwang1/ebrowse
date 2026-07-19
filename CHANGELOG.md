@@ -8,6 +8,13 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- Page capture now uses CDP `DOMSnapshot.captureSnapshot` by default
+  (`browser.capture_engine = "cdp"`): no JavaScript runs in the page and every
+  discovered element carries a CDP backend-node-id binding for the upcoming
+  act-time fast path (ADR 0015). Outlines are byte-identical to the
+  discover.js engine (cross-engine parity tests on all fixture pages), which
+  remains available as `capture_engine = "js"` until removal.
+
 - Eval tasks now start on their declared target URL, stop at a configurable
   200 tool calls by default, and support isolated parallel execution with
   `ebrowse-eval run --jobs N`.

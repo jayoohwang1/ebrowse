@@ -30,6 +30,10 @@ class BrowserConfig:
     cdp_url: str = ""
     profile_dir: str = ""  # default resolved at use: ~/.cache/ebrowse/profile
     viewport: list[int] = field(default_factory=lambda: [1280, 1280])
+    # "cdp": DOMSnapshot.captureSnapshot — no JS runs in the page, refs get
+    # node bindings (ADR 0015). "js": the discover.js walk — temporary escape
+    # hatch until eval runs establish parity, then removed.
+    capture_engine: str = "cdp"  # "cdp" | "js"
 
 
 @dataclass(slots=True)

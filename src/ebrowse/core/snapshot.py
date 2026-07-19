@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ebrowse import debug
+
 _JS_PATH = Path(__file__).parent / "js" / "discover.js"
 _DIAGNOSE_JS_PATH = Path(__file__).parent / "js" / "diagnose.js"
 _js_cache: str | None = None
@@ -64,6 +66,9 @@ class DomNode:
     cross_origin: bool = False  # iframe node we could not enter
     # runtime annotations (not serialized): set during element extraction
     ref: str | None = None
+    # CDP binding (engine="cdp" captures only): consumed by the act-time fast
+    # path (ADR 0015). Dies with the node — never persisted across captures.
+    backend_node_id: int | None = None
     is_list_group: bool = False  # synthetic node wrapping grouped siblings
     candidate: str | None = None  # weak-evidence provenance (clickable.candidate_evidence)
     # A shallow projection used by the section splitter can own a wrapper's
@@ -197,16 +202,51 @@ async def _discover_main_frame(page) -> dict[str, Any]:
     return await page.evaluate(discover_js())
 
 
-async def capture(page) -> DomSnapshot:
-    """Snapshot the page: one evaluate per frame, stitched into one tree.
-
-    Child frames are entered when their <iframe> element is rendered at a
-    useful size; frames we cannot evaluate in (rare with Playwright, possible
-    on sandboxed/detached frames) become cross_origin leaf nodes.
+async def capture(page, engine: str = "cdp") -> DomSnapshot:
+    """Snapshot the page. engine="cdp" (default, ADR 0015): one
+    DOMSnapshot.captureSnapshot — no JS runs in the page, DomNodes carry
+    backend_node_id bindings, same-process iframes come with the payload.
+    engine="js" (temporary escape hatch) or any CDP failure: the discover.js
+    evaluate walk. Either way, frames the CDP payload did not cover (OOPIFs
+    on the cdp path; all child frames on the js path) are stitched by
+    per-frame evaluate; frames we cannot evaluate in become cross_origin
+    leaf nodes.
     """
-    raw = await _discover_main_frame(page)
-    snap = DomSnapshot.from_dict(raw)
+    snap: DomSnapshot | None = None
+    if engine == "cdp":
+        snap = await _capture_cdp_main(page)
+        if snap is None:
+            debug.emit("capture", "cdp_engine_failed", level="warn")
+    if snap is None:
+        raw = await _discover_main_frame(page)
+        snap = DomSnapshot.from_dict(raw)
+    await _stitch_child_frames(page, snap)
+    return snap
 
+
+async def _capture_cdp_main(page) -> DomSnapshot | None:
+    """DOMSnapshot capture of the main target (same-process frames included);
+    None on any CDP failure so capture() can degrade to the js engine."""
+    from ebrowse.core.cdp_capture import COMPUTED_STYLES, translate
+
+    try:
+        cdp = await page.context.new_cdp_session(page)
+        try:
+            metrics = await cdp.send("Page.getLayoutMetrics")
+            payload = await cdp.send(
+                "DOMSnapshot.captureSnapshot",
+                {"computedStyles": COMPUTED_STYLES, "includeDOMRects": True},
+            )
+        finally:
+            await cdp.detach()
+        css = metrics.get("cssLayoutViewport") or metrics.get("layoutViewport") or {}
+        viewport = (int(css.get("clientWidth", 1280)), int(css.get("clientHeight", 1280)))
+        return translate(payload, viewport)
+    except Exception:
+        return None
+
+
+async def _stitch_child_frames(page, snap: DomSnapshot) -> None:
     # index iframe nodes in the main tree by id/title/src for stitching
     iframe_nodes = [n for n in snap.root.walk() if n.tag == "iframe"]
 
@@ -242,8 +282,6 @@ async def capture(page) -> DomSnapshot:
         path = (*node.iframe_path, fid)
         _offset_and_tag(child, int(box["x"]) - child.rect[0], int(box["y"]) - child.rect[1], path)
         node.children = [child]
-
-    return snap
 
 
 def _match_iframe_node(nodes: list[DomNode], fid: str, url: str) -> DomNode | None:
