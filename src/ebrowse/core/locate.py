@@ -169,7 +169,19 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None):
                        strategy=i, reason=reason)  # fmt: skip
         mismatch = mismatch or reason
 
-    debug.emit("locate", "locate_failed", level="warn", ref=ref, mismatch=mismatch or "")
+    debug.emit("locate", "locate_failed", level="warn", ref=ref,
+               mismatch=mismatch or "", candidates=len(candidates))  # fmt: skip
+    if not candidates:
+        # anonymous element (no id/testid/name/text/href): the descriptor has
+        # no locatable identity. Callers rescue via the capture-time node
+        # binding (ADR 0015); this error surfaces only when that is dead too,
+        # and a re-outline mints a fresh binding — the hint is genuine.
+        who = f"{ref} ({desc.short_desc()})" if ref else desc.short_desc()
+        raise CommandError(
+            f"{who} has no locatable identity (icon-only/anonymous element) and its "
+            "node binding from the last outline is gone — run 'ebrowse outline' to re-bind",
+            ExitCode.USAGE,
+        )
     if mismatch:
         who = f"stale ref {ref}" if ref else "stale ref"
         raise CommandError(

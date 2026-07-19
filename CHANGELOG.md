@@ -14,6 +14,12 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   act-time fast path (ADR 0015). Outlines are byte-identical to the
   discover.js engine (cross-engine parity tests on all fixture pages), which
   remains available as `capture_engine = "js"` until removal.
+- Anonymous elements (icon-only buttons, unlabeled inputs — no id/testid/
+  name/text/placeholder) are now actionable: when descriptor resolution
+  refuses, every verb falls back to the capture-time CDP node binding and acts
+  on the exact node the outline described (ADR 0015). Previously such refs
+  failed forever with a re-outline hint that could not help; a dead binding
+  now fails loudly and a re-outline genuinely re-binds.
 
 - Eval tasks now start on their declared target URL, stop at a configurable
   200 tool calls by default, and support isolated parallel execution with

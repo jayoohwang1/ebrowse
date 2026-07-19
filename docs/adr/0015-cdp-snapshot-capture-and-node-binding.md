@@ -39,14 +39,25 @@ a persistent CDP session, and bind every discovered element to its
   maps, `:disabled` fieldset inheritance, clickable signals) is recomputed in
   Python over the flat arrays — the snapshot includes hidden nodes, so this is
   possible and moves logic into the testable core.
-- `DomNode` gains a runtime `backend_node_id`; the session records
-  `ref → (capture_seq, backendNodeId)`. `locate.resolve()` consumes the binding
-  as a fast path: a live, verified node is acted on directly; a dead binding
-  falls through **loudly** to the descriptor strategy chain. Refuse-over-misbind
-  (ADR 0003) is preserved: the binding can only ever point at the exact node the
+- `DomNode` gains a runtime `backend_node_id`; the session refreshes a
+  `ref → backendNodeId` table on every observe. The binding is consumed as a
+  **rescue, not the primary path**: locators from the descriptor chain remain
+  the actor whenever they resolve (that machinery — occlusion arbitration,
+  label routing, keyboard fallbacks — is battle-tested and unchanged), and the
+  `CdpTarget` bridge acts on the bound node only when the chain refuses (zero
+  candidates on an anonymous element, or every candidate mismatched). A dead
+  binding keeps the descriptor error **loudly**. Refuse-over-misbind (ADR
+  0003) is preserved: the binding can only ever point at the exact node the
   outline described, and its staleness is detectable (unlike positional or
   geometric fallbacks, which were rejected for silently misbinding exactly the
-  elements with the least verifiable identity).
+  elements with the least verifiable identity). Since every verb re-observes,
+  bindings self-heal: a re-outline (or any action) re-binds, so the stale-ref
+  recovery hint is now genuinely actionable even for anonymous elements.
+- `CdpTarget` duck-types the Locator/ElementHandle slice the verbs and the
+  interaction pipeline use; its page-side evaluates run in a private isolated
+  world (`Page.createIsolatedWorld`), never the main world, and its input goes
+  through the same trusted CDP Input events Playwright dispatches. Binding may
+  become the primary act path later, after eval-suite soak.
 - The **listener signal** (`el`, weak candidate tier) loses
   `getEventListeners()` (a command-line-API/JS-execution feature). It is
   approximated from capture data: `onclick`-family attributes, `cursor:pointer`,
