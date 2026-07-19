@@ -6,6 +6,72 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ## [Unreleased]
 
+### Added
+
+- **`evals/` workspace package (`ebrowse-evals`)** — foundation of the evaluation
+  harness. Trace schema v1 (typed JSONL records + content-addressed blob store,
+  forward-compatible by construction; see `evals/docs/trace-schema.md`), the
+  task/benchmark model with optional per-task `eval.py` evaluators receiving the
+  full trace (`evals/docs/tasks.md`), an `ebrowse-eval` CLI (`validate`, `tasks`),
+  and a committed generated sample trace for building viewers/inspection tools
+  against. Runner/capture/viewer land next; `experiments/` is unchanged until parity.
+- **`ebrowse-eval run` — the eval runner.** Ports `experiments/run-agent.sh` into
+  the package: task selection (`--task` globs / `--tag` / `--sample --seed`),
+  config layering (harness defaults → benchmark → task → CLI flags) persisted
+  fully resolved into `run_meta` alongside git sha/dirty + ebrowse version/mode,
+  a generic `AgentHarness` protocol with a `PiHarness` implementation (tool-guide
+  prepending, `experiments/.env` defaults, JSON event + pi session capture,
+  isolated per-run workdir, `--worktree` PATH shim with daemon stop), and one
+  Step trace record per agent tool-call with a `StepCapture` hook for the
+  browser-state capture layer. Per-task `eval.py` (or declarative `expected`)
+  results land in `run_end`.
+- **Per-step capture layer (`ebrowse_evals.capture`)** — `StepCapture` fills each
+  Step record's browser state, screenshot, and DomSnapshot blobs and appends
+  `browser_event` records (console, failed requests, navigations, dialogs)
+  unconditionally after every agent tool-call, degrading to a partial step plus an
+  `anomaly` record on any failure (capture never breaks a run). Backed by a new
+  additive daemon verb `debug-capture` that reuses the session's own snapshot
+  machinery — including the snapshot already taken for the previous verb's
+  observation when no possibly-mutating verb ran since.
+- **`ebrowse-eval view <run-dir>`** — human trace viewer rendering a run into one
+  self-contained HTML file (assets inlined, no CDN). Two-lane step log: right lane
+  is what the agent saw (command, verbatim output, tokens/latency); left lane is
+  ground truth + internals (screenshot filmstrip, URL/title, timing bar, anomaly
+  badges, with browser events / ebrowse_log / browser state / DomSnapshot JSON
+  behind a per-step expander). Header carries run metadata, outcome/totals, and
+  the anomaly list linking to steps; degrades gracefully on missing blobs, torn
+  tails, and unknown record types. See `evals/docs/viewer.md`.
+- **`ebrowse-eval` inspection queries** — canned entity-centric queries over a
+  trace run directory (`overview`, `anomalies`, `errors` with recovery-hint
+  followed/ignored joins, `step`, `trace-ref`, `trace-section`, `timing`,
+  `grep`, and `replay --step N` regenerating tier-2 detail by running the
+  stored DomSnapshot blob through pure core). Concise deterministic plain text,
+  `--json` everywhere; documented in `evals/docs/inspect.md`.
+- **Phase 2 wiring: capture + debug log flow into `ebrowse-eval run` traces.**
+  The runner's ebrowse shim now instruments every call (on by default for
+  ebrowse runs; `--no-capture` to disable): per-call `EBROWSE_REQUEST_ID=call-<n>`,
+  a synchronous post-call debug-capture spool, and the daemon debug log enabled
+  via env. `ebrowse_evals.ingest` joins both back to steps ordinally after the
+  run — capture fields onto each ebrowse step, daemon events as `ebrowse_log`
+  records, anomaly promotion, and phase timings rolled into `step.timing`.
+- **Structured debug-event channel (tier 1).** `EBROWSE_DEBUG_LOG=<path>` /
+  config `[debug] log` streams per-request JSONL events (`{request_id, module,
+  event, level, fields, ts, mono}`): phase timings, snapshot/ref/diff/locate
+  facts, and anomaly events (`ref_rebound`, `ref_gone`, `snapshot_truncated`,
+  `element_moved`, `wait_timeout`, `section_reshaped`). Off by default — zero
+  overhead, no file, byte-identical output. `EBROWSE_REQUEST_ID` lets a harness
+  set the request id joined across CLI response and events (ADR 0013).
+- **Opt-in accessibility-tree expansion.** `ebrowse expand <target> --ax` renders
+  an actionable, deterministic accessibility-tree outline with inline durable refs.
+- **Browse every option of a large `<select>`.** `expand @ref` on a native
+  select lists its options, 50 per page with the usual cursor hints
+  (`… 300 more options — expand @e5 --cursor 50`; `--all` dumps the captured
+  list). The capture cap rose 50 → 350 options, covering country pickers and
+  country+state combos; only timezone-class monsters truncate, and there the
+  tail is honestly absent with the escape hatch named (`'ebrowse select @e5
+  "<label>"' still matches any option by its text` — selection always matches
+  the live DOM). Closes #10.
+
 ### Changed
 
 - **Section splitting is now lossless and expansion-budgeted.** Oversized semantic
@@ -32,19 +98,6 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   the overall budget from 160 to 500 chars. Sections the agent has `expand`ed
   on the current page get an 8000-char budget — verbose text diffs where the
   agent is actively reading.
-
-### Added
-
-- **Opt-in accessibility-tree expansion.** `ebrowse expand <target> --ax` renders
-  an actionable, deterministic accessibility-tree outline with inline durable refs.
-- **Browse every option of a large `<select>`.** `expand @ref` on a native
-  select lists its options, 50 per page with the usual cursor hints
-  (`… 300 more options — expand @e5 --cursor 50`; `--all` dumps the captured
-  list). The capture cap rose 50 → 350 options, covering country pickers and
-  country+state combos; only timezone-class monsters truncate, and there the
-  tail is honestly absent with the escape hatch named (`'ebrowse select @e5
-  "<label>"' still matches any option by its text` — selection always matches
-  the live DOM). Closes #10.
 
 ### Fixed
 

@@ -2,6 +2,12 @@ version = 1
 revision = 3
 requires-python = ">=3.11"
 
+[manifest]
+members = [
+    "ebrowse",
+    "ebrowse-evals",
+]
+
 [[package]]
 name = "anyio"
 version = "4.14.1"
@@ -45,6 +51,7 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "ebrowse-evals" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -53,6 +60,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "ebrowse-evals", marker = "extra == 'dev'", editable = "evals" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "loguru", specifier = ">=0.7" },
     { name = "playwright", specifier = ">=1.52" },
@@ -62,6 +70,17 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8" },
 ]
 provides-extras = ["dev"]
+
+[[package]]
+name = "ebrowse-evals"
+version = "0.1.0"
+source = { editable = "evals" }
+dependencies = [
+    { name = "ebrowse" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "ebrowse", editable = "." }]
 
 [[package]]
 name = "greenlet"

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import difflib
 
+from ebrowse import debug
 from ebrowse.model import Diff, Element, PageMem, Section, SectionDiff
 
 _TRACKED_STATE = ("value", "checked", "expanded", "disabled", "pressed", "selected")
@@ -148,6 +149,26 @@ def _element_delta(
     text_changed = prev.content_hash != new.content_hash
     if not added and not removed and not state_changes and not text_changed:
         return None
+    if debug.enabled():
+        # Which comparison drove the verdict: element multiset delta, tracked
+        # state fields, and/or the section content hash.
+        debug.emit(
+            "diff",
+            "section_verdict",
+            sid=new.sid,
+            verdict="changed",
+            added=len(added),
+            removed=len(removed),
+            state_changes=len(state_changes),
+            content_hash_changed=text_changed,
+        )
+        # refs that stopped resolving on the SAME page across observes — the
+        # per-ref "ref_gone" anomaly channel (navigation churn never reaches
+        # here: diff_pages is same-page only). Capped: a bulk section swap is
+        # already visible in the counts above.
+        for e in [e for bucket in prev_by_key.values() for e in bucket][:5]:
+            debug.emit("diff", "ref_gone", level="warn", ref=e.ref, sid=new.sid,
+                       desc=e.desc.short_desc())  # fmt: skip
     return SectionDiff(
         sid=new.sid,
         kind="changed",
@@ -184,6 +205,30 @@ def diff_pages(
     new_texts = new_texts or {}
     expanded_fps = expanded_fps or set()
 
+    if debug.enabled():
+        for s in appeared:
+            debug.emit("diff", "section_verdict", sid=s.sid, verdict="new",
+                       fingerprint=s.fingerprint, type=s.type)  # fmt: skip
+        for s in disappeared:
+            debug.emit("diff", "section_verdict", sid=s.sid, verdict="gone",
+                       fingerprint=s.fingerprint, type=s.type)  # fmt: skip
+        # section_reshaped anomaly: a fingerprint failed to match across
+        # observes of the same page while the content clearly overlaps — the
+        # fingerprint inputs (class/heading/ancestry) churned under stable
+        # content, which defeats section-level diffing and summary caching.
+        for s in appeared:
+            for old in disappeared:
+                if s.content_hash == old.content_hash or (
+                    s.heading and s.heading == old.heading and s.type == old.type
+                ):
+                    debug.emit(
+                        "diff", "section_reshaped", level="warn",
+                        new_sid=s.sid, new_fingerprint=s.fingerprint,
+                        old_fingerprint=old.fingerprint, heading=s.heading or "",
+                        content_hash_equal=s.content_hash == old.content_hash,
+                    )  # fmt: skip
+                    break
+
     sections: list[SectionDiff] = []
     for s in appeared:
         sections.append(SectionDiff(sid=s.sid, kind="appeared", section=s))
@@ -197,6 +242,17 @@ def diff_pages(
         if delta:
             sections.append(delta)
 
+    if debug.enabled():
+        changed = sum(1 for sd in sections if sd.kind == "changed")
+        debug.emit(
+            "diff",
+            "summary",
+            matched=len(pairs),
+            unchanged=len(pairs) - changed,
+            changed=changed,
+            new=len(appeared),
+            gone=len(disappeared),
+        )
     if not sections:
         return Diff(kind="no_change")
     kind = "dialog" if any(

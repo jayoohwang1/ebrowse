@@ -17,7 +17,7 @@ from typing import Any
 
 from loguru import logger
 
-from ebrowse import __version__
+from ebrowse import __version__, debug
 from ebrowse.config import Config, cache_dir, load_config, socket_path
 from ebrowse.daemon.protocol import CommandError, ExitCode, Request, Response
 from ebrowse.session import Session
@@ -37,7 +37,14 @@ def _verb_timeout(verb: str) -> int:
 # Verbs allowed while a native dialog blocks the current tab: resolve it, or
 # escape to another tab / re-attach / close. Everything else would touch the
 # frozen page and is refused with a recovery hint.
-_DIALOG_SAFE_VERBS = frozenset({"dialog", "tabs", "tab", "connect", "close"})
+_DIALOG_SAFE_VERBS = frozenset({"dialog", "tabs", "tab", "connect", "close", "debug-capture"})
+
+# Verbs that cannot change page state. Used for debug-capture snapshot
+# freshness: a snapshot taken during the last command stays reusable across
+# read-only verbs (debug-capture itself must not invalidate what it observes).
+_READ_ONLY_VERBS = frozenset(
+    {"debug-capture", "outline", "expand", "query", "get", "screenshot", "describe-screen", "tabs"}
+)
 
 
 class Daemon:
@@ -130,6 +137,30 @@ class Daemon:
             self.last_activity = time.monotonic()
 
     async def _dispatch(self, req: Request) -> Response:
+        # Tier-1 debug channel (docs/architecture.md "Debug event channel"):
+        # OFF by default. When debug.log is configured, collect this request's
+        # events in-memory (contextvar recorder) and flush them as JSONL after
+        # the response is built — event shape {request_id, module, event,
+        # level, fields, ts, mono}, joined to the CLI call by request_id.
+        if not self.cfg.debug.log:
+            return await self._dispatch_inner(req)
+        with debug.recording(req.id) as rec:
+            t0 = time.monotonic()
+            debug.emit("daemon", "request_begin", verb=req.verb, session=req.session)
+            resp = await self._dispatch_inner(req)
+            debug.emit(
+                "daemon",
+                "request_end",
+                verb=req.verb,
+                session=req.session,
+                ok=resp.ok,
+                exit_code=resp.exit_code,
+                dur_ms=round((time.monotonic() - t0) * 1000, 1),
+            )
+        debug.write_jsonl(debug.resolve_log_path(self.cfg.debug.log, req.session), rec.events)
+        return resp
+
+    async def _dispatch_inner(self, req: Request) -> Response:
         logger.info(f"[{req.session}] {req.verb} {req.args}")
         # daemon-level verbs (no session)
         if req.verb == "daemon_status":
@@ -183,6 +214,10 @@ class Daemon:
             and (warn := session.dialog_block_warning(verb)) is not None
         ):
             raise CommandError(warn, ExitCode.ACTION_FAILED)
+        if verb not in _READ_ONLY_VERBS:
+            session.cmd_seq += 1  # possibly mutating: invalidates debug-capture reuse
+        if verb == "debug-capture":
+            return await session.verb_debug_capture()
         if verb in ("open", "goto"):
             return await session.verb_open(args["url"])
         if verb == "reload":

@@ -1,0 +1,8 @@
+[task]
+prompt = "Open http://127.0.0.1:8196/list.html and tell me how many products are listed."
+url = "http://127.0.0.1:8196/list.html"
+tags = ["fixture", "read-only"]
+timeout_s = 120
+
+[task.expected]
+contains = "32"

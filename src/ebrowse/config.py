@@ -88,12 +88,22 @@ class SecurityConfig:
 
 
 @dataclass(slots=True)
+class DebugConfig:
+    # JSONL debug-event log path (env: EBROWSE_DEBUG_LOG). Empty = off (default;
+    # zero overhead, no file created). A literal "{session}" in the path is
+    # replaced with the session name for per-session files. See docs/architecture.md
+    # ("Debug event channel") and src/ebrowse/debug.py.
+    log: str = ""
+
+
+@dataclass(slots=True)
 class Config:
     daemon: DaemonConfig = field(default_factory=DaemonConfig)
     browser: BrowserConfig = field(default_factory=BrowserConfig)
     summarizer: SummarizerConfig = field(default_factory=SummarizerConfig)
     observe: ObserveConfig = field(default_factory=ObserveConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
+    debug: DebugConfig = field(default_factory=DebugConfig)
 
 
 def config_path() -> Path:

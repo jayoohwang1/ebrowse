@@ -15,6 +15,7 @@ a wrong click can cost the whole task.
 
 from __future__ import annotations
 
+from ebrowse import debug
 from ebrowse.errors import CommandError, ExitCode
 from ebrowse.model import ElementDesc
 
@@ -134,7 +135,7 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None):
     # same text) are indistinguishable by identity facts; a reorder among
     # them still misbinds. Detecting that would need extra stored state.
     mismatch: str | None = None
-    for loc in candidates:
+    for i, loc in enumerate(candidates):
         try:
             n = await loc.count()
         except Exception:
@@ -143,6 +144,7 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None):
             continue
         if n == 1:
             if mismatch is None:
+                debug.emit("locate", "resolved", ref=ref, strategy=i, matches=1, verified=False)
                 return loc  # happy path: unique match, nothing suspicious
             picked = loc
         elif desc.nth_hint < n:
@@ -152,9 +154,22 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None):
         facts = await _live_facts(picked)
         reason = identity_mismatch(desc, facts) if facts is not None else None
         if reason is None:
+            debug.emit(
+                "locate", "resolved", ref=ref, strategy=i, matches=n,
+                nth=desc.nth_hint if n > 1 else 0, verified=facts is not None,
+                after_mismatch=mismatch or "",
+            )  # fmt: skip
             return picked
+        if mismatch is None:
+            # a previously-issued ref resolving to a live element whose
+            # identity facts contradict the stored descriptor — a candidate
+            # ref rebinding (the page reordered/replaced siblings). If a later
+            # strategy verifies, this was recovered; otherwise we refuse below.
+            debug.emit("locate", "ref_rebound", level="warn", ref=ref,
+                       strategy=i, reason=reason)  # fmt: skip
         mismatch = mismatch or reason
 
+    debug.emit("locate", "locate_failed", level="warn", ref=ref, mismatch=mismatch or "")
     if mismatch:
         who = f"stale ref {ref}" if ref else "stale ref"
         raise CommandError(
