@@ -1,0 +1,4 @@
+[task]
+prompt = "Find UA or AA flights from London to New York that arrive between 8:00 PM and 11:00 PM on FlightAware."
+url = "https://www.flightaware.com/"
+tags = ["online-mind2web", "hard", "reachable"]

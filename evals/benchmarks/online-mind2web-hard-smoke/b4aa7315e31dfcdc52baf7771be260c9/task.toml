@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the HGX H100 driver for Ubuntu 22.04 on AMD64 CPU."
+url = "https://www.nvidia.com/"
+tags = ["online-mind2web", "hard", "reachable"]

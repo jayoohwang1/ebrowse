@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import html
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -85,9 +86,16 @@ def _timing_bar(timing: dict[str, Any]) -> str:
     return f'<div class="tbar">{segs}</div><div class="tlegend">{legend}</div>'
 
 
-def _screenshot_cell(ref: str | None, blobs: BlobStore) -> str:
+def _screenshot_cell(
+    ref: str | None, blobs: BlobStore, blob_url: Callable[[str], str] | None = None
+) -> str:
     if not ref:
         return '<div class="shot placeholder">no screenshot captured</div>'
+    if blob_url is not None:
+        return (
+            f'<img class="shot" src="{_e(blob_url(ref))}" '
+            f'alt="screenshot {_e(_short_ref(ref))}" loading="lazy">'
+        )
     try:
         data = blobs.get(ref)
     except (FileNotFoundError, OSError):
@@ -101,10 +109,17 @@ def _screenshot_cell(ref: str | None, blobs: BlobStore) -> str:
     return f'<img class="shot" src="{uri}" alt="screenshot {_e(_short_ref(ref))}" loading="lazy">'
 
 
-def _dom_snapshot_block(ref: str | None, blobs: BlobStore) -> str:
+def _dom_snapshot_block(
+    ref: str | None, blobs: BlobStore, blob_url: Callable[[str], str] | None = None
+) -> str:
     if not ref:
         return "<p class='muted'>no DomSnapshot captured</p>"
     label = f"DomSnapshot <code>{_e(_short_ref(ref))}</code>"
+    if blob_url is not None:
+        return (
+            f'<details class="dom-lazy" data-url="{_e(blob_url(ref))}">'
+            f"<summary>{label}</summary><pre class='muted'>open to load</pre></details>"
+        )
     try:
         data = blobs.get(ref)
     except (FileNotFoundError, OSError):
@@ -165,6 +180,7 @@ def _step_row(
     attached: dict[str, list[dict[str, Any]]],
     blobs: BlobStore,
     t0: float | None,
+    blob_url: Callable[[str], str] | None = None,
 ) -> str:
     n = step.get("step", "?")
     browser = step.get("browser", {}) if isinstance(step.get("browser"), dict) else {}
@@ -176,7 +192,7 @@ def _step_row(
 
     # -- left lane (ground truth + internals) ------------------------------
     left: list[str] = [
-        _screenshot_cell(step.get("screenshot"), blobs),
+        _screenshot_cell(step.get("screenshot"), blobs, blob_url),
         f'<div class="pageid"><strong>{_e(title)}</strong><br><span class="url">{_e(url)}</span></div>',
         _timing_bar(step.get("timing", {}) or {}),
     ]
@@ -194,7 +210,7 @@ def _step_row(
         inner.append("<h4>ebrowse log</h4>" + _log_rows(logs))
     if browser:
         inner.append("<h4>browser state</h4>" + _kv_table(browser))
-    inner.append("<h4>blobs</h4>" + _dom_snapshot_block(step.get("dom_snapshot"), blobs))
+    inner.append("<h4>blobs</h4>" + _dom_snapshot_block(step.get("dom_snapshot"), blobs, blob_url))
     if step.get("screenshot"):
         inner.append(
             f"<p class='muted'>screenshot <code>{_e(_short_ref(step['screenshot']))}</code></p>"
@@ -368,16 +384,106 @@ body:not(.show-debug) .log-debug { display:none; }
   margin:.8rem 0; border-radius:0 6px 6px 0; font-size:.9rem; }
 .error-box { border:1px solid var(--bad); border-radius:6px; padding:.3rem .6rem; }
 .muted { color:var(--muted); }
+.back { margin:.2rem 0 1rem; } .back a { color:var(--accent); text-decoration:none; }
+.back a:hover { text-decoration:underline; }
+.compact-chunk { border-bottom:1px solid var(--line); padding:.7rem 0; }
+.compact-head { margin-bottom:.35rem; }
+.load-chunk { border:1px solid var(--accent); color:var(--accent); background:transparent;
+  border-radius:6px; padding:.25rem .55rem; cursor:pointer; }
+.compact-step { display:grid; grid-template-columns:5.5rem minmax(8rem,18rem) minmax(8rem,1fr) minmax(10rem,1.3fr);
+  gap:.65rem; align-items:baseline; padding:.2rem .45rem; font-size:.8rem; }
+.compact-step:nth-child(even) { background:var(--panel); }
+.compact-page,.compact-thought { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.compact-page { color:var(--muted); } .compact-step code { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media (max-width:800px) { .compact-step { grid-template-columns:4.5rem 1fr; }
+  .compact-thought,.compact-step code { grid-column:2; } }
 """
 
 _JS = """
 document.getElementById('show-debug').addEventListener('change', function () {
   document.body.classList.toggle('show-debug', this.checked);
 });
+document.addEventListener('toggle', async function (event) {
+  const box = event.target.closest?.('.dom-lazy');
+  if (!box || !box.open || box.dataset.loaded) return;
+  box.dataset.loaded = '1';
+  const pre = box.querySelector('pre');
+  try { const response = await fetch(box.dataset.url); pre.textContent = await response.text(); }
+  catch (error) { pre.textContent = 'failed to load DomSnapshot: ' + error; }
+}, true);
+document.addEventListener('click', async function (event) {
+  const button = event.target.closest?.('.load-chunk');
+  if (!button) return;
+  button.disabled = true; button.textContent = 'Loading…';
+  try {
+    const response = await fetch(button.dataset.url);
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    button.closest('.compact-chunk').outerHTML = await response.text();
+  } catch (error) {
+    button.disabled = false; button.textContent = 'Retry expanding steps';
+  }
+});
 """
 
 
-def render_run(run_dir: Path) -> str:
+def _attachments(records: list[dict[str, Any]]) -> dict[Any, dict[str, list[dict[str, Any]]]]:
+    known = {"run_meta", "run_end", "step", "summary"}
+    attached: dict[Any, dict[str, list[dict[str, Any]]]] = {}
+    for record in records:
+        rtype = record.get("type")
+        if rtype in known or record.get("step") is None:
+            continue
+        bucket = attached.setdefault(record["step"], {})
+        key = rtype if rtype in ("browser_event", "ebrowse_log", "anomaly") else "_unknown"
+        bucket.setdefault(key, []).append(record)
+    return attached
+
+
+def _short_text(value: object, limit: int) -> str:
+    text = " ".join(str(value or "").split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _compact_step(step: dict[str, Any]) -> str:
+    browser_value = step.get("browser")
+    browser: dict[str, Any] = browser_value if isinstance(browser_value, dict) else {}
+    page = browser.get("title") or browser.get("url") or "unknown page"
+    thought = _short_text(step.get("agent_text"), 180)
+    action = _short_text(step.get("command"), 220)
+    thought_html = f'<span class="compact-thought">{_e(thought)}</span>' if thought else ""
+    return (
+        f'<div class="compact-step"><strong>step {_e(step.get("step", "?"))}</strong>'
+        f'<span class="compact-page">{_e(_short_text(page, 100))}</span>'
+        f"{thought_html}<code>{_e(action)}</code></div>"
+    )
+
+
+def render_step_fragment(
+    run_dir: Path,
+    offset: int,
+    limit: int,
+    blob_url: Callable[[str], str] | None = None,
+) -> str:
+    """Render a bounded full-detail step slice for server-side lazy expansion."""
+    reader = TraceReader(run_dir)
+    records = list(reader.raw())
+    meta = next((r for r in records if r.get("type") == "run_meta"), None)
+    t0 = meta.get("ts") if meta and isinstance(meta.get("ts"), (int, float)) else None
+    steps = [r for r in records if r.get("type") == "step"]
+    attached = _attachments(records)
+    return "".join(
+        _step_row(step, attached.get(step.get("step"), {}), reader.blobs, t0, blob_url)
+        for step in steps[offset : offset + limit]
+    )
+
+
+def render_run(
+    run_dir: Path,
+    back_href: str | None = None,
+    blob_url: Callable[[str], str] | None = None,
+    fragment_url: Callable[[int, int], str] | None = None,
+    compact_middle: bool = False,
+) -> str:
     """Render a run directory to a single self-contained HTML page."""
     reader = TraceReader(run_dir)  # raises FileNotFoundError -> CLI reports it
     records = list(reader.raw())
@@ -391,26 +497,42 @@ def render_run(run_dir: Path) -> str:
 
     # Attach per-step records; unknown types with a step id show up under
     # "other records" instead of vanishing.
-    known = {"run_meta", "run_end", "step", "summary"}
-    attached: dict[Any, dict[str, list[dict[str, Any]]]] = {}
-    for r in records:
-        rtype = r.get("type")
-        if rtype in known or r.get("step") is None:
-            continue
-        bucket = attached.setdefault(r["step"], {})
-        key = rtype if rtype in ("browser_event", "ebrowse_log", "anomaly") else "_unknown"
-        bucket.setdefault(key, []).append(r)
+    attached = _attachments(records)
 
     # Summaries become range markers placed after their step_end row.
     markers_after: dict[Any, list[str]] = {}
     for s in summaries:
         markers_after.setdefault(s.get("step_end"), []).append(_summary_marker(s))
 
-    body: list[str] = [_header(meta, end, anomalies, len(steps))]
-    for step in steps:
+    body: list[str] = []
+    if back_href:
+        body.append(f'<nav class="back"><a href="{_e(back_href)}">&larr; all runs</a></nav>')
+    body.append(_header(meta, end, anomalies, len(steps)))
+
+    def full_step(step: dict[str, Any]) -> None:
         n = step.get("step")
-        body.append(_step_row(step, attached.get(n, {}), reader.blobs, t0))
+        body.append(_step_row(step, attached.get(n, {}), reader.blobs, t0, blob_url))
         body.extend(markers_after.pop(n, []))
+
+    if compact_middle and fragment_url is not None and len(steps) > 35:
+        for step in steps[:25]:
+            full_step(step)
+        middle_end = len(steps) - 10
+        for offset in range(25, middle_end, 10):
+            chunk = steps[offset : min(offset + 10, middle_end)]
+            first, last = chunk[0].get("step", "?"), chunk[-1].get("step", "?")
+            body.append(
+                f'<section class="compact-chunk"><div class="compact-head">'
+                f'<button class="load-chunk" data-url="{_e(fragment_url(offset, len(chunk)))}">'
+                f"Expand steps {_e(first)}–{_e(last)}</button></div>"
+                + "".join(_compact_step(step) for step in chunk)
+                + "</section>"
+            )
+        for step in steps[-10:]:
+            full_step(step)
+    else:
+        for step in steps:
+            full_step(step)
     for leftovers in markers_after.values():  # summaries pointing past the last step
         body.extend(leftovers)
 

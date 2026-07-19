@@ -1,0 +1,4 @@
+[task]
+prompt = "Show me the list of young female English Spot rabbits available for adoption in Chicago, IL, within 50 miles."
+url = "https://www.petfinder.com/"
+tags = ["online-mind2web", "hard", "reachable"]

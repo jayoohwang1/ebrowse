@@ -1,0 +1,4 @@
+[task]
+prompt = "Show me the result of a proton emission decay for a Beryllium nucleus with 4 protons and 2 neutrons in the simulation."
+url = "https://phet.colorado.edu/"
+tags = ["online-mind2web", "hard", "reachable"]

@@ -1,0 +1,4 @@
+[task]
+prompt = "See the prediction about the girl child's height, whose current height at seven years is 4 feet and whose weight is 55 lbs, her mother is 5 feet 2, and her father is 5 feet 8."
+url = "https://www.babycenter.com/"
+tags = ["online-mind2web", "hard", "reachable"]

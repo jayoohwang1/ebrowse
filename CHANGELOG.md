@@ -8,6 +8,20 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- Eval tasks now start on their declared target URL, stop at a configurable
+  200 tool calls by default, and support isolated parallel execution with
+  `ebrowse-eval run --jobs N`.
+- Added `ebrowse-eval serve`, a central local trace application that discovers
+  runs recursively, groups them by directory, opens traces dynamically, and
+  moves selected runs or whole directory groups to the system trash.
+- Central trace pages now render the first 25 and last 10 steps in full, show
+  compact middle steps expandable in groups of 10, and lazy-load screenshot
+  and DomSnapshot blobs. Standalone exports remain self-contained.
+- The trace server now treats browser-cancelled responses as normal disconnects
+  instead of printing `BrokenPipeError` worker tracebacks.
+- Pi raw-event capture now filters cumulative `message_update` snapshots and
+  has a 64 MiB ceiling without compromising timeout/tool-limit recovery.
+
 - **`evals/` workspace package (`ebrowse-evals`)** — foundation of the evaluation
   harness. Trace schema v1 (typed JSONL records + content-addressed blob store,
   forward-compatible by construction; see `evals/docs/trace-schema.md`), the

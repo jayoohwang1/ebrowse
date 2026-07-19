@@ -47,11 +47,18 @@ as a `join_mismatch` anomaly), fills each step's browser/screenshot/DomSnapshot
 fields, re-emits daemon events as `ebrowse_log` records, promotes warn-level
 anomaly events to `anomaly` records, and rolls phase timings into `step.timing`.
 
+Pi's raw JSON artifact excludes cumulative `message_update` snapshots, which
+repeat the complete message-so-far on every token. Useful lifecycle and
+`message_end` events remain in `pi-events.jsonl`, bounded to 64 MiB with one
+`events_truncated` marker at the ceiling. Timeout and tool-limit recovery keeps
+`message_end` records in memory, so it remains complete after the file cap.
+
 ```bash
 uv run ebrowse-eval validate evals/tests/fixtures/sample-trace
 uv run ebrowse-eval tasks evals/tests/fixtures/benchmark --tag fixture
 # run tasks through pi (provider/model from flags, $PI_PROVIDER/$PI_MODEL, or experiments/.env)
 uv run ebrowse-eval run evals/tests/fixtures/benchmark --task 'list-*' --worktree
+uv run ebrowse-eval serve runs --open
 uv run ebrowse-eval view evals/tests/fixtures/sample-trace --open
 uv run ebrowse-eval overview evals/tests/fixtures/sample-trace
 uv run ebrowse-eval trace-ref evals/tests/fixtures/sample-trace @e1
@@ -64,6 +71,14 @@ each run's `run_meta`. `--worktree` is the port of `run-agent.sh -w`: it shims
 `ebrowse` to this checkout's `.venv` and stops any running daemon first. The
 agent boundary is the `AgentHarness` protocol (`harness.py`); `runner.StepCapture`
 is the hook where the capture layer enriches each step.
+
+For tasks with a `url`, the pi harness opens that URL before the agent starts
+and tells the agent to remain on the target site. The setup navigation is not
+an agent step or part of the tool-call budget. Runs default to at most 200 completed
+tool calls; override with `--tool-call-limit N` or disable with `--tool-call-limit 0`.
+Use `--jobs N` to run tasks concurrently. Each run owns an isolated daemon
+socket, Chromium profile, and cache, so setup and teardown cannot affect other
+workers.
 
 `view` renders a run into a single self-contained HTML page — a two-lane
 step log (right: what the agent saw; left: screenshot filmstrip + internals

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import random
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import metadata
@@ -29,6 +30,8 @@ HARNESS_DEFAULTS: dict[str, Any] = {
     "tool": "ebrowse",
     "worktree": False,
     "timeout_s": 600.0,
+    "tool_call_limit": 200,
+    "jobs": 1,
     "capture": True,  # instrument the ebrowse shim (spool + debug log); ebrowse-only
 }
 
@@ -107,6 +110,8 @@ class RunResult:
 
 
 def _outcome(result: HarnessResult, eval_result: EvalResult) -> str:
+    if result.tool_limit_hit:
+        return "tool_limit"
     if result.timed_out:
         return "timeout"
     if result.exit_code != 0:
@@ -149,7 +154,15 @@ def run_task(
     timeout_s = task.timeout_s if task.timeout_s is not None else config.get("timeout_s")
     workdir = run_dir / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
-    result = harness.run(task.prompt, workdir=workdir, env={}, timeout_s=timeout_s, run_dir=run_dir)
+    result = harness.run(
+        task.prompt,
+        workdir=workdir,
+        env={},
+        timeout_s=timeout_s,
+        run_dir=run_dir,
+        start_url=task.url,
+        tool_call_limit=config.get("tool_call_limit"),
+    )
     steps = [
         Step(
             step=i,
@@ -213,32 +226,45 @@ def run_tasks(
     name: str | None = None,
 ) -> list[RunResult]:
     """Run each selected task in its own run directory under runs_root."""
-    results: list[RunResult] = []
     # Absolute: run_dir paths get embedded in the shim script and passed to the
     # agent subprocess (--session-dir, EBROWSE_DEBUG_LOG), whose cwd is the
     # run's workdir — a relative runs_root would scatter artifacts under it.
     runs_root = runs_root.resolve()
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    prepared: list[tuple[Task, dict[str, Any], Path]] = []
+    reserved: set[Path] = set()
     for task in tasks:
         config = resolve_config(benchmark.config if benchmark else None, task.config, cli_config)
         base = f"{name}-{task.id}" if name else f"{task.id}-{stamp}"
         run_dir = runs_root / base
         n = 2
-        while run_dir.exists():
+        while run_dir.exists() or run_dir in reserved:
             run_dir = runs_root / f"{base}-{n}"
             n += 1
-        results.append(
-            run_task(
-                task,
-                harness,
-                config,
-                run_dir,
-                benchmark=benchmark.name if benchmark else None,
-                repo_root=repo_root,
-                capture=capture,
-            )
+        reserved.add(run_dir)
+        prepared.append((task, config, run_dir))
+
+    def execute(item: tuple[Task, dict[str, Any], Path]) -> RunResult:
+        task, config, run_dir = item
+        return run_task(
+            task,
+            harness,
+            config,
+            run_dir,
+            benchmark=benchmark.name if benchmark else None,
+            repo_root=repo_root,
+            capture=capture,
         )
-    return results
+
+    jobs = max(1, int(cli_config.get("jobs") or 1))
+    if jobs == 1:
+        return [execute(item) for item in prepared]
+    by_index: dict[int, RunResult] = {}
+    with ThreadPoolExecutor(max_workers=jobs, thread_name_prefix="ebrowse-eval") as pool:
+        futures = {pool.submit(execute, item): i for i, item in enumerate(prepared)}
+        for future in as_completed(futures):
+            by_index[futures[future]] = future.result()
+    return [by_index[i] for i in range(len(prepared))]
 
 
 __all__ = [

@@ -1,0 +1,4 @@
+[task]
+prompt = "Find all startup companies from the 2022 and 2023 Y Combinator batches that are based in France and currently have job openings."
+url = "https://www.ycombinator.com/"
+tags = ["online-mind2web", "hard", "reachable"]

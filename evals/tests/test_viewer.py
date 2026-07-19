@@ -4,12 +4,20 @@ from __future__ import annotations
 
 import json
 import shutil
+import threading
+import urllib.error
+import urllib.parse
+import urllib.request
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
 
+from ebrowse_evals import viewer_server
 from ebrowse_evals.cli import main
+from ebrowse_evals.trace.store import TraceReader
 from ebrowse_evals.viewer import render_run
+from ebrowse_evals.viewer_server import discover_runs, make_handler, render_index, trash_runs
 
 SAMPLE = Path(__file__).parent / "fixtures" / "sample-trace"
 
@@ -88,3 +96,152 @@ def test_cli_view_writes_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]
 
 def test_cli_view_missing_dir(tmp_path: Path) -> None:
     assert main(["view", str(tmp_path / "nope")]) == 2
+
+
+def test_central_index_discovers_and_groups_nested_runs(tmp_path: Path) -> None:
+    root = tmp_path / "runs"
+    shutil.copytree(SAMPLE, root / "batch-a" / "run-one")
+    shutil.copytree(SAMPLE, root / "batch-b" / "nested" / "run-two")
+    runs = discover_runs(root)
+    assert [r.group for r in runs] == ["batch-a", "batch-b/nested"]
+    page = render_index(root, runs)
+    assert "2 runs" in page
+    assert "batch-a" in page and "batch-b/nested" in page
+    assert "/run/batch-a/run-one" in page
+    assert "list-count" in page and "success" in page
+    assert 'action="/trash"' in page
+    assert page.count('class="group-pick"') == 2
+    assert "Move selected to trash" in page
+
+
+def test_central_server_routes_index_trace_and_rejects_escape(tmp_path: Path) -> None:
+    root = tmp_path / "runs"
+    shutil.copytree(SAMPLE, root / "batch" / "run")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(root))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        assert "ebrowse eval runs" in urllib.request.urlopen(base + "/").read().decode()
+        trace = urllib.request.urlopen(base + "/run/batch/run").read().decode()
+        assert "all runs" in trace and 'id="step-1"' in trace
+        assert "data:image/png" not in trace
+        step = TraceReader(root / "batch" / "run").steps()[0]
+        assert step.dom_snapshot is not None
+        blob_query = urllib.parse.urlencode({"run": "batch/run", "ref": step.dom_snapshot})
+        assert urllib.request.urlopen(base + "/blob?" + blob_query).read().startswith(b"{")
+        fragment = (
+            urllib.request.urlopen(base + "/steps?run=batch%2Frun&offset=0&limit=2").read().decode()
+        )
+        assert fragment.count('class="step"') == 2
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            urllib.request.urlopen(base + "/run/%2E%2E/nope")
+        assert exc.value.code == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+
+def test_server_mode_compacts_middle_and_lazy_loads_chunks(tmp_path: Path) -> None:
+    run = tmp_path / "run"
+    shutil.copytree(SAMPLE, run)
+    records = [json.loads(line) for line in (run / "events.jsonl").read_text().splitlines()]
+    template = next(record for record in records if record.get("type") == "step")
+    kept = [record for record in records if record.get("type") not in ("step", "run_end")]
+    for n in range(1, 51):
+        step = dict(template)
+        step["step"] = n
+        step["command"] = f"ebrowse action {n}"
+        step["agent_text"] = f"Thought for step {n}"
+        kept.append(step)
+    (run / "events.jsonl").write_text("\n".join(json.dumps(record) for record in kept) + "\n")
+
+    page = render_run(
+        run,
+        blob_url=lambda ref: f"/blob/{ref}",
+        fragment_url=lambda offset, limit: f"/steps/{offset}/{limit}",
+        compact_middle=True,
+    )
+    assert page.count('class="step"') == 35
+    assert page.count('class="compact-step"') == 15
+    assert "Expand steps 26–35" in page and "Expand steps 36–40" in page
+    assert 'id="step-25"' in page and 'id="step-41"' in page
+    assert 'id="step-26"' not in page
+    assert "data:image/png" not in page
+    assert 'class="dom-lazy"' in page
+
+    fragment = viewer_server.render_step_fragment(run, 25, 10, blob_url=lambda ref: f"/blob/{ref}")
+    assert fragment.count('class="step"') == 10
+    assert 'id="step-26"' in fragment and 'id="step-35"' in fragment
+
+
+def test_trash_runs_validates_and_invokes_trash_put(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "runs"
+    shutil.copytree(SAMPLE, root / "batch" / "run")
+    calls: list[list[str]] = []
+
+    class Result:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(command: list[str], **kwargs: object) -> Result:
+        calls.append(command)
+        return Result()
+
+    monkeypatch.setattr(viewer_server.subprocess, "run", fake_run)
+    assert trash_runs(root, ["batch/run", "batch/run"]) == 1
+    assert calls == [["trash-put", "--", str((root / "batch" / "run").resolve())]]
+    with pytest.raises(ValueError, match="invalid trace run"):
+        trash_runs(root, ["../outside"])
+
+
+def test_central_server_trash_post_redirects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "runs"
+    shutil.copytree(SAMPLE, root / "batch" / "run")
+    selected: list[str] = []
+
+    def fake_trash(root_arg: Path, values: list[str]) -> int:
+        assert root_arg == root.resolve()
+        selected.extend(values)
+        return len(values)
+
+    monkeypatch.setattr(viewer_server, "trash_runs", fake_trash)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(root))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        data = urllib.parse.urlencode({"run": "batch/run"}).encode()
+        opener = urllib.request.build_opener(urllib.request.HTTPRedirectHandler())
+        page = (
+            opener.open(
+                urllib.request.Request(
+                    f"http://127.0.0.1:{server.server_port}/trash", data=data, method="POST"
+                )
+            )
+            .read()
+            .decode()
+        )
+        assert selected == ["batch/run"]
+        assert "Moved 1 run to trash" in page
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+
+@pytest.mark.parametrize("error", [BrokenPipeError, ConnectionResetError, ConnectionAbortedError])
+def test_central_server_ignores_client_disconnects(tmp_path: Path, error: type[OSError]) -> None:
+    root = tmp_path / "runs"
+    root.mkdir()
+    handler_type = make_handler(root)
+    handler = object.__new__(handler_type)
+    handler.send_response = lambda status: None  # type: ignore[method-assign]
+    handler.send_header = lambda key, value: None  # type: ignore[method-assign]
+    handler.end_headers = lambda: (_ for _ in ()).throw(error())  # type: ignore[method-assign]
+    handler._send(b"page", "text/html")

@@ -169,7 +169,9 @@ def test_run_task_ingests_shim_artifacts(tmp_path):
         def describe(self):
             return {"harness": "fake"}
 
-        def run(self, prompt, workdir, env, timeout_s, run_dir):
+        def run(
+            self, prompt, workdir, env, timeout_s, run_dir, start_url=None, tool_call_limit=None
+        ):
             _spool(run_dir / SPOOL_DIR, 1, {"browser": {"url": "http://x"}})
             (run_dir / DEBUG_LOG_FILE).write_text(
                 json.dumps(

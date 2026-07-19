@@ -46,4 +46,10 @@ Config layering (later overrides earlier): harness defaults → benchmark
 `[config]` → task `[config]` → CLI flags. The fully resolved result is
 persisted into the run's `run_meta` record.
 
+For the pi/ebrowse harness, `url` is also the initial browser location. The
+harness opens it before the agent starts; this setup action is excluded from
+the trace's agent-step numbering and tool-call limit. Relevant config keys are
+`timeout_s`, `tool_call_limit` (default 200; zero disables), and `jobs`
+(default 1; CLI `--jobs` controls benchmark concurrency).
+
 Example benchmark: `evals/tests/fixtures/benchmark/`.

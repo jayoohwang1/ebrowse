@@ -19,3 +19,6 @@ build/
 
 # Eval runs (large, local-only)
 runs/
+
+# Local editor configuration
+.vscode/

@@ -1,0 +1,4 @@
+[task]
+prompt = "Add the cheapest black sofa with at least three seats, a leather finish, and at least four stars to my cart."
+url = "https://www.ikea.com/"
+tags = ["online-mind2web", "hard", "reachable", "cart"]
