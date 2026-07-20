@@ -150,6 +150,24 @@ def test_run_task_emits_valid_trace(tmp_path):
     assert harness.calls[0]["tool_call_limit"] == 200
 
 
+def test_run_meta_is_written_after_prepare_but_before_agent_run(tmp_path):
+    class PreparingHarness(FakeHarness):
+        def prepare_run(self, env, run_dir, start_url, config):
+            config["resolved_navigation_domains"] = ["example.ca"]
+
+        def run(self, prompt, workdir, env, timeout_s, run_dir, **kwargs):
+            raw = list(TraceReader(run_dir).raw())
+            assert len(raw) == 1
+            assert raw[0]["type"] == "run_meta"
+            assert raw[0]["config"]["resolved_navigation_domains"] == ["example.ca"]
+            return super().run(prompt, workdir, env, timeout_s, run_dir, **kwargs)
+
+    task = load_task(BENCH / "list-count")
+    run_dir = tmp_path / "prepared"
+    run_task(task, PreparingHarness(), resolve_config(), run_dir)
+    assert TraceReader(run_dir).validate() == []
+
+
 def test_run_task_outcomes(tmp_path):
     task = load_task(BENCH / "list-count")
     wrong = FakeHarness(HarnessResult(final_answer="no idea"))

@@ -10,7 +10,9 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 - Redirect-aware eval startup discovers bounded regional task redirects before the
   agent runs, freezes the resulting domain scope, and records the chain in trace
-  metadata and `navigation-bootstrap.json`.
+  metadata and `navigation-bootstrap.json`. Harness preparation completes before the
+  single authoritative `run_meta` record is emitted, so live runs remain discoverable
+  throughout agent execution without later metadata correction records.
 
 - Pi/ebrowse evals now expose one shell-free custom browser tool instead of
   Bash. A configurable verb/argument/output/timeout policy blocks `eval`, file

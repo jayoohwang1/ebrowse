@@ -23,7 +23,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from ebrowse_evals.harness import AgentHarness, HarnessResult
+from ebrowse_evals.harness import AgentHarness, HarnessResult, PreparatoryHarness
 from ebrowse_evals.tasks import Benchmark, EvalResult, Task
 from ebrowse_evals.trace.records import AgentMessage, PromptSnapshot, RunEnd, RunMeta, Step
 from ebrowse_evals.trace.store import TraceReader, TraceWriter
@@ -148,36 +148,35 @@ def run_task(
     run_dir = run_dir.resolve()  # see run_tasks: paths embed in shim + subprocess args
     writer = TraceWriter(run_dir)
     git_sha, git_dirty = _git_state(repo_root)
-    run_meta = RunMeta(
-        run_id=run_dir.name,
-        task_id=task.id,
-        prompt=task.prompt,
-        benchmark=benchmark,
-        config=config,
-        agent=harness.describe(),
-        git_sha=git_sha,
-        git_dirty=git_dirty,
-        ebrowse_version=_ebrowse_version(),
-        ebrowse_mode="worktree" if config.get("worktree") else "installed",
-    )
     timeout_s = task.timeout_s if task.timeout_s is not None else config.get("timeout_s")
     workdir = run_dir / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
-    try:
-        result = harness.run(
-            task.prompt,
-            workdir=workdir,
-            env={},
-            timeout_s=timeout_s,
-            run_dir=run_dir,
-            start_url=task.url,
-            tool_call_limit=config.get("tool_call_limit"),
+    if isinstance(harness, PreparatoryHarness):
+        harness.prepare_run(env={}, run_dir=run_dir, start_url=task.url, config=config)
+    writer.write(
+        RunMeta(
+            run_id=run_dir.name,
+            task_id=task.id,
+            prompt=task.prompt,
+            benchmark=benchmark,
             config=config,
+            agent=harness.describe(),
+            git_sha=git_sha,
+            git_dirty=git_dirty,
+            ebrowse_version=_ebrowse_version(),
+            ebrowse_mode="worktree" if config.get("worktree") else "installed",
         )
-    except BaseException:
-        writer.write(run_meta)
-        raise
-    writer.write(run_meta)
+    )
+    result = harness.run(
+        task.prompt,
+        workdir=workdir,
+        env={},
+        timeout_s=timeout_s,
+        run_dir=run_dir,
+        start_url=task.url,
+        tool_call_limit=config.get("tool_call_limit"),
+        config=config,
+    )
     if result.start_prompt:
         start_bytes = result.start_prompt.encode()
         writer.write(
