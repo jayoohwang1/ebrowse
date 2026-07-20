@@ -26,6 +26,11 @@ def _css_escape(s: str) -> str:
     return s.translate(_CSS_ESCAPE)
 
 
+def _css_escape_value(s: str) -> str:
+    """Escape a string for use inside a double-quoted attribute selector."""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def _frame_scope(page, desc: ElementDesc):
     """Resolve the frame the element lives in (iframe_path from discovery).
     fid is the frame's id, title, or src attribute — whichever capture used
@@ -129,17 +134,17 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None, witness=None)
     identity facts cannot see. The zero-cost happy path is unchanged.
     """
     scope = _frame_scope(page, desc)
-    candidates: list[tuple] = []  # (locator, collapsed_first)
+    candidates: list[tuple] = []  # (locator, suspicious, unique_only)
     if desc.id:
-        candidates.append((scope.locator(f"#{_css_escape(desc.id)}"), False))
+        candidates.append((scope.locator(f"#{_css_escape(desc.id)}"), False, False))
     if desc.testid:
         for attr in ("data-testid", "data-qa", "data-test"):
-            candidates.append((scope.locator(f'[{attr}="{desc.testid}"]'), False))
+            candidates.append((scope.locator(f'[{attr}="{desc.testid}"]'), False, False))
     if desc.role and desc.name:
-        candidates.append((scope.get_by_role(desc.role, name=desc.name, exact=True), False))
-        candidates.append((scope.get_by_role(desc.role, name=desc.name), False))
+        candidates.append((scope.get_by_role(desc.role, name=desc.name, exact=True), False, False))
+        candidates.append((scope.get_by_role(desc.role, name=desc.name), False, False))
     if desc.placeholder:
-        candidates.append((scope.get_by_placeholder(desc.placeholder, exact=True), False))
+        candidates.append((scope.get_by_placeholder(desc.placeholder, exact=True), False, False))
     if desc.role and desc.text_head:
         # roles like link/menuitem/option/tab take their accessible name from
         # text content, which discovery stores in text_head rather than name.
@@ -147,22 +152,37 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None, witness=None)
         # match many links, and nth_hint counts identical DESCRIPTORS, not
         # href matches — resolving 'Products' as the 0th 'a[href$="#"]' once
         # hovered the Home link while reporting 'link "Products"'.
-        candidates.append((scope.get_by_role(desc.role, name=desc.text_head, exact=True), False))
+        candidates.append(
+            (scope.get_by_role(desc.role, name=desc.text_head, exact=True), False, False)
+        )
     if desc.href:
         base = scope.locator(f'a[href$="{desc.href}"]')
         # same wrong-element risk: constrain repeated hrefs by the link text
         candidates.append(
-            (base.filter(has_text=desc.text_head[:60]) if desc.text_head else base, False)
+            (base.filter(has_text=desc.text_head[:60]) if desc.text_head else base, False, False)
         )
         if "?" in desc.href:
-            candidates.append((scope.locator(f'a[href$="{desc.href.split("?")[0]}"]'), False))
+            candidates.append(
+                (scope.locator(f'a[href$="{desc.href.split("?")[0]}"]'), False, False)
+            )
     if desc.text_head and desc.tag in ("a", "button", "summary"):
         # .first collapses a multi-match to count()==1 — always suspicious
         candidates.append(
-            (scope.locator(desc.tag).filter(has_text=desc.text_head[:60]).first, True)
+            (scope.locator(desc.tag).filter(has_text=desc.text_head[:60]).first, True, False)
         )
     if desc.text_head:
-        candidates.append((scope.locator(desc.tag, has_text=desc.text_head[:60]), False))
+        candidates.append((scope.locator(desc.tag, has_text=desc.text_head[:60]), False, False))
+    # Anonymous-element fallbacks (ADR 0015 follow-up): class tokens and
+    # filtered custom attrs survive node replacement, which kills the CDP
+    # binding. UNIQUE matches only — nth over a class-matched set would not
+    # align with nth_hint (counted over descriptor-identical elements), and
+    # without a live binding there is no witness to catch a misbind.
+    if desc.cls:
+        sel = desc.tag + "".join(f".{t}" for t in desc.cls.split())
+        candidates.append((scope.locator(sel), True, True))
+    if desc.attrs:
+        sel = desc.tag + "".join(f'[{k}="{_css_escape_value(v)}"]' for k, v in desc.attrs)
+        candidates.append((scope.locator(sel), True, True))
 
     # Pre-act verification (issue #12): a unique match with no earlier
     # suspicion returns at zero cost; any disambiguated pick — and every pick
@@ -174,15 +194,17 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None, witness=None)
     # Reorders among FULLY identical siblings are invisible to identity facts;
     # those are caught by the witness geometry check on suspicious picks below.
     mismatch: str | None = None
-    for i, (loc, collapsed) in enumerate(candidates):
+    for i, (loc, suspicious, unique_only) in enumerate(candidates):
         try:
             n = await loc.count()
         except Exception:
             continue
         if n == 0:
             continue
+        if unique_only and n != 1:
+            continue  # refuse-over-misbind: never nth-guess a fallback match
         if n == 1:
-            if mismatch is None and not collapsed:
+            if mismatch is None and not suspicious:
                 debug.emit("locate", "resolved", ref=ref, strategy=i, matches=1, verified=False)
                 return loc  # happy path: unique match, nothing suspicious
             picked = loc

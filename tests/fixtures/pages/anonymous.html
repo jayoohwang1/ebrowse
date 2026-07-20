@@ -26,7 +26,7 @@
     <h1>Search</h1>
     <div class="searchbar">
       <input type="search" placeholder="Search terms">
-      <button class="iconbtn" type="button">
+      <button class="iconbtn" type="button" data-kind="search">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M10 4a6 6 0 1 0 3.9 10.6l4.3 4.3 1.4-1.4-4.3-4.3A6 6 0 0 0 10 4zm0 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/>
         </svg>
@@ -59,6 +59,14 @@
         b.replaceWith(n);
         n.addEventListener("click", () => {
           document.getElementById("result").textContent = "search-clicked: replaced";
+        });
+        // the bare input too: no class, no custom attrs — NO descriptor
+        // fallback exists, so its dead binding must fail loudly
+        const f = document.querySelector(".barefield input");
+        const g = f.cloneNode(true);
+        f.replaceWith(g);
+        g.addEventListener("input", (e) => {
+          document.getElementById("echo").textContent = "note: " + e.target.value;
         });
       }, 6000);
     }

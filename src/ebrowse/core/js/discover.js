@@ -58,6 +58,25 @@
 
   const collapse = (s) => (s || "").replace(/\s+/g, " ").trim();
 
+  // custom-attr locator hints for anonymous interactive elements (mirrors
+  // core/cdp_capture._extra_attrs — keep the exclude set in sync)
+  const XA_EXCLUDE = new Set(("id class style role href placeholder title alt src type name " +
+    "value tabindex contenteditable draggable disabled required multiple checked selected " +
+    "for data-testid data-qa data-test").split(" "));
+  function extraAttrs(el) {
+    const pairs = [];
+    for (const at of el.attributes) {
+      const k = at.name.toLowerCase();
+      if (XA_EXCLUDE.has(k) || k.startsWith("on") || k.startsWith("aria-")) continue;
+      pairs.push([k, at.value.slice(0, 60)]);
+    }
+    if (!pairs.length) return null;
+    pairs.sort((x, y) => (x[0] < y[0] ? -1 : 1));
+    const xa = {};
+    for (const [k, v] of pairs.slice(0, 4)) xa[k] = v;
+    return xa;
+  }
+
   function accName(el) {
     const aria = el.getAttribute("aria-label");
     if (aria) return collapse(aria).slice(0, 120);
@@ -244,6 +263,13 @@
       if (el.closest("[inert]")) {
         if (!node.a) node.a = a;
         a.inr = 1;
+      }
+      if (!(a.id || a.tid || a.nm || a.ph || a.href)) {
+        const xa = extraAttrs(el);
+        if (xa) {
+          a.xa = xa;
+          if (!node.a) node.a = a;
+        }
       }
     }
 

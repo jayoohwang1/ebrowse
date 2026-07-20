@@ -139,6 +139,51 @@ def _collapse(s: str) -> str:
     return " ".join(s.split())
 
 
+# attrs never useful as identity: curated elsewhere, style/state, or handlers
+_XA_EXCLUDE = frozenset(
+    [
+        "id",
+        "class",
+        "style",
+        "role",
+        "href",
+        "placeholder",
+        "title",
+        "alt",
+        "src",
+        "type",
+        "name",
+        "value",
+        "tabindex",
+        "contenteditable",
+        "draggable",
+        "disabled",
+        "required",
+        "multiple",
+        "checked",
+        "selected",
+        "for",
+        "data-testid",
+        "data-qa",
+        "data-test",
+    ]
+)
+
+
+def _extra_attrs(el: dict[str, str]) -> dict[str, str] | None:
+    """Filtered custom attributes for an otherwise-anonymous element: no
+    curated/standard keys, no on* handlers, no aria-* (state, not identity),
+    values capped. At most 4 pairs, sorted for determinism."""
+    xa = {}
+    for k, v in el.items():
+        if k in _XA_EXCLUDE or k.startswith(("on", "aria-")):
+            continue
+        xa[k] = v[:60]
+    if not xa:
+        return None
+    return dict(sorted(xa.items())[:4])
+
+
 class _DocWalker:
     """Walks one decoded document into DomNodes (discover.js semantics)."""
 
@@ -420,6 +465,16 @@ class _DocWalker:
             if in_inert:
                 node.attrs = node.attrs or {}
                 node.attrs["inr"] = 1
+            # custom-attr locator hints for anonymous interactive elements:
+            # pages that name nothing usually still hang framework attributes
+            # on functional elements (data-action, data-cy, ...) — recorded
+            # only when no standard identity exists, consumed by locate's
+            # unique-match fallback candidates (ADR 0015 follow-up)
+            if not (a.get("id") or a.get("tid") or a.get("nm") or a.get("ph") or a.get("href")):
+                xa = _extra_attrs(el)
+                if xa:
+                    a["xa"] = xa
+                    node.attrs = a
 
         # own text: direct text-node children only
         own = "".join(d.node_value[ci] for ci in d.children[idx] if d.node_type[ci] == _TEXT_NODE)

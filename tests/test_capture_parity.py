@@ -32,6 +32,9 @@ PAGES = [
     "disabled_states.html",
     "dialogs.html",
     "huge.html",
+    "anonymous.html",
+    "identical_row.html",
+    "scrollpanel.html",
 ]
 
 
@@ -84,3 +87,25 @@ async def test_scrolled_coordinates_are_absolute(server, page):
     for ra, rb in zip(a, b, strict=True):
         # sub-pixel rounding may differ by 1px; document-absolute must hold
         assert all(abs(x - y) <= 1 for x, y in zip(ra, rb, strict=True))
+
+
+async def test_inner_scroll_state_parity(server, page):
+    """Pins the scrollRects-as-scroll-offset interpretation: a pre-scrolled
+    inner container must report the same scr=[scrollTop, maxScroll] from both
+    engines (a wrong value silently corrupts 'more below the fold' hints)."""
+    await page.goto(server.url("scrollpanel.html"), wait_until="load")
+
+    def scr_of(snap):
+        for n in snap.root.walk():
+            if n.attrs.get("scr"):
+                return n.attrs["scr"]
+        return None
+
+    js_scr = scr_of(await capture(page, engine="js"))
+    cdp_scr = scr_of(await capture(page, engine="cdp"))
+    assert js_scr is not None and js_scr[0] > 0, js_scr  # the panel IS scrolled
+    assert cdp_scr is not None, "cdp engine missed the scroll container"
+    assert abs(cdp_scr[0] - js_scr[0]) <= 1 and abs(cdp_scr[1] - js_scr[1]) <= 1, (
+        js_scr,
+        cdp_scr,
+    )

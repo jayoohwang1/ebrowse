@@ -99,28 +99,36 @@ def test_anonymous_input_fills_via_binding(server, env):
     assert "note: hello binding" in r.stdout  # oninput echo → landed on the node
 
 
-def test_dead_binding_error_names_reoutline(server, env):
-    """#mutate replaces the icon button 6s after load with NO verb in between
-    (every verb re-observes and would re-bind — that self-healing is test 1's
-    behavior). The dead binding must fail loudly naming re-outline, and the
-    re-outline must actually fix it."""
+def test_dead_binding_paths_after_node_replacement(server, env):
+    """#mutate replaces the icon button AND the bare input 6s after load with
+    NO verb in between (every verb re-observes and would re-bind — that
+    self-healing is test 1's behavior). Both bindings die; the two refs then
+    diverge: the button has class tokens, so the descriptor fallback finds
+    the replacement and the click SUCCEEDS; the bare input has no class and
+    no custom attrs, so its fill fails loudly naming re-outline — and the
+    re-outline genuinely fixes it."""
     # query param forces a real load (hash-only would be an in-page navigation
     # from the prior test's page, and the timer script would never arm)
     r = ebrowse(env, "open", server.url("anonymous.html") + "?m=1#mutate")
     assert r.returncode == 0, r.stderr
-    button, _ = anonymous_refs(env)  # observed BEFORE the 6s mutation
-    time.sleep(8)  # the page replaces the node; no ebrowse command runs
-    r = ebrowse(env, "click", button)
+    button, field = anonymous_refs(env)  # observed BEFORE the 6s mutation
+    time.sleep(8)  # the page replaces the nodes; no ebrowse command runs
+    r = ebrowse(env, "fill", field, "ghost")
     if r.returncode == 0:
         # a slow run can push the observe past the mutation, re-binding to the
         # replacement — the stale window never existed, nothing to assert
         pytest.skip("observe landed after the mutation; no stale window")
     assert "outline" in (r.stdout + r.stderr)
-    assert ebrowse(env, "outline").returncode == 0
-    button, _ = anonymous_refs(env)
+    # the button survives via its class-token fallback (button.iconbtn),
+    # binding-dead notwithstanding — and hits the REPLACEMENT node
     r = ebrowse(env, "click", button)
-    assert r.returncode == 0, r.stderr
+    assert r.returncode == 0, r.stdout + r.stderr
     assert "search-clicked: replaced" in r.stdout
+    # recovery for the naked input: re-outline re-binds
+    button, field = anonymous_refs(env)
+    r = ebrowse(env, "fill", field, "rebound")
+    assert r.returncode == 0, r.stderr
+    assert "note: rebound" in r.stdout
 
 
 def test_identical_siblings_reorder_witness_picks_bound_node(server, env):

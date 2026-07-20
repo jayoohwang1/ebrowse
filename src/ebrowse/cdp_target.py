@@ -24,7 +24,9 @@ protocol ops (scroll/focus) and coordinate input still work.
 
 from __future__ import annotations
 
+import asyncio
 import json
+import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -104,7 +106,16 @@ class CdpTarget:
             return None
         if expect_tag and node.get("nodeName", "").lower() != expect_tag:
             return None  # id reuse across documents — treat as dead
-        return cls(bridge, backend_id, ref)
+        target = cls(bridge, backend_id, ref)
+        # DOM.describeNode also succeeds on DETACHED nodes (kept alive by any
+        # reference); acting on one throws raw protocol errors mid-verb. One
+        # isConnected evaluate makes create() the single liveness gate.
+        try:
+            if not await target.evaluate("(el) => el.isConnected"):
+                return None
+        except Exception:
+            return None
+        return target
 
     # ------------------------------------------------------------ evaluate ----
 
@@ -183,7 +194,18 @@ class CdpTarget:
         return box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
 
     async def scroll_into_view_if_needed(self, timeout: float | None = None) -> None:
-        await self._b.send("DOM.scrollIntoViewIfNeeded", {"backendNodeId": self._id})
+        try:
+            await self._b.send("DOM.scrollIntoViewIfNeeded", {"backendNodeId": self._id})
+        except Exception as e:
+            if "detached" in str(e).lower():
+                # the node died between create() and the action — same
+                # recovery as any dead binding
+                raise CommandError(
+                    f"{self.ref}: the bound element was removed from the page mid-action "
+                    "— run 'ebrowse outline' to re-bind",
+                    ExitCode.ACTION_FAILED,
+                ) from e
+            raise
 
     # ---------------------------------------------------------------- state ----
 
@@ -217,24 +239,35 @@ class CdpTarget:
         await self.scroll_into_view_if_needed()
         x, y = await self._center()
         if trial:
-            # actionability approximation: the center point must hit the
-            # element (or a descendant/label surface). A miss raises so
-            # _plan_pointer takes its obstructed route, same as a locator.
-            hit = await self.evaluate(
-                """(el, pt) => {
-                    const t = document.elementFromPoint(pt[0], pt[1]);
-                    let n = t;
-                    while (n) {
-                        if (n === el) return true;
-                        n = n.parentNode || (n instanceof ShadowRoot ? n.host : null);
-                    }
-                    return false;
-                }""",
-                [x, y],
-            )
-            if not hit:
-                raise RuntimeError(f"trial click at ({x:.0f},{y:.0f}) does not reach {self.ref}")
-            return
+            # Actionability approximation of Playwright's trial click: retry
+            # the center-point hit test for the timeout so transient overlays
+            # and entrance animations can clear (the same reason _plan_pointer
+            # arbitrates a suspected cover with a trial instead of refusing).
+            # Only a PERSISTENT miss raises, sending the plan to its
+            # obstructed route. Geometry is re-read each attempt: an animating
+            # target moves, and its center must be current when the hit lands.
+            deadline = time.monotonic() + (timeout or 2000) / 1000
+            while True:
+                hit = await self.evaluate(
+                    """(el, pt) => {
+                        const t = document.elementFromPoint(pt[0], pt[1]);
+                        let n = t;
+                        while (n) {
+                            if (n === el) return true;
+                            n = n.parentNode || (n instanceof ShadowRoot ? n.host : null);
+                        }
+                        return false;
+                    }""",
+                    [x, y],
+                )
+                if hit:
+                    return
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(
+                        f"trial click at ({x:.0f},{y:.0f}) does not reach {self.ref}"
+                    )
+                await asyncio.sleep(0.1)
+                x, y = await self._center()
         keys = _resolve_modifiers(modifiers)
         for k in keys:
             await self._b.page.keyboard.down(k)

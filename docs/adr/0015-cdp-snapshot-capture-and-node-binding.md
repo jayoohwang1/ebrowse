@@ -93,7 +93,14 @@ a persistent CDP session, and bind every discovered element to its
 - Chromium-only capture (already the commitment of ADR 0002); the plain-JS
   engine flag is the interim escape hatch.
 - Bindings die on navigation and node replacement by design; cross-page ref
-  persistence continues to ride on descriptors.
+  persistence continues to ride on descriptors — which, for anonymous
+  elements, include two replacement-surviving fallbacks: session-stable class
+  tokens (`ElementDesc.cls`, hashy tokens kept: locating needs within-session
+  stability only, unlike fingerprints) and filtered custom attributes
+  (`ElementDesc.attrs`, fully anonymous elements only). Both are excluded
+  from `match_key()` (never churn ref identity) and resolve on UNIQUE matches
+  only — nth over a class-matched set would not align with `nth_hint`, and
+  without a live binding there is no witness to catch a misbind.
 - Architecture principle 3 is rephrased: "Playwright calls only in
   core/snapshot.py …" becomes "browser I/O (Playwright or CDP) only in …".
 - Future capture upgrades (paint order → pure-code occlusion, computed-style

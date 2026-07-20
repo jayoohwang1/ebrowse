@@ -70,6 +70,12 @@ class ElementDesc:
     text_head: str = ""  # first 80 chars visible text, whitespace-collapsed
     nth_hint: int = 0  # disambiguator among identical descriptors on a page
     iframe_path: tuple[str, ...] = ()  # ancestor frame ids/titles; () = main frame
+    # Locator HINTS for otherwise-anonymous elements (ADR 0015 follow-up) —
+    # deliberately EXCLUDED from match_key(): cls keeps hashy build tokens
+    # (great within-session discriminators, unstable across deploys) and
+    # neither may churn ref identity/reuse.
+    cls: str = ""  # state-filtered class tokens, space-joined, document order
+    attrs: tuple[tuple[str, str], ...] = ()  # filtered custom attrs, sorted, capped
 
     def match_key(self) -> tuple:
         """Exact-match identity used by RefRegistry (excludes nth_hint)."""
@@ -106,6 +112,7 @@ class ElementDesc:
     def from_dict(cls, d: dict[str, Any]) -> ElementDesc:
         d = dict(d)
         d["iframe_path"] = tuple(d.get("iframe_path") or ())
+        d["attrs"] = tuple(tuple(a) for a in d.get("attrs") or ())
         return cls(**d)
 
 
