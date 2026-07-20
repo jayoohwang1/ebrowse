@@ -20,8 +20,10 @@ fully resolved in `run_meta.config`:
 
 ```toml
 [config]
-navigation_policy = "task-host" # task-host | allowlist | unrestricted
-navigation_allowed_domains = [] # additions in task-host; complete list in allowlist
+navigation_policy = "task-host" # task-host | task-redirects | allowlist | unrestricted
+navigation_allowed_domains = [] # additions in task-host/task-redirects; complete in allowlist
+navigation_bootstrap_timeout_s = 15
+navigation_bootstrap_max_hosts = 5
 ebrowse_allowed_verbs = []       # empty = standard browser-only profile
 ebrowse_tool_timeout_s = 150
 ebrowse_tool_args_max_bytes = 16384
@@ -40,7 +42,15 @@ CLI equivalents cover common experiment overrides:
 ```
 
 `task-host` requires `task.url`, permits that exact hostname and its subdomains, and
-adds any `navigation_allowed_domains`. `allowlist` uses only the configured list.
+adds any `navigation_allowed_domains`. `task-redirects` first opens the trusted task
+URL in a temporary bootstrap daemon, permits only public HTTP(S) navigation in that
+initial tab, records at most five observed main-frame hosts, and then restarts the
+daemon with the original, observed, and explicitly configured domains frozen. Popups
+are blocked during discovery. The redirect chain, final URL, errors, and resolved
+scope are written to `navigation-bootstrap.json` and `run_meta.config`; the timeout
+and host cap are configurable with the two keys above. This is the Online-Mind2Web
+smoke benchmark default so regional redirects do not require machine-specific task
+exceptions. `allowlist` uses only the configured list.
 `unrestricted` is an explicit escape hatch for experiments that need cross-site
 navigation; it does not restore Bash or other Pi tools.
 
@@ -48,6 +58,10 @@ Explicit `open` calls permit only HTTP(S), reject URL credentials, and validate 
 hostname. The browser separately restricts top-level document navigation from clicks,
 redirects, and popups. It intentionally does not restrict scripts, images, API calls,
 or other subresources because modern sites commonly load those cross-domain.
+
+Private and loopback literal targets are blocked during public-task bootstrap. This
+does not attempt DNS pinning; use network/container isolation when protection from
+DNS rebinding or a compromised browser is required.
 
 ## Security boundary
 

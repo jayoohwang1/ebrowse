@@ -46,6 +46,9 @@ max_section_tokens = 16384      # ordinary expansion ceiling; collection page bu
 
 [security]
 allowed_domains = []            # empty = all; restricts top-level navigation otherwise
+bootstrap_navigation = false    # harness-managed redirect discovery mode
+bootstrap_max_hosts = 5
+block_private_network = false   # blocks literal private/loopback navigation targets
 
 [debug]
 log = ""                        # JSONL debug-event log path; "" = off (default, zero overhead)

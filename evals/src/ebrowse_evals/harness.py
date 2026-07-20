@@ -41,6 +41,7 @@ SPOOL_DIR = "capture"  # per-call debug-capture payloads: capture/<n>.json
 DEBUG_LOG_FILE = "ebrowse-debug.jsonl"  # daemon tier-1 events (EBROWSE_DEBUG_LOG)
 SYSTEM_PROMPTS_FILE = "system-prompts.jsonl"
 TOOL_POLICY_FILE = "browser-tool-policy.json"
+NAVIGATION_BOOTSTRAP_FILE = "navigation-bootstrap.json"
 DEFAULT_PI_EVENTS_MAX_BYTES = 64 * 1024 * 1024
 
 BROWSER_SYSTEM_PROMPT = """You are a browser automation agent completing one assigned task.
@@ -294,22 +295,54 @@ def resolve_navigation_domains(
     extras = [str(value).strip().lower().rstrip(".") for value in configured if str(value).strip()]
     if mode == "unrestricted":
         return []
-    if mode not in {"task-host", "allowlist"}:
+    if mode not in {"task-host", "task-redirects", "allowlist"}:
         raise ValueError(
-            f"unknown navigation_policy {mode!r} (want task-host|allowlist|unrestricted)"
+            f"unknown navigation_policy {mode!r} "
+            "(want task-host|task-redirects|allowlist|unrestricted)"
         )
     domains = list(extras)
-    if mode == "task-host":
+    if mode in {"task-host", "task-redirects"}:
         host = urlsplit(start_url or "").hostname
         if not host:
             raise ValueError(
-                "navigation_policy='task-host' requires task.url — set a URL, use "
+                f"navigation_policy={mode!r} requires task.url — set a URL, use "
                 "'allowlist' with navigation_allowed_domains, or choose 'unrestricted'"
             )
         domains.insert(0, host.lower().rstrip("."))
     if not domains:
         raise ValueError("navigation allowlist is empty — configure navigation_allowed_domains")
     return list(dict.fromkeys(domains))
+
+
+def _navigation_urls(payload: dict[str, Any], start_url: str) -> tuple[list[str], str]:
+    """Extract the ordered main-frame navigation chain from debug-capture."""
+    urls = [start_url]
+    for event in payload.get("events") or []:
+        if not isinstance(event, dict) or event.get("kind") != "navigation":
+            continue
+        data = event.get("data") or {}
+        if not isinstance(data, dict):
+            continue
+        candidate = data.get("to") or data.get("url")
+        if isinstance(candidate, str) and candidate.startswith(("http://", "https://")):
+            urls.append(candidate)
+    browser = payload.get("browser") or {}
+    final_url = browser.get("url") if isinstance(browser, dict) else None
+    if isinstance(final_url, str) and final_url.startswith(("http://", "https://")):
+        urls.append(final_url)
+    return list(dict.fromkeys(urls)), str(final_url or start_url)
+
+
+def _local_task_url(url: str) -> bool:
+    import ipaddress
+
+    host = (urlsplit(url).hostname or "").lower().rstrip(".")
+    if host == "localhost" or host.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
 
 
 def _string_list_config(config: dict[str, Any], key: str) -> list[str]:
@@ -416,20 +449,108 @@ class PiHarness:
                 full_env["PLAYWRIGHT_BROWSERS_PATH"] = str(shared_browsers)
         full_env["XDG_CACHE_HOME"] = str(cache_dir)
         ebrowse_target: tuple[str, list[str]] | None = None
+        bootstrap_record: dict[str, Any] | None = None
         if self.tool == "ebrowse":
             ebrowse_target = self._ebrowse_target()
+            navigation_mode = str(config.get("navigation_policy", "task-host"))
             domains = resolve_navigation_domains(
                 start_url,
-                str(config.get("navigation_policy", "task-host")),
+                navigation_mode,
                 _string_list_config(config, "navigation_allowed_domains"),
             )
+            executable, prefix = ebrowse_target
+            if navigation_mode == "task-redirects":
+                assert start_url is not None  # validated by resolve_navigation_domains
+                bootstrap_timeout = float(config.get("navigation_bootstrap_timeout_s", 15.0))
+                bootstrap_max_hosts = int(config.get("navigation_bootstrap_max_hosts", 5))
+                if bootstrap_timeout <= 0 or bootstrap_max_hosts <= 0:
+                    raise ValueError("navigation bootstrap timeout and max hosts must be positive")
+                bootstrap_env = dict(full_env)
+                bootstrap_env.pop("EBROWSE_SECURITY_ALLOWED_DOMAINS", None)
+                bootstrap_env["EBROWSE_SECURITY_BOOTSTRAP_NAVIGATION"] = "true"
+                bootstrap_env["EBROWSE_SECURITY_BOOTSTRAP_MAX_HOSTS"] = str(bootstrap_max_hosts)
+                bootstrap_env["EBROWSE_SECURITY_BLOCK_PRIVATE_NETWORK"] = (
+                    "false" if _local_task_url(start_url) else "true"
+                )
+                subprocess.run(
+                    [executable, *prefix, "daemon", "stop"],
+                    env=bootstrap_env,
+                    capture_output=True,
+                    check=False,
+                )
+                try:
+                    bootstrap_open = subprocess.run(
+                        [executable, *prefix, "open", start_url],
+                        env=bootstrap_env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                        timeout=bootstrap_timeout,
+                    )
+                    bootstrap_error = (
+                        bootstrap_open.stdout + bootstrap_open.stderr
+                        if bootstrap_open.returncode != 0
+                        else None
+                    )
+                except subprocess.TimeoutExpired as exc:
+                    bootstrap_error = f"navigation bootstrap timed out: {exc}"
+                payload: dict[str, Any] = {}
+                try:
+                    from ebrowse_evals.capture import DaemonCaptureClient
+
+                    payload = DaemonCaptureClient(
+                        socket_path=runtime_dir / "ebrowse.sock", timeout_s=10
+                    ).debug_capture()
+                except Exception as exc:  # noqa: BLE001 - recorded, then scope freezes safely
+                    bootstrap_error = (
+                        bootstrap_error or f"capture failed: {type(exc).__name__}: {exc}"
+                    )
+                observed_urls, final_url = _navigation_urls(payload, start_url)
+                observed_hosts = [
+                    host.lower().rstrip(".")
+                    for url in observed_urls
+                    if (host := urlsplit(url).hostname)
+                ]
+                observed_hosts = list(dict.fromkeys(observed_hosts))
+                if len(observed_hosts) > bootstrap_max_hosts:
+                    raise ValueError(
+                        f"navigation bootstrap observed {len(observed_hosts)} hosts; "
+                        f"limit is {bootstrap_max_hosts}"
+                    )
+                domains = list(dict.fromkeys([*observed_hosts, *domains]))
+                bootstrap_record = {
+                    "requested_url": start_url,
+                    "observed_urls": observed_urls,
+                    "final_url": final_url,
+                    "observed_hosts": observed_hosts,
+                    "resolved_domains": domains,
+                    "timeout_s": bootstrap_timeout,
+                    "max_hosts": bootstrap_max_hosts,
+                    "error": bootstrap_error,
+                }
+                (run_dir / NAVIGATION_BOOTSTRAP_FILE).write_text(
+                    json.dumps(bootstrap_record, indent=2) + "\n", encoding="utf-8"
+                )
+                config["navigation_bootstrap"] = bootstrap_record
+                config["resolved_navigation_domains"] = domains
+                subprocess.run(
+                    [executable, *prefix, "daemon", "stop"],
+                    env=bootstrap_env,
+                    capture_output=True,
+                    check=False,
+                )
+            full_env.pop("EBROWSE_SECURITY_BOOTSTRAP_NAVIGATION", None)
+            full_env.pop("EBROWSE_SECURITY_BOOTSTRAP_MAX_HOSTS", None)
+            if navigation_mode == "task-redirects" and start_url is not None:
+                full_env["EBROWSE_SECURITY_BLOCK_PRIVATE_NETWORK"] = (
+                    "false" if _local_task_url(start_url) else "true"
+                )
             if domains:
                 full_env["EBROWSE_SECURITY_ALLOWED_DOMAINS"] = ",".join(domains)
             else:
                 full_env.pop("EBROWSE_SECURITY_ALLOWED_DOMAINS", None)
             if self.capture:
                 full_env["EBROWSE_DEBUG_LOG"] = str(run_dir / DEBUG_LOG_FILE)
-            executable, prefix = ebrowse_target
             subprocess.run(
                 [executable, *prefix, "daemon", "stop"],
                 env=full_env,

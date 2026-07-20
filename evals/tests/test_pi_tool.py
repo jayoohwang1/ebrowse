@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ebrowse_evals.harness import resolve_navigation_domains
+from ebrowse_evals.harness import _navigation_urls, resolve_navigation_domains
 from ebrowse_evals.pi_tool import (
     DEFAULT_ALLOWED_VERBS,
     PolicyBlock,
@@ -107,5 +107,26 @@ def test_navigation_domain_resolution():
     ) == ["www.example.com", "login.example.net"]
     assert resolve_navigation_domains(None, "allowlist", ["example.com"]) == ["example.com"]
     assert resolve_navigation_domains(None, "unrestricted", []) == []
+    assert resolve_navigation_domains(
+        "https://www.example.com/start", "task-redirects", ["login.example.net"]
+    ) == ["www.example.com", "login.example.net"]
     with pytest.raises(ValueError, match="requires task.url"):
         resolve_navigation_domains(None, "task-host", [])
+
+
+def test_navigation_bootstrap_chain_includes_events_and_final_url():
+    payload = {
+        "events": [
+            {"kind": "navigation", "data": {"to": "https://example.ca/landing"}},
+            {"kind": "console", "data": {"url": "https://ignored.test"}},
+        ],
+        "browser": {"url": "https://shop.example.ca/final"},
+    }
+    assert _navigation_urls(payload, "https://example.com/") == (
+        [
+            "https://example.com/",
+            "https://example.ca/landing",
+            "https://shop.example.ca/final",
+        ],
+        "https://shop.example.ca/final",
+    )

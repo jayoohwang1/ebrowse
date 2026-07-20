@@ -70,7 +70,7 @@ browser-interacting result with post-action browser state in a fixed side lane;
 see [docs/viewer.md](docs/viewer.md).
 
 Pi/ebrowse runs expose no Bash or filesystem tools. They use one shell-free custom
-tool with a standard browser-verb allowlist and task-host navigation restriction;
+tool with a standard browser-verb allowlist and frozen task navigation restriction;
 `eval`, upload, process control, CDP attachment, and caller-selected paths are blocked
 by default. See [docs/pi-browser-policy.md](docs/pi-browser-policy.md).
 

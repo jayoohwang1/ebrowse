@@ -205,3 +205,22 @@ def test_allowed_domains_enforced_on_landed_urls():
     assert "ebrowse back" in str(ei.value)
     with pytest.raises(CommandError):
         s._check_url_allowed("https://evil.test/")
+
+
+def test_navigation_bootstrap_blocks_private_and_caps_hosts():
+    import pytest
+
+    from ebrowse.errors import CommandError
+    from ebrowse.session import Session
+
+    cfg = Config()
+    cfg.security.bootstrap_navigation = True
+    cfg.security.bootstrap_max_hosts = 2
+    cfg.security.block_private_network = True
+    session = Session("bootstrap", cfg)
+    session._check_url_allowed("https://example.com/")
+    session._check_url_allowed("https://example.ca/")
+    with pytest.raises(CommandError, match="bootstrap_max_hosts"):
+        session._check_url_allowed("https://third.example/")
+    with pytest.raises(CommandError, match="private or loopback"):
+        session._check_url_allowed("http://127.0.0.1/")

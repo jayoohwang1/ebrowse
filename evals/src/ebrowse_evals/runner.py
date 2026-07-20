@@ -37,6 +37,8 @@ HARNESS_DEFAULTS: dict[str, Any] = {
     "capture": True,  # browser tool spools post-call state + debug log; ebrowse-only
     "navigation_policy": "task-host",
     "navigation_allowed_domains": [],
+    "navigation_bootstrap_timeout_s": 15.0,
+    "navigation_bootstrap_max_hosts": 5,
     "ebrowse_allowed_verbs": [],  # empty resolves to the browser-only standard profile
     "ebrowse_tool_timeout_s": 150.0,
     "ebrowse_tool_args_max_bytes": 16_384,
@@ -146,33 +148,36 @@ def run_task(
     run_dir = run_dir.resolve()  # see run_tasks: paths embed in shim + subprocess args
     writer = TraceWriter(run_dir)
     git_sha, git_dirty = _git_state(repo_root)
-    writer.write(
-        RunMeta(
-            run_id=run_dir.name,
-            task_id=task.id,
-            prompt=task.prompt,
-            benchmark=benchmark,
-            config=config,
-            agent=harness.describe(),
-            git_sha=git_sha,
-            git_dirty=git_dirty,
-            ebrowse_version=_ebrowse_version(),
-            ebrowse_mode="worktree" if config.get("worktree") else "installed",
-        )
+    run_meta = RunMeta(
+        run_id=run_dir.name,
+        task_id=task.id,
+        prompt=task.prompt,
+        benchmark=benchmark,
+        config=config,
+        agent=harness.describe(),
+        git_sha=git_sha,
+        git_dirty=git_dirty,
+        ebrowse_version=_ebrowse_version(),
+        ebrowse_mode="worktree" if config.get("worktree") else "installed",
     )
     timeout_s = task.timeout_s if task.timeout_s is not None else config.get("timeout_s")
     workdir = run_dir / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
-    result = harness.run(
-        task.prompt,
-        workdir=workdir,
-        env={},
-        timeout_s=timeout_s,
-        run_dir=run_dir,
-        start_url=task.url,
-        tool_call_limit=config.get("tool_call_limit"),
-        config=config,
-    )
+    try:
+        result = harness.run(
+            task.prompt,
+            workdir=workdir,
+            env={},
+            timeout_s=timeout_s,
+            run_dir=run_dir,
+            start_url=task.url,
+            tool_call_limit=config.get("tool_call_limit"),
+            config=config,
+        )
+    except BaseException:
+        writer.write(run_meta)
+        raise
+    writer.write(run_meta)
     if result.start_prompt:
         start_bytes = result.start_prompt.encode()
         writer.write(

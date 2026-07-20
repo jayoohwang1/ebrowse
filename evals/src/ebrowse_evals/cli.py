@@ -227,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_run.add_argument(
         "--navigation-policy",
-        choices=["task-host", "allowlist", "unrestricted"],
+        choices=["task-host", "task-redirects", "allowlist", "unrestricted"],
         help="browser navigation scope (default: task-host)",
     )
     p_run.add_argument(

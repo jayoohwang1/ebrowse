@@ -8,6 +8,10 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- Redirect-aware eval startup discovers bounded regional task redirects before the
+  agent runs, freezes the resulting domain scope, and records the chain in trace
+  metadata and `navigation-bootstrap.json`.
+
 - Pi/ebrowse evals now expose one shell-free custom browser tool instead of
   Bash. A configurable verb/argument/output/timeout policy blocks `eval`, file
   upload, process control, CDP attachment, session overrides, and caller-chosen

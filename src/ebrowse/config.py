@@ -85,6 +85,12 @@ class ObserveConfig:
 @dataclass(slots=True)
 class SecurityConfig:
     allowed_domains: list[str] = field(default_factory=list)  # empty = all
+    # Eval-harness startup mode: permit public HTTP(S) redirects on the initial
+    # tab while recording a bounded set of hosts. The harness restarts the
+    # daemon with that set frozen before exposing the browser to the agent.
+    bootstrap_navigation: bool = False
+    bootstrap_max_hosts: int = 5
+    block_private_network: bool = False
 
 
 @dataclass(slots=True)
