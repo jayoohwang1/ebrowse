@@ -20,8 +20,16 @@ Tags:
   is also here: browsing works but it geoblocks the purchase flows the tasks need.
 - `open` — homepage verified reachable with local non-stealth ebrowse Chromium
   (smoke sites 2026-07-18, all remaining hosts 2026-07-20: real title + usable
-  outline; porsche/samsung/uniqlo redirect to regional storefronts, covered by
-  the task-redirects policy).
+  outline; porsche/samsung/uniqlo redirect to regional storefronts, which the
+  unrestricted navigation policy allows freely).
+
+The benchmark runs with `navigation_policy = "unrestricted"`: the Pi harness is
+already sandboxed (ebrowse tool only, restricted verb allowlist, no eval/shell),
+so a navigation allowlist added little and broke tasks whose functionality lives
+on a sibling subdomain (awt.cbp.gov, corporate.target.com, *.stanford.edu) or a
+linked company domain (the ohiomeansjobs→monster.com job engine, youtubekids.com).
+Note this also disables private-network (localhost/metadata) blocking, which the
+prior task-redirects mode enabled during startup.
 
 Same browser-only Pi policy and trace-oriented (unscored) setup as the smoke
 benchmark — see its [README](../online-mind2web-hard-smoke/README.md) for the

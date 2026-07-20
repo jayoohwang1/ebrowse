@@ -4,4 +4,9 @@ name = "online-mind2web-hard"
 [config]
 timeout_s = 900
 tool_call_limit = 200
-navigation_policy = "task-redirects"
+# The Pi harness is already tightly sandboxed (only the ebrowse tool, a
+# restricted verb allowlist, no eval/shell), so a navigation allowlist adds
+# little and broke tasks whose functionality lives on a sibling subdomain or a
+# linked company domain (awt.cbp.gov, corporate.target.com, monster.com job
+# engine, youtubekids.com — see the 2026-07-20 batch). Run unrestricted.
+navigation_policy = "unrestricted"
