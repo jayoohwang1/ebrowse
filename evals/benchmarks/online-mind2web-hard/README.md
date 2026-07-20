@@ -10,8 +10,12 @@ Tags:
   [hard-smoke](../online-mind2web-hard-smoke/README.md) batch (site verified
   reachable 2026-07-18).
 - `blocked-site` — homepage stopped local non-stealth Chromium at a bot
-  challenge (cars.com, sourceforge.net, apartments.com); expect policy/challenge
-  failures rather than agent signal.
+  challenge (cars.com, sourceforge.net, apartments.com; checked 2026-07-18);
+  expect policy/challenge failures rather than agent signal.
+- `open` — homepage verified reachable with local non-stealth ebrowse Chromium
+  (smoke sites 2026-07-18, all remaining hosts 2026-07-20: real title + usable
+  outline; porsche/samsung/uniqlo redirect to regional storefronts, covered by
+  the task-redirects policy).
 
 Same browser-only Pi policy and trace-oriented (unscored) setup as the smoke
 benchmark — see its [README](../online-mind2web-hard-smoke/README.md) for the

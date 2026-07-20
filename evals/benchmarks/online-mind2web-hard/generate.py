@@ -22,7 +22,10 @@ from pathlib import Path
 
 BENCH_DIR = Path(__file__).parent
 LEVEL = "hard"
-# Homepages that stopped local, non-stealth ebrowse Chromium at a bot challenge.
+# Homepages that stopped local, non-stealth ebrowse Chromium at a bot challenge
+# (checked 2026-07-18). Every other hard-task homepage was verified reachable
+# 2026-07-20 (real title + usable outline via `python -m ebrowse.dev <url>
+# outline`; some redirect to regional storefronts, which task-redirects covers).
 BLOCKED_HOSTS = {"www.cars.com", "sourceforge.net", "www.apartments.com"}
 # Sites exercised by the 2026-07-19 smoke batch (real page + usable outline).
 SMOKE_CHECKED_IDS_FILE = BENCH_DIR.parent / "online-mind2web-hard-smoke"
