@@ -1,9 +1,11 @@
 # Online-Mind2Web hard (full subset)
 
-All 79 hard-difficulty tasks, generated from the Online-Mind2Web dataset dump by
-[`generate.py`](generate.py) — edit/re-run the generator on a new dataset drop
-instead of hand-editing task.toml files. Dataset revisions reissue task ids with
-a date suffix (e.g. `_070826`); the generator replaces the older directory.
+The hard-difficulty Online-Mind2Web tasks (75 of the 79 in the dataset; the 4
+bestbuy.com tasks are dropped — see `EXCLUDED_HOSTS`), generated from the
+dataset dump by [`generate.py`](generate.py) — edit/re-run the generator on a
+new dataset drop instead of hand-editing task.toml files. Dataset revisions
+reissue task ids with a date suffix (e.g. `_070826`); the generator replaces the
+older directory. 69 of the 75 are `open` (reachable); 6 are `blocked-site`.
 
 Tags:
 - `smoke` — the task's base id was part of the 20-task

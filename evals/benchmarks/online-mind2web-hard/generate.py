@@ -27,6 +27,10 @@ LEVEL = "hard"
 # 2026-07-20 (real title + usable outline via `python -m ebrowse.dev <url>
 # outline`; some redirect to regional storefronts, which task-redirects covers).
 BLOCKED_HOSTS = {"www.cars.com", "sourceforge.net", "www.apartments.com"}
+# Hosts deliberately dropped from the benchmark (not bot walls — a decision to
+# exclude the site). bestbuy.com: aggressive HTTP/2 protocol errors on product
+# pages block the tasks unpredictably (see runs qwen-hard-4464a842, -fc53ddd3).
+EXCLUDED_HOSTS = {"www.bestbuy.com"}
 # Sites exercised by the 2026-07-19 smoke batch (real page + usable outline).
 SMOKE_CHECKED_IDS_FILE = BENCH_DIR.parent / "online-mind2web-hard-smoke"
 
@@ -36,7 +40,11 @@ def toml_str(s: str) -> str:
 
 
 def main(dataset_path: str) -> int:
-    tasks = [t for t in json.load(open(dataset_path)) if t["level"] == LEVEL]
+    tasks = [
+        t
+        for t in json.load(open(dataset_path))
+        if t["level"] == LEVEL and t["website"].split("/")[2] not in EXCLUDED_HOSTS
+    ]
     smoke_bases = {
         p.name.split("_")[0]
         for p in SMOKE_CHECKED_IDS_FILE.iterdir()
@@ -78,12 +86,14 @@ def main(dataset_path: str) -> int:
             encoding="utf-8",
         )
 
+    all_ds_bases = {t["task_id"].split("_")[0] for t in json.load(open(dataset_path))}
     for name, p in existing.items():
         if name not in wanted and by_base.get(name.split("_")[0]) == name:
             base_still_wanted = any(w.split("_")[0] == name.split("_")[0] for w in wanted)
             if not base_still_wanted:
                 shutil.rmtree(p)
-                print(f"removed {name} (no longer in dataset)")
+                why = "excluded host" if name.split("_")[0] in all_ds_bases else "no longer in dataset"
+                print(f"removed {name} ({why})")
 
     print(f"{len(tasks)} {LEVEL} tasks: {added} added, {replaced} replaced, {updated} updated")
     return 0
