@@ -5,7 +5,7 @@ bestbuy.com tasks are dropped — see `EXCLUDED_HOSTS`), generated from the
 dataset dump by [`generate.py`](generate.py) — edit/re-run the generator on a
 new dataset drop instead of hand-editing task.toml files. Dataset revisions
 reissue task ids with a date suffix (e.g. `_070826`); the generator replaces the
-older directory. 67 of the 75 are `open` (reachable); 8 are `blocked-site`.
+older directory. 66 of the 75 are `open` (reachable); 9 are `blocked-site`.
 
 Tags:
 - `smoke` — the task's base id was part of the 20-task
@@ -16,7 +16,8 @@ Tags:
   at a bot challenge (cars.com, sourceforge.net, apartments.com; checked
   2026-07-18) or the homepage loads but interior task pages wall the automation
   (cvs.com Akamai "Access Denied", healthline.com CloudFront 403; observed in
-  the 2026-07-20 batch — these pass a homepage-only reach check).
+  the 2026-07-20 batch — these pass a homepage-only reach check). dillards.com
+  is also here: browsing works but it geoblocks the purchase flows the tasks need.
 - `open` — homepage verified reachable with local non-stealth ebrowse Chromium
   (smoke sites 2026-07-18, all remaining hosts 2026-07-20: real title + usable
   outline; porsche/samsung/uniqlo redirect to regional storefronts, covered by

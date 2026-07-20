@@ -32,12 +32,16 @@ LEVEL = "hard"
 #     pages, run qwen-hard-afcebfed), healthline.com (CloudFront 403 on ~half of
 #     visited pages, run qwen-hard-dcd26e66). These pass a homepage-only reach
 #     check, so they must be listed here explicitly.
+#   - dillards.com: browsing works, but the site geolocates this environment as
+#     international and refuses the purchase/gift-card flows the tasks require
+#     (run qwen-hard-199be0b5), so the tasks cannot succeed from here.
 BLOCKED_HOSTS = {
     "www.cars.com",
     "sourceforge.net",
     "www.apartments.com",
     "www.cvs.com",
     "www.healthline.com",
+    "www.dillards.com",
 }
 # Hosts deliberately dropped from the benchmark (not bot walls — a decision to
 # exclude the site). bestbuy.com: aggressive HTTP/2 protocol errors on product
