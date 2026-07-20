@@ -46,7 +46,7 @@ Blob refs are `"sha256:<hex>"`. Content addressing dedupes identical payloads
 | `browser_event` | page event | console / network_failure / dialog / navigation since previous step — unrecoverable if not captured live |
 | `ebrowse_log` | internal event | `module` + `event` + structured `fields` (not prose), `level`, `request_id` joining it to a step |
 | `anomaly` | pipeline surprise | the triage layer — a run's list should fit on one screen (ref_rebound, snapshot_truncated, element_moved, wait_timeout, section_reshaped, …) |
-| `summary` | step range | post-hoc cheap-model summary for LLM navigation |
+| `summary` | step range | post-hoc cheap-model annotation. Plain step-range summaries set only `text`; `ebrowse-eval annotate` also sets `kind` (`verdict` \| `issue` \| `stuck_span` \| `vision`), `category`/`severity` on issues, and the `screenshot` blob a vision finding was judged against. Read by `ebrowse-eval issues` and the viewer |
 | `run_end` | run (last record) | outcome, totals (tokens, peak context, anomaly count), eval result |
 
 A crashed run is still a readable trace: the reader tolerates a torn final

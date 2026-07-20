@@ -358,6 +358,48 @@ def cmd_timing(run_dir: str, as_json: bool = False) -> int:
     return 0
 
 
+# -- issues (LLM annotations) -----------------------------------------------
+
+
+def cmd_issues(run_dir: str, as_json: bool = False) -> int:
+    """Annotation triage: verdict, cited issue spans, stuck spans, vision
+    findings — each with the drill-down command to verify it."""
+    reader = open_reader(run_dir)
+    records = list(reader.records())
+    meta = next((r for r in records if isinstance(r, RunMeta)), None)
+    summaries = [r for r in records if isinstance(r, Summary)]
+    annotated = [s for s in summaries if s.kind]
+    if as_json:
+        return _emit_json([_rec_json(s) for s in annotated])
+    if not annotated:
+        print(f"no annotations — run 'ebrowse-eval annotate {run_dir}'")
+        return 0
+    if meta:
+        print(f"run {meta.run_id or '?'} prompt={_truncate(meta.prompt, 80)!r}")
+    for s in annotated:
+        if s.kind == "verdict":
+            print(f"verdict: {s.text}")
+    issues = [s for s in annotated if s.kind == "issue"]
+    if issues:
+        print("issues:")
+        for s in issues:
+            print(
+                f"  steps {s.step_start}-{s.step_end:<4} {s.category or '?':<16} "
+                f"{s.severity or '?':<5} {s.text}"
+            )
+            print(f"    > ebrowse-eval step {run_dir} {s.step_start}")
+    stuck = [s for s in annotated if s.kind == "stuck_span"]
+    if stuck:
+        spans = ", ".join(f"{s.step_start}-{s.step_end}" for s in stuck)
+        print(f"stuck spans: {spans}")
+    for s in annotated:
+        if s.kind == "vision":
+            print(f"vision steps {s.step_start}-{s.step_end}  [{s.screenshot or 'no screenshot'}]")
+            for line in s.text.splitlines():
+                print(f"  {line}")
+    return 0
+
+
 # -- grep -------------------------------------------------------------------
 
 

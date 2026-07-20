@@ -192,6 +192,12 @@ class Summary(Record):
     step_end: int = 0
     text: str = ""
     model: str | None = None
+    # Annotation-pipeline fields (additive, all optional; plain step-range
+    # summaries leave them None):
+    kind: str | None = None  # "verdict" | "issue" | "stuck_span" | "vision"
+    category: str | None = None  # issue: tool_bug|agent_confusion|site_behavior|inefficiency
+    severity: str | None = None  # issue: "high" | "low"
+    screenshot: str | None = None  # vision: blob ref the finding was made against
 
 
 RECORD_TYPES: dict[str, type[Record]] = {

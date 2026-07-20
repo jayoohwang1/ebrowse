@@ -8,6 +8,14 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- `ebrowse-eval annotate` — post-hoc LLM trace annotation via a local
+  OpenAI-compatible endpoint: a full-trajectory text pass (one-line verdict,
+  per-incident issue spans with category/severity, stuck spans) plus a targeted
+  vision pass comparing step screenshots against the outline the agent saw.
+  Results are appended as `summary` records (additive `kind`/`category`/
+  `severity`/`screenshot` fields); `ebrowse-eval issues` renders the triage
+  list with executable drill-down commands.
+
 - Page capture now uses CDP `DOMSnapshot.captureSnapshot` by default
   (`browser.capture_engine = "cdp"`), producing the existing DomSnapshot shape
   without running page JavaScript and attaching backend-node-id bindings (ADR 0015).

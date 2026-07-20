@@ -311,6 +311,28 @@ def main(argv: list[str] | None = None) -> int:
     _rd(p)
     p.set_defaults(func=lambda a: _inspect.cmd_timing(a.run_dir, a.as_json))
 
+    p = sub.add_parser("issues", help="LLM-annotation triage list with drill-down commands")
+    _rd(p)
+    p.set_defaults(func=lambda a: _inspect.cmd_issues(a.run_dir, a.as_json))
+
+    p = sub.add_parser(
+        "annotate",
+        help="annotate run(s) with a local LLM: verdict, issue spans, vision discrepancies",
+    )
+    p.add_argument("run_dirs", nargs="+")
+    p.add_argument(
+        "--api-base",
+        default=None,
+        help="OpenAI-compatible endpoint (default: http://localhost:5001/v1)",
+    )
+    p.add_argument("--model", help="model id (default: the run's own agent model)")
+    p.add_argument("--no-vision", action="store_true", help="skip the screenshot pass")
+    p.add_argument("--max-vision", type=int, default=4, help="max vision calls per run")
+    p.add_argument(
+        "--force", action="store_true", help="replace existing annotations instead of skipping"
+    )
+    p.set_defaults(func=_cmd_annotate)
+
     p = sub.add_parser("grep", help="regex over trace records (escape hatch)")
     _rd(p)
     p.add_argument("pattern")
@@ -332,6 +354,61 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     return args.func(args)
+
+
+def _cmd_annotate(args: argparse.Namespace) -> int:
+    from ebrowse_evals.annotate import (
+        DEFAULT_API_BASE,
+        LlamaClient,
+        annotate_run,
+        strip_summaries,
+    )
+    from ebrowse_evals.trace.records import Summary
+
+    failed = 0
+    for rd in args.run_dirs:
+        run_dir = Path(rd)
+        try:
+            reader = TraceReader(run_dir)
+        except FileNotFoundError as e:
+            print(f"error: {e}", file=sys.stderr)
+            failed += 1
+            continue
+        existing = any(isinstance(r, Summary) and r.kind for r in reader.records())
+        if existing and not args.force:
+            print(f"skip {run_dir.name}: already annotated (--force to replace)")
+            continue
+        if existing:
+            strip_summaries(run_dir)
+        meta = reader.meta()
+        model = args.model or (meta.config.get("model") if meta else None) or ""
+        if not model:
+            print(f"error: {run_dir.name}: no model in run_meta — pass --model", file=sys.stderr)
+            failed += 1
+            continue
+        client = LlamaClient(api_base=args.api_base or DEFAULT_API_BASE, model=model)
+        try:
+            recs = annotate_run(
+                run_dir,
+                client,
+                model,
+                vision=not args.no_vision,
+                max_vision=args.max_vision,
+                log=lambda m, n=run_dir.name: print(f"  [{n}] {m}"),
+            )
+        except (RuntimeError, ValueError) as e:
+            print(f"error: {run_dir.name}: {e}", file=sys.stderr)
+            failed += 1
+            continue
+        kinds: dict[str, int] = {}
+        for r in recs:
+            kinds[r.kind or "?"] = kinds.get(r.kind or "?", 0) + 1
+        print(
+            f"annotated {run_dir.name}: "
+            + ", ".join(f"{v} {k}" for k, v in sorted(kinds.items()))
+            + f" — view with 'ebrowse-eval issues {run_dir}'"
+        )
+    return 1 if failed else 0
 
 
 def _cmd_replay(args: argparse.Namespace) -> int:
