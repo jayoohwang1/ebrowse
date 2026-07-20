@@ -21,7 +21,16 @@ from urllib.parse import urlparse
 from loguru import logger
 
 if TYPE_CHECKING:
-    from playwright.async_api import Browser, BrowserContext, Dialog, FloatRect, Page, Playwright
+    from playwright.async_api import (
+        Browser,
+        BrowserContext,
+        Dialog,
+        FloatRect,
+        Page,
+        Playwright,
+        Request,
+        Route,
+    )
 
     from ebrowse.actions import ActionSnapshot
 
@@ -164,6 +173,7 @@ class Session(CompoundMixin, ActionsMixin):
         self.last_snapshot: DomSnapshot | None = None
         self.cmd_seq = 0  # bumped by the daemon per possibly-mutating verb
         self._snapshot_cmd_seq = -1
+        self._blocked_navigation: str | None = None
 
     # ------------------------------------------------------------ browser ----
 
@@ -202,6 +212,14 @@ class Session(CompoundMixin, ActionsMixin):
                 f"could not start browser: {e} — try 'ebrowse doctor'", ExitCode.INTERNAL
             ) from e
         self._context.on("page", self._on_new_page)
+        if (
+            self.cfg.security.allowed_domains
+            or self.cfg.security.bootstrap_navigation
+            or self.cfg.security.block_private_network
+        ):
+            # Restrict only top-level documents. Blocking third-party scripts,
+            # images, and API calls would make ordinary sites unusable.
+            await self._context.route("**/*", self._route_request)
         pages = self._context.pages
         if pages:
             for page in pages:
@@ -211,6 +229,38 @@ class Session(CompoundMixin, ActionsMixin):
             # The context "page" event adopts and wires this page. _wire_page
             # is idempotent in case a backend delivers the event late.
             self._activate_page(await self._context.new_page())
+
+    async def _route_request(self, route: Route, request: Request) -> None:
+        if (
+            request.is_navigation_request
+            and request.resource_type == "document"
+            and request.frame.parent_frame is None
+        ):
+            try:
+                page = request.frame.page
+                opener = await page.opener()
+                if self.cfg.security.bootstrap_navigation and opener is not None:
+                    raise CommandError(
+                        "popups are disabled during navigation bootstrap", ExitCode.USAGE
+                    )
+                self._check_url_allowed(request.url)
+            except CommandError as exc:
+                self._capture_event("navigation_blocked", url=request.url[:300])
+                # A synthetic 204 cancels a document navigation without replacing
+                # the current page with Chromium's chrome-error:// page. Redirect
+                # destinations may bypass a second route callback, so the landed
+                # URL check remains the backstop for those.
+                await route.fulfill(status=204, body="")
+                if opener is not None:
+                    self._notes.append(
+                        f"blocked a new tab from leaving the allowed domains: {request.url[:200]}"
+                    )
+                    with contextlib.suppress(Exception):
+                        await page.close()
+                    return
+                self._blocked_navigation = str(exc)
+                return
+        await route.continue_()
 
     def _activate_page(self, page: Page) -> None:
         """Make page the logical active tab and move it to the MRU front."""
@@ -662,6 +712,11 @@ class Session(CompoundMixin, ActionsMixin):
             with debug.timed("session", "navigate", url=url[:200]):
                 await self.page.goto(url, wait_until="domcontentloaded", timeout=GOTO_TIMEOUT_MS)
         except Exception as e:
+            if self._blocked_navigation is not None:
+                try:
+                    self._raise_if_navigation_blocked()
+                except CommandError as blocked:
+                    raise blocked from e
             raise CommandError(
                 f"navigation failed: {_first_line(e)}", ExitCode.ACTION_FAILED
             ) from e
@@ -1099,6 +1154,8 @@ class Session(CompoundMixin, ActionsMixin):
         with contextlib.suppress(Exception):
             await self.page.wait_for_load_state("networkidle", timeout=3000)
             fired = True
+        if self._blocked_navigation is not None:
+            self._raise_if_navigation_blocked()
         # not firing within the 3s cap is routine on busy pages (level=info,
         # not the wait_timeout anomaly — that one is for the quiesce cap)
         debug.emit("session", "wait", condition="networkidle", fired=fired,
@@ -1106,14 +1163,41 @@ class Session(CompoundMixin, ActionsMixin):
 
     def _check_url_allowed(self, url: str, landed: bool = False) -> None:
         allowed = self.cfg.security.allowed_domains
-        if not allowed:
+        security_active = (
+            bool(allowed)
+            or self.cfg.security.bootstrap_navigation
+            or self.cfg.security.block_private_network
+        )
+        if not security_active:
             return
+        import ipaddress
         from urllib.parse import urlsplit
 
         parts = urlsplit(url)
         if landed and parts.scheme not in ("http", "https"):
             return  # about:blank, chrome-error:// etc.
-        host = parts.netloc.lower()
+        host = (parts.hostname or "").lower().rstrip(".")
+        if parts.scheme not in ("http", "https"):
+            raise CommandError("navigation requires an HTTP(S) URL", ExitCode.USAGE)
+        if self.cfg.security.block_private_network:
+            private = host == "localhost" or host.endswith(".localhost")
+            with contextlib.suppress(ValueError):
+                private = private or ipaddress.ip_address(host).is_private
+            if private:
+                raise CommandError(
+                    f"private or loopback navigation target {host} is blocked",
+                    ExitCode.USAGE,
+                )
+        if self.cfg.security.bootstrap_navigation:
+            hosts = getattr(self, "_bootstrap_navigation_hosts", set())
+            if host not in hosts and len(hosts) >= self.cfg.security.bootstrap_max_hosts:
+                raise CommandError(
+                    "navigation bootstrap exceeded security.bootstrap_max_hosts",
+                    ExitCode.USAGE,
+                )
+            hosts.add(host)
+            self._bootstrap_navigation_hosts = hosts
+            return
         if not any(host == d or host.endswith("." + d) for d in allowed):
             hint = (
                 "run 'ebrowse back' or edit security.allowed_domains"
@@ -1123,6 +1207,15 @@ class Session(CompoundMixin, ActionsMixin):
             raise CommandError(
                 f"domain {host} not in security.allowed_domains — {hint}", ExitCode.USAGE
             )
+
+    def _raise_if_navigation_blocked(self) -> None:
+        if self._blocked_navigation is None:
+            return
+        reason, self._blocked_navigation = self._blocked_navigation, None
+        raise CommandError(
+            f"navigation blocked: {reason} — remain on the task website",
+            ExitCode.USAGE,
+        )
 
     async def _resolve_locator(self, target: str):
         """@ref/CSS resolution for getters (refs delegate to core/locate.py;

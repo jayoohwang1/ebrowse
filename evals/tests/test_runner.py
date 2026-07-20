@@ -7,9 +7,11 @@ import json
 import time
 from pathlib import Path
 
+import ebrowse_evals.harness as harness_module
 from ebrowse_evals.harness import (
     PI_EVENTS_FILE,
     HarnessResult,
+    ParsedMessage,
     ParsedStep,
     PiHarness,
     parse_pi_session,
@@ -22,7 +24,7 @@ from ebrowse_evals.runner import (
     select_tasks,
 )
 from ebrowse_evals.tasks import load_benchmark, load_task
-from ebrowse_evals.trace.records import Step
+from ebrowse_evals.trace.records import AgentMessage, PromptSnapshot, Step
 from ebrowse_evals.trace.store import TraceReader, TraceWriter
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -52,7 +54,17 @@ class FakeHarness:
     def describe(self):
         return {"harness": "fake", "provider": "test", "model": "test-model"}
 
-    def run(self, prompt, workdir, env, timeout_s, run_dir, start_url=None, tool_call_limit=None):
+    def run(
+        self,
+        prompt,
+        workdir,
+        env,
+        timeout_s,
+        run_dir,
+        start_url=None,
+        tool_call_limit=None,
+        config=None,
+    ):
         self.calls.append(
             {
                 "prompt": prompt,
@@ -60,6 +72,7 @@ class FakeHarness:
                 "timeout_s": timeout_s,
                 "start_url": start_url,
                 "tool_call_limit": tool_call_limit,
+                "config": config,
             }
         )
         return self.result
@@ -138,6 +151,40 @@ def test_run_task_emits_valid_trace(tmp_path):
     assert harness.calls[0]["tool_call_limit"] == 200
 
 
+def test_pi_ebrowse_preamble_adapts_cli_skill_to_custom_tool(tmp_path):
+    (tmp_path / "SKILL.md").write_text(
+        "`ebrowse` is a CLI. Run it via shell. One background daemon owns the browser;\n"
+        "state (page, refs, logins) persists between commands.\n"
+        "Run `ebrowse outline` next.\n"
+    )
+    preamble = PiHarness(
+        provider="p", model="m", tool="ebrowse", repo_root=tmp_path
+    ).tool_preamble()
+    assert "using the `ebrowse` tool" in preamble
+    assert "available through the dedicated `ebrowse` tool" in preamble
+    assert "without the leading `ebrowse` prefix" in preamble
+    assert "Run it via shell" not in preamble
+    assert "Run `ebrowse outline` next" in preamble  # examples remain recognizable
+
+
+def test_run_meta_is_written_after_prepare_but_before_agent_run(tmp_path):
+    class PreparingHarness(FakeHarness):
+        def prepare_run(self, env, run_dir, start_url, config):
+            config["resolved_navigation_domains"] = ["example.ca"]
+
+        def run(self, prompt, workdir, env, timeout_s, run_dir, **kwargs):
+            raw = list(TraceReader(run_dir).raw())
+            assert len(raw) == 1
+            assert raw[0]["type"] == "run_meta"
+            assert raw[0]["config"]["resolved_navigation_domains"] == ["example.ca"]
+            return super().run(prompt, workdir, env, timeout_s, run_dir, **kwargs)
+
+    task = load_task(BENCH / "list-count")
+    run_dir = tmp_path / "prepared"
+    run_task(task, PreparingHarness(), resolve_config(), run_dir)
+    assert TraceReader(run_dir).validate() == []
+
+
 def test_run_task_outcomes(tmp_path):
     task = load_task(BENCH / "list-count")
     wrong = FakeHarness(HarnessResult(final_answer="no idea"))
@@ -148,6 +195,34 @@ def test_run_task_outcomes(tmp_path):
     assert run_task(task, hung, {}, tmp_path / "c").outcome == "timeout"
     capped = FakeHarness(HarnessResult(tool_limit_hit=True, exit_code=-15))
     assert run_task(task, capped, {}, tmp_path / "d").outcome == "tool_limit"
+
+
+def test_run_task_persists_structured_policy_block(tmp_path):
+    task = load_task(BENCH / "list-count")
+    harness = FakeHarness(
+        HarnessResult(
+            steps=[
+                ParsedStep(
+                    command="ebrowse eval document.title",
+                    output="blocked",
+                    is_error=True,
+                    tool_name="ebrowse",
+                    details={
+                        "error_class": "policy_block",
+                        "verb": "eval",
+                        "reason": "not enabled",
+                    },
+                )
+            ]
+        )
+    )
+    run_task(task, harness, {}, tmp_path / "policy")
+    step = TraceReader(tmp_path / "policy").steps()[0]
+    assert step.error == {
+        "class": "policy_block",
+        "verb": "eval",
+        "reason": "not enabled",
+    }
 
 
 def test_run_task_invokes_custom_evaluator_on_trace(tmp_path):
@@ -234,6 +309,60 @@ def test_pi_harness_stops_at_tool_call_limit(tmp_path):
     assert result.tool_limit_hit is True
     assert result.timed_out is False
     assert len(result.steps) == 2
+
+
+def test_pi_browser_harness_loads_only_custom_ebrowse_tool(tmp_path):
+    argv_file = tmp_path / "argv.json"
+    pi = tmp_path / "fake-pi"
+    pi.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, pathlib, sys\n"
+        f"pathlib.Path({str(argv_file)!r}).write_text(json.dumps(sys.argv))\n"
+    )
+    pi.chmod(0o755)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    ebrowse = tmp_path / "fake-ebrowse"
+    ebrowse.write_text("#!/bin/sh\nexit 0\n")
+    ebrowse.chmod(0o755)
+    PiHarness(
+        provider="p", model="m", tool="ebrowse", pi_bin=str(pi), ebrowse_bin=str(ebrowse)
+    ).run(
+        "go",
+        run_dir / "work",
+        {},
+        10,
+        run_dir,
+        config={"navigation_policy": "unrestricted"},
+    )
+    argv = json.loads(argv_file.read_text())
+    tools_at = argv.index("--tools")
+    assert argv[tools_at + 1] == "ebrowse"
+    assert "--no-builtin-tools" in argv
+    assert "--no-extensions" in argv
+    assert "--no-skills" in argv
+    assert "--no-prompt-templates" in argv
+    assert "--no-context-files" in argv
+    assert "bash" not in argv and "edit" not in argv and "write" not in argv
+
+
+def test_pi_harness_waits_for_daemon_socket_removal(tmp_path, monkeypatch):
+    runtime = tmp_path / "run"
+    runtime.mkdir()
+    socket_file = runtime / "ebrowse.sock"
+    socket_file.touch()
+    sleeps = 0
+
+    def fake_sleep(_seconds):
+        nonlocal sleeps
+        sleeps += 1
+        if sleeps == 2:
+            socket_file.unlink()
+
+    monkeypatch.setattr(harness_module.subprocess, "run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(harness_module.time, "sleep", fake_sleep)
+    PiHarness._stop_ebrowse_daemon("ebrowse", [], {"XDG_RUNTIME_DIR": str(runtime)})
+    assert sleeps == 2
 
 
 def test_pi_harness_filters_cumulative_updates_and_keeps_fallback(tmp_path):
@@ -334,3 +463,121 @@ def test_parse_pi_session_sample_fixture():
         "input_tokens": 250,
         "peak_context": 160,
     }
+    assert [message.role for message in result.messages] == [
+        "user",
+        "assistant",
+        "toolResult",
+        "assistant",
+    ]
+    assert result.messages[0].is_start is True
+    assert result.messages[1].content[0]["type"] == "thinking"
+    assert step.tool_call_id == "tool-1"
+    assert step.tool_name == "bash"
+    assert result.messages[2].tool_call_id == "tool-1"
+
+
+def test_parse_custom_ebrowse_call_and_policy_details():
+    entries = [
+        {
+            "type": "message",
+            "id": "a1",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "toolCall",
+                        "id": "c1",
+                        "name": "ebrowse",
+                        "arguments": {"command": "eval document.title"},
+                    }
+                ],
+            },
+        },
+        {
+            "type": "message",
+            "id": "r1",
+            "message": {
+                "role": "toolResult",
+                "toolCallId": "c1",
+                "toolName": "ebrowse",
+                "content": [{"type": "text", "text": "blocked"}],
+                "isError": True,
+                "details": {
+                    "error_class": "policy_block",
+                    "verb": "eval",
+                    "reason": "not allowed",
+                },
+            },
+        },
+    ]
+    result = parse_pi_session(entries)
+    assert result.steps[0].command == "ebrowse eval document.title"
+    assert result.steps[0].details["error_class"] == "policy_block"
+
+
+def test_run_task_persists_prompts_messages_and_step_links(tmp_path):
+    task = load_task(BENCH / "list-count")
+    harness = FakeHarness(
+        HarnessResult(
+            start_prompt="exact starting prompt",
+            system_prompts=["effective system prompt"],
+            messages=[
+                ParsedMessage(
+                    1,
+                    "u1",
+                    None,
+                    "user",
+                    [{"type": "text", "text": "exact starting prompt"}],
+                    is_start=True,
+                ),
+                ParsedMessage(
+                    2,
+                    "a1",
+                    "u1",
+                    "assistant",
+                    [
+                        {
+                            "type": "toolCall",
+                            "id": "call-1",
+                            "name": "bash",
+                            "arguments": {"command": "ebrowse outline"},
+                        }
+                    ],
+                    turn=1,
+                ),
+                ParsedMessage(
+                    3,
+                    "r1",
+                    "a1",
+                    "toolResult",
+                    [{"type": "text", "text": "PAGE Example"}],
+                    turn=1,
+                    tool_call_id="call-1",
+                    tool_name="bash",
+                ),
+            ],
+            steps=[
+                ParsedStep(
+                    command="ebrowse outline",
+                    output="PAGE Example",
+                    message_id="a1",
+                    tool_call_id="call-1",
+                    tool_name="bash",
+                    call_index=1,
+                )
+            ],
+            final_answer="32 products",
+        )
+    )
+    run_task(task, harness, {}, tmp_path / "run")
+    records = list(TraceReader(tmp_path / "run").records())
+    prompts = [record for record in records if isinstance(record, PromptSnapshot)]
+    messages = [record for record in records if isinstance(record, AgentMessage)]
+    step = next(record for record in records if isinstance(record, Step))
+    assert [(prompt.kind, prompt.text) for prompt in prompts] == [
+        ("start", "exact starting prompt"),
+        ("system", "effective system prompt"),
+    ]
+    assert [message.message_id for message in messages] == ["u1", "a1", "r1"]
+    assert step.message_id == "a1"
+    assert step.tool_call_id == "call-1"

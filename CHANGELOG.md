@@ -9,36 +9,33 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 ### Added
 
 - Page capture now uses CDP `DOMSnapshot.captureSnapshot` by default
-  (`browser.capture_engine = "cdp"`): no JavaScript runs in the page and every
-  discovered element carries a CDP backend-node-id binding for the upcoming
-  act-time fast path (ADR 0015). Outlines are byte-identical to the
-  discover.js engine (cross-engine parity tests on all fixture pages), which
-  remains available as `capture_engine = "js"` until removal.
-- Anonymous elements (icon-only buttons, unlabeled inputs — no id/testid/
-  name/text/placeholder) are now actionable: when descriptor resolution
-  refuses, every verb falls back to the capture-time CDP node binding and acts
-  on the exact node the outline described (ADR 0015). Previously such refs
-  failed forever with a re-outline hint that could not help; a dead binding
-  now fails loudly and a re-outline genuinely re-binds.
-- Anonymous elements now carry descriptor fallbacks that survive node
-  replacement (which kills the CDP binding): session-stable class tokens
-  (hashy build tokens kept — best discriminators) and, for fully anonymous
-  elements, filtered custom attributes. Both resolve on UNIQUE matches only
-  (refuse-over-misbind); ref identity/reuse is unaffected. The binding-rescue
-  trial click also gained Playwright-style retries so transient overlays and
-  entrance animations no longer cause false blocks.
-- Diffs now pair elements across observations by CDP node identity first
-  (`Element.node_id`), descriptors second: state changes attribute to the
-  right sibling after reorders of identical elements, and an in-place relabel
-  ("Add to cart" → "Added ✓") reports as `~ @old → @new label: ...` instead
-  of a remove+add pair (>8 relabels per section still report as a bulk swap).
-  js-engine captures and cross-navigation diffs behave exactly as before.
-- Suspicious descriptor picks (nth-disambiguated, `.first`-collapsed, or made
-  after an identity mismatch) are geometry-checked against the ref's node
-  binding; on disagreement the bound node is acted on instead — reorders of
-  fully identical siblings no longer misbind. `browser.act_via_binding = true`
-  switches to binding-first resolution for eval A/B comparison.
+  (`browser.capture_engine = "cdp"`), producing the existing DomSnapshot shape
+  without running page JavaScript and attaching backend-node-id bindings (ADR 0015).
+- Anonymous elements can fall back to their capture-time CDP binding when descriptor
+  resolution refuses, with unique descriptor fallbacks for replaced nodes.
+- Diffs pair elements by CDP node identity before descriptors, preserving attribution
+  across identical-element reorders and in-place relabels.
+- Suspicious descriptor picks are geometry-checked against node bindings;
+  `browser.act_via_binding = true` enables binding-first eval experiments.
+- Redirect-aware eval startup discovers bounded regional task redirects before the
+  agent runs, freezes the resulting domain scope, and records the chain in trace
+  metadata and `navigation-bootstrap.json`. Harness preparation completes before the
+  single authoritative `run_meta` record is emitted, so live runs remain discoverable
+  throughout agent execution without later metadata correction records.
+- Pi's injected ebrowse operating guide now describes the dedicated custom tool
+  instead of telling the browser-only agent to invoke the CLI through a shell.
+- Redirect bootstrap now waits for the old daemon socket to disappear after browser
+  cleanup before restarting, preventing Chromium persistent-profile lock races.
 
+- Pi/ebrowse evals now expose one shell-free custom browser tool instead of
+  Bash. A configurable verb/argument/output/timeout policy blocks `eval`, file
+  upload, process control, CDP attachment, session overrides, and caller-chosen
+  paths by default; frozen task navigation is enforced for explicit opens,
+  clicks, redirects, and popups, with structured policy errors retained in traces.
+- Eval traces now preserve the exact starting prompt, Pi's effective system
+  prompt, and every finalized conversation message/content block. The viewer is
+  conversation-first with a fixed browser-state side lane on every row and
+  retains the legacy step renderer for older runs.
 - Eval tasks now start on their declared target URL, stop at a configurable
   200 tool calls by default, and support isolated parallel execution with
   `ebrowse-eval run --jobs N`.
@@ -66,7 +63,7 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   fully resolved into `run_meta` alongside git sha/dirty + ebrowse version/mode,
   a generic `AgentHarness` protocol with a `PiHarness` implementation (tool-guide
   prepending, `experiments/.env` defaults, JSON event + pi session capture,
-  isolated per-run workdir, `--worktree` PATH shim with daemon stop), and one
+  isolated per-run workdir, fixed worktree executable with daemon stop), and one
   Step trace record per agent tool-call with a `StepCapture` hook for the
   browser-state capture layer. Per-task `eval.py` (or declarative `expected`)
   results land in `run_end`.
@@ -93,7 +90,7 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   stored DomSnapshot blob through pure core). Concise deterministic plain text,
   `--json` everywhere; documented in `evals/docs/inspect.md`.
 - **Phase 2 wiring: capture + debug log flow into `ebrowse-eval run` traces.**
-  The runner's ebrowse shim now instruments every call (on by default for
+  The trusted browser-tool launcher instruments every allowed call (on by default for
   ebrowse runs; `--no-capture` to disable): per-call `EBROWSE_REQUEST_ID=call-<n>`,
   a synchronous post-call debug-capture spool, and the daemon debug log enabled
   via env. `ebrowse_evals.ingest` joins both back to steps ordinally after the

@@ -50,6 +50,8 @@ For the pi/ebrowse harness, `url` is also the initial browser location. The
 harness opens it before the agent starts; this setup action is excluded from
 the trace's agent-step numbering and tool-call limit. Relevant config keys are
 `timeout_s`, `tool_call_limit` (default 200; zero disables), and `jobs`
-(default 1; CLI `--jobs` controls benchmark concurrency).
+(default 1; CLI `--jobs` controls benchmark concurrency). Pi/ebrowse runs also
+default to the browser-only tool and redirect-aware task navigation policy documented in
+[pi-browser-policy.md](pi-browser-policy.md).
 
 Example benchmark: `evals/tests/fixtures/benchmark/`.

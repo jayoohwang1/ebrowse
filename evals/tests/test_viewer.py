@@ -15,6 +15,7 @@ import pytest
 
 from ebrowse_evals import viewer_server
 from ebrowse_evals.cli import main
+from ebrowse_evals.trace import AgentMessage, PromptSnapshot, TraceWriter
 from ebrowse_evals.trace.store import TraceReader
 from ebrowse_evals.viewer import render_run
 from ebrowse_evals.viewer_server import discover_runs, make_handler, render_index, trash_runs
@@ -72,6 +73,61 @@ def test_fake_png_blobs_get_placeholder_not_img(html: str) -> None:
     # Sample-trace .png blobs are fake text files; must render as placeholders.
     assert "placeholder" in html
     assert "data:image/png" not in html
+
+
+def test_conversation_view_shows_all_blocks_and_fixed_browser_lane(tmp_path: Path) -> None:
+    run = tmp_path / "run"
+    shutil.copytree(SAMPLE, run)
+    writer = TraceWriter(run)
+    writer.write(PromptSnapshot(kind="start", text="EXACT start <prompt>", sha256="start"))
+    writer.write(PromptSnapshot(kind="system", text="full secret system", sha256="system"))
+    writer.write(
+        AgentMessage(
+            sequence=1,
+            message_id="u1",
+            role="user",
+            content=[{"type": "text", "text": "EXACT start <prompt>"}],
+            is_start=True,
+        )
+    )
+    writer.write(
+        AgentMessage(
+            sequence=2,
+            message_id="a1",
+            role="assistant",
+            turn=1,
+            content=[
+                {"type": "thinking", "thinking": "private reasoning"},
+                {"type": "text", "text": "ordinary assistant output"},
+                {
+                    "type": "toolCall",
+                    "id": "read-1",
+                    "name": "read",
+                    "arguments": {"path": "notes.txt"},
+                },
+            ],
+        )
+    )
+    writer.write(
+        AgentMessage(
+            sequence=3,
+            message_id="r1",
+            role="toolResult",
+            content=[{"type": "text", "text": "non-browser tool output"}],
+            tool_call_id="read-1",
+            tool_name="read",
+        )
+    )
+    page = render_run(run)
+    assert "EXACT start &lt;prompt&gt;" in page
+    assert "full secret system" in page
+    assert '<details class="system-prompt">' in page  # collapsed by default
+    assert "private reasoning" in page
+    assert "ordinary assistant output" in page
+    assert "non-browser tool output" in page
+    assert "notes.txt" in page
+    assert page.count('class="browser-side browser-empty"') >= 3
+    assert "grid-template-columns:minmax(0,1fr) 340px" in page
 
 
 def test_tolerates_torn_tail_missing_blobs_unknown_types(tmp_path: Path) -> None:

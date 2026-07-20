@@ -136,7 +136,12 @@ class TraceReader:
         if ids != sorted(set(ids)):
             problems.append(f"step ids not strictly increasing: {ids}")
         for r in records:
-            for ref in (getattr(r, "screenshot", None), getattr(r, "dom_snapshot", None)):
+            for ref in (
+                getattr(r, "screenshot", None),
+                getattr(r, "dom_snapshot", None),
+                getattr(r, "text_ref", None),
+                getattr(r, "content_ref", None),
+            ):
                 if ref is not None:
                     try:
                         self.blobs.path(ref)

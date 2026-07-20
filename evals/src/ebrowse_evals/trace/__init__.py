@@ -12,9 +12,11 @@ addition only. See evals/docs/trace-schema.md.
 
 from ebrowse_evals.trace.records import (
     SCHEMA_VERSION,
+    AgentMessage,
     Anomaly,
     BrowserEvent,
     EbrowseLog,
+    PromptSnapshot,
     RunEnd,
     RunMeta,
     Step,
@@ -26,9 +28,11 @@ from ebrowse_evals.trace.store import BlobStore, TraceReader, TraceWriter
 __all__ = [
     "SCHEMA_VERSION",
     "Anomaly",
+    "AgentMessage",
     "BlobStore",
     "BrowserEvent",
     "EbrowseLog",
+    "PromptSnapshot",
     "RunEnd",
     "RunMeta",
     "Step",

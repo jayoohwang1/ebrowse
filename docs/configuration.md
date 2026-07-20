@@ -47,11 +47,20 @@ max_sections = 60               # soft outline-size target; safe merges only
 max_section_tokens = 16384      # ordinary expansion ceiling; collection page budget
 
 [security]
-allowed_domains = []            # empty = all; subdomains of listed domains allowed
+allowed_domains = []            # empty = all; restricts top-level navigation otherwise
+bootstrap_navigation = false    # harness-managed redirect discovery mode
+bootstrap_max_hosts = 5
+block_private_network = false   # blocks literal private/loopback navigation targets
 
 [debug]
 log = ""                        # JSONL debug-event log path; "" = off (default, zero overhead)
 ```
+
+When `security.allowed_domains` is non-empty, exact hosts and their subdomains are
+allowed. Ports do not affect matching. Disallowed top-level document requests from
+explicit opens, clicks, and popups are cancelled without replacing the current page;
+the landed-page check remains a backstop for redirects. Cross-domain subresources are
+not restricted.
 
 ## Debug event log
 

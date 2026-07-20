@@ -81,6 +81,8 @@ class ActionsMixin(InteractionMixin):
         _blocking_modal: str | None
         _hover_delivery_suspect: bool
 
+        def _raise_if_navigation_blocked(self) -> None: ...
+
         def _active_dialog(self) -> PendingDialog | None: ...
         @property
         def page(self) -> Page: ...
@@ -270,6 +272,7 @@ class ActionsMixin(InteractionMixin):
         with contextlib.suppress(Exception):
             await self.page.wait_for_load_state("domcontentloaded", timeout=5000)
         await self._quiesce()
+        self._raise_if_navigation_blocked()
 
         navigated = urldefrag(self.page.url)[0] != begin_state.url
         if navigated:

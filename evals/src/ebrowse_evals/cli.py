@@ -102,12 +102,22 @@ def _cmd_run(args: argparse.Namespace) -> int:
         "tool_call_limit": args.tool_call_limit,
         "jobs": args.jobs,
         "capture": False if args.no_capture else None,
+        "navigation_policy": args.navigation_policy,
+        "navigation_allowed_domains": args.allow_domain,
+        "ebrowse_allowed_verbs": (
+            [verb.strip() for verb in args.ebrowse_verbs.split(",") if verb.strip()]
+            if args.ebrowse_verbs
+            else None
+        ),
+        "ebrowse_tool_timeout_s": args.ebrowse_tool_timeout,
+        "ebrowse_tool_args_max_bytes": args.ebrowse_tool_args_max_bytes,
+        "ebrowse_tool_output_max_bytes": args.ebrowse_tool_output_max_bytes,
     }
     # Harness identity (provider/model/tool/worktree) is run-level, not per-task,
     # so resolve it once from harness defaults + benchmark config + flags.
     base = resolve_config(bench.config if bench else None, cli_config)
     tool = str(base.get("tool", "none"))
-    # Capture instruments the ebrowse shim, so it only applies to ebrowse runs;
+    # Capture is integrated into the custom ebrowse tool, so it only applies there;
     # default on there (rich traces are the point) unless explicitly disabled.
     capture = bool(base.get("capture", True)) and tool == "ebrowse"
     cli_config["capture"] = capture
@@ -199,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument(
         "--worktree",
         action="store_true",
-        help="shim `ebrowse` to this checkout's .venv (stops any running daemon first)",
+        help="use this checkout's .venv as the fixed ebrowse target",
     )
     p_run.add_argument("--timeout", type=float, help="per-task timeout in seconds")
     p_run.add_argument(
@@ -214,6 +224,35 @@ def main(argv: list[str] | None = None) -> int:
         "--no-capture",
         action="store_true",
         help="skip per-step browser-state capture + ebrowse debug-log ingestion",
+    )
+    p_run.add_argument(
+        "--navigation-policy",
+        choices=["task-host", "task-redirects", "allowlist", "unrestricted"],
+        help="browser navigation scope (default: task-host)",
+    )
+    p_run.add_argument(
+        "--allow-domain",
+        action="append",
+        help="additional allowed navigation domain (repeatable)",
+    )
+    p_run.add_argument(
+        "--ebrowse-verbs",
+        help="comma-separated replacement for the standard browser-only verb allowlist",
+    )
+    p_run.add_argument(
+        "--ebrowse-tool-timeout",
+        type=float,
+        help="timeout for one ebrowse tool call in seconds (default: 150)",
+    )
+    p_run.add_argument(
+        "--ebrowse-tool-args-max-bytes",
+        type=int,
+        help="maximum total encoded argument bytes per ebrowse call",
+    )
+    p_run.add_argument(
+        "--ebrowse-tool-output-max-bytes",
+        type=int,
+        help="maximum ebrowse result bytes returned to Pi",
     )
     p_run.add_argument("--runs-dir", default="runs", help="where run directories go")
     p_run.add_argument("--name", help="run-name prefix (default: <task-id>-<utc timestamp>)")

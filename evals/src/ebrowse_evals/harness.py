@@ -4,7 +4,7 @@ The runner talks to agents only through the ``AgentHarness`` protocol: give it
 a prompt, a working dir, env, and a timeout; get back parsed steps + totals.
 ``PiHarness`` is the concrete implementation, a port of
 ``experiments/run-agent.sh`` — tool-guide prepending, pi invocation, JSON
-event capture, and the worktree PATH shim. Tests use a fake harness; nothing
+event capture, and the browser-only Pi extension. Tests use a fake harness; nothing
 in the runner or trace layer knows what "pi" is.
 
 Session parsing mirrors ``experiments/inspect-session.py``: each assistant
@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
+from urllib.parse import urlsplit
 
 PROMPT_FILE = "prompt.txt"
 PI_EVENTS_FILE = "pi-events.jsonl"
@@ -38,7 +39,22 @@ INITIAL_OPEN_FILE = "initial-open.txt"
 SESSION_DIR = "session"
 SPOOL_DIR = "capture"  # per-call debug-capture payloads: capture/<n>.json
 DEBUG_LOG_FILE = "ebrowse-debug.jsonl"  # daemon tier-1 events (EBROWSE_DEBUG_LOG)
+SYSTEM_PROMPTS_FILE = "system-prompts.jsonl"
+TOOL_POLICY_FILE = "browser-tool-policy.json"
+NAVIGATION_BOOTSTRAP_FILE = "navigation-bootstrap.json"
 DEFAULT_PI_EVENTS_MAX_BYTES = 64 * 1024 * 1024
+
+BROWSER_SYSTEM_PROMPT = """You are a browser automation agent completing one assigned task.
+Use only the provided ebrowse tool to inspect and interact with the task website.
+Do not claim success unless the browser state supports it. If a tool action is
+blocked by policy, do not try to bypass the restriction; use the standard
+browser operations available to you or explain that the task could not be completed."""
+
+SKILL_CLI_INTRO = """`ebrowse` is a CLI. Run it via shell. One background daemon owns the browser;
+state (page, refs, logins) persists between commands."""
+SKILL_TOOL_INTRO = """`ebrowse` is available through the dedicated `ebrowse` tool. Pass each documented
+command without the leading `ebrowse` prefix. Browser state (page, refs, logins)
+persists between tool calls."""
 
 
 @dataclass(slots=True)
@@ -51,11 +67,41 @@ class ParsedStep:
     agent_text: str | None = None
     tokens: dict[str, Any] = field(default_factory=dict)
     latency_s: float | None = None
+    message_id: str | None = None
+    tool_call_id: str | None = None
+    tool_name: str | None = None
+    call_index: int | None = None
+    details: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class ParsedMessage:
+    """One finalized agent transcript message."""
+
+    sequence: int
+    message_id: str
+    parent_id: str | None
+    role: str
+    content: Any
+    ts: float | None = None
+    turn: int | None = None
+    tool_call_id: str | None = None
+    tool_name: str | None = None
+    model: str | None = None
+    provider: str | None = None
+    usage: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    stop_reason: str | None = None
+    is_error: bool | None = None
+    is_start: bool = False
 
 
 @dataclass(slots=True)
 class HarnessResult:
     steps: list[ParsedStep] = field(default_factory=list)
+    messages: list[ParsedMessage] = field(default_factory=list)
+    start_prompt: str = ""
+    system_prompts: list[str] = field(default_factory=list)
     final_answer: str = ""
     totals: dict[str, Any] = field(default_factory=dict)
     exit_code: int = 0
@@ -81,8 +127,24 @@ class AgentHarness(Protocol):
         run_dir: Path,
         start_url: str | None = None,
         tool_call_limit: int | None = None,
+        config: dict[str, Any] | None = None,
     ) -> HarnessResult:
         """Execute one task. Artifacts (prompt, events, session) land in run_dir."""
+        ...
+
+
+@runtime_checkable
+class PreparatoryHarness(Protocol):
+    """Optional phase for setup that contributes dynamic run metadata."""
+
+    def prepare_run(
+        self,
+        env: dict[str, str],
+        run_dir: Path,
+        start_url: str | None,
+        config: dict[str, Any],
+    ) -> None:
+        """Complete setup and mutate config before run_meta is serialized."""
         ...
 
 
@@ -115,14 +177,19 @@ def parse_pi_session(entries: list[dict[str, Any]]) -> HarnessResult:
     result = HarnessResult()
     pending: dict[str, ParsedStep] = {}  # toolCallId -> awaiting its result
     issued_at: dict[str, float] = {}
+    call_turn: dict[str, int] = {}
     out_tok = in_tok = peak = turns = 0
+    first_user = True
     for e in entries:
         if e.get("type") != "message":
             continue
         m = e["message"]
         role = m.get("role")
+        message_id = str(e.get("id") or f"message-{len(result.messages) + 1}")
+        turn: int | None = turns or None
         if role == "assistant":
             turns += 1
+            turn = turns
             u = m.get("usage") or {}
             out_tok += u.get("output", 0)
             in_tok += u.get("input", 0)
@@ -130,32 +197,71 @@ def parse_pi_session(entries: list[dict[str, Any]]) -> HarnessResult:
             txt = _text(m.get("content"))
             if txt:
                 result.final_answer = txt
+            call_index = 0
             for c in m.get("content") or []:
                 if isinstance(c, dict) and c.get("type") == "toolCall":
+                    call_index += 1
                     args = c.get("arguments") or {}
-                    command = args.get("command") or json.dumps(args)
+                    if c.get("name") == "ebrowse" and isinstance(args.get("command"), str):
+                        command = f"ebrowse {args['command']}"
+                    else:
+                        command = args.get("command") or json.dumps(args)
+                    call_id = str(c.get("id"))
                     step = ParsedStep(
                         command=str(command),
                         agent_text=txt or None,
                         tokens={k: u[k] for k in ("input", "output", "totalTokens") if k in u},
+                        message_id=message_id,
+                        tool_call_id=call_id,
+                        tool_name=str(c.get("name", "")),
+                        call_index=call_index,
                     )
                     result.steps.append(step)
-                    call_id = str(c.get("id"))
                     pending[call_id] = step
+                    call_turn[call_id] = turns
                     at = _ts(m.get("timestamp"))
                     if at is not None:
                         issued_at[call_id] = at
         elif role == "toolResult":
             call_id = str(m.get("toolCallId"))
+            turn = call_turn.get(call_id, turns or None)
             step = pending.pop(call_id, None)
-            if step is None:
-                continue
-            step.output = _text(m.get("content"))
-            step.is_error = bool(m.get("isError"))
-            done = _ts(m.get("timestamp"))
-            begun = issued_at.get(call_id)
-            if done is not None and begun is not None:
-                step.latency_s = done - begun
+            if step is not None:
+                step.output = _text(m.get("content"))
+                step.is_error = bool(m.get("isError"))
+                step.details = dict(m.get("details") or {})
+                done = _ts(m.get("timestamp"))
+                begun = issued_at.get(call_id)
+                if done is not None and begun is not None:
+                    step.latency_s = done - begun
+        if role in {"user", "assistant", "toolResult"}:
+            is_start = role == "user" and first_user
+            if is_start:
+                first_user = False
+            result.messages.append(
+                ParsedMessage(
+                    sequence=len(result.messages) + 1,
+                    message_id=message_id,
+                    parent_id=str(e["parentId"]) if e.get("parentId") is not None else None,
+                    role=str(role),
+                    content=m.get("content", ""),
+                    ts=_ts(e.get("timestamp")) or _ts(m.get("timestamp")),
+                    turn=turn,
+                    tool_call_id=(str(m.get("toolCallId")) if m.get("toolCallId") else None),
+                    tool_name=(str(m.get("toolName")) if m.get("toolName") else None),
+                    model=(str(m.get("model")) if m.get("model") else None),
+                    provider=(str(m.get("provider")) if m.get("provider") else None),
+                    usage=dict(m.get("usage") or {}),
+                    metadata={
+                        key: value
+                        for key, value in m.items()
+                        if key not in {"role", "content", "timestamp", "usage"}
+                    },
+                    stop_reason=(str(m.get("stopReason")) if m.get("stopReason") else None),
+                    is_error=(bool(m.get("isError")) if role == "toolResult" else None),
+                    is_start=is_start,
+                )
+            )
     result.totals = {
         "turns": turns,
         "tool_calls": len(result.steps),
@@ -201,6 +307,72 @@ def load_env_file(path: Path) -> dict[str, str]:
     return env
 
 
+def resolve_navigation_domains(
+    start_url: str | None,
+    mode: str,
+    configured: list[str] | tuple[str, ...],
+) -> list[str]:
+    """Resolve task navigation scope to ebrowse's allowed-domain format."""
+    extras = [str(value).strip().lower().rstrip(".") for value in configured if str(value).strip()]
+    if mode == "unrestricted":
+        return []
+    if mode not in {"task-host", "task-redirects", "allowlist"}:
+        raise ValueError(
+            f"unknown navigation_policy {mode!r} "
+            "(want task-host|task-redirects|allowlist|unrestricted)"
+        )
+    domains = list(extras)
+    if mode in {"task-host", "task-redirects"}:
+        host = urlsplit(start_url or "").hostname
+        if not host:
+            raise ValueError(
+                f"navigation_policy={mode!r} requires task.url — set a URL, use "
+                "'allowlist' with navigation_allowed_domains, or choose 'unrestricted'"
+            )
+        domains.insert(0, host.lower().rstrip("."))
+    if not domains:
+        raise ValueError("navigation allowlist is empty — configure navigation_allowed_domains")
+    return list(dict.fromkeys(domains))
+
+
+def _navigation_urls(payload: dict[str, Any], start_url: str) -> tuple[list[str], str]:
+    """Extract the ordered main-frame navigation chain from debug-capture."""
+    urls = [start_url]
+    for event in payload.get("events") or []:
+        if not isinstance(event, dict) or event.get("kind") != "navigation":
+            continue
+        data = event.get("data") or {}
+        if not isinstance(data, dict):
+            continue
+        candidate = data.get("to") or data.get("url")
+        if isinstance(candidate, str) and candidate.startswith(("http://", "https://")):
+            urls.append(candidate)
+    browser = payload.get("browser") or {}
+    final_url = browser.get("url") if isinstance(browser, dict) else None
+    if isinstance(final_url, str) and final_url.startswith(("http://", "https://")):
+        urls.append(final_url)
+    return list(dict.fromkeys(urls)), str(final_url or start_url)
+
+
+def _local_task_url(url: str) -> bool:
+    import ipaddress
+
+    host = (urlsplit(url).hostname or "").lower().rstrip(".")
+    if host == "localhost" or host.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
+
+
+def _string_list_config(config: dict[str, Any], key: str) -> list[str]:
+    value = config.get(key) or []
+    if not isinstance(value, (list, tuple)) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"{key} must be an array of strings")
+    return list(value)
+
+
 @dataclass(slots=True)
 class PiHarness:
     """Drives the pi coding agent as a subprocess, like run-agent.sh does."""
@@ -221,6 +393,7 @@ class PiHarness:
             "provider": self.provider,
             "model": self.model,
             "tool": self.tool,
+            "tool_mode": "browser-only" if self.tool == "ebrowse" else "builtin",
         }
 
     def tool_preamble(self) -> str:
@@ -228,7 +401,8 @@ class PiHarness:
         if self.tool == "ebrowse":
             skill = self.repo_root / "SKILL.md"
             guide = skill.read_text(encoding="utf-8") if skill.is_file() else ""
-            return f"You control a web browser using the 'ebrowse' CLI. Its operating guide follows.\n\n{guide}\n"
+            guide = guide.replace(SKILL_CLI_INTRO, SKILL_TOOL_INTRO, 1)
+            return f"You control a web browser using the `ebrowse` tool. Its operating guide follows.\n\n{guide}\n"
         if self.tool == "agent-browser":
             proc = subprocess.run(
                 ["agent-browser", "skills", "get", "core", "--full"],
@@ -242,68 +416,150 @@ class PiHarness:
             return ""
         raise ValueError(f"unknown tool: {self.tool} (want ebrowse|agent-browser|none)")
 
-    def _shim_target(self) -> str:
-        """The real ebrowse invocation the shim wraps (quoted shell fragment)."""
+    def _ebrowse_target(self) -> tuple[str, list[str]]:
+        """Fixed executable + prefix used by setup and the policy launcher."""
         if self.worktree:
             venv_py = self.repo_root / ".venv" / "bin" / "python"
             if not venv_py.exists():
                 raise FileNotFoundError(
                     f"no venv at {venv_py} — run 'uv sync' in {self.repo_root} first"
                 )
-            return f'"{venv_py}" -m ebrowse.cli.main'
+            return str(venv_py), ["-m", "ebrowse.cli.main"]
         real = self.ebrowse_bin or shutil.which("ebrowse")
         if real is None:
             raise FileNotFoundError(
                 "no `ebrowse` on PATH to instrument — install it (uv tool install) "
                 "or pass --worktree to use this checkout's venv"
             )
-        return f'"{real}"'
+        return str(real), []
 
-    def _install_shim(self, run_dir: Path, env: dict[str, str]) -> None:
-        """Wrap `ebrowse` for worktree redirection and/or per-call capture.
+    def _eval_env(self, run_dir: Path, env: dict[str, str]) -> tuple[dict[str, str], Path]:
+        """Build the isolated per-run environment shared by prepare and run."""
+        full_env = {**os.environ, **env}
+        runtime_key = hashlib.sha256(str(run_dir).encode()).hexdigest()[:16]
+        runtime_dir = Path(tempfile.gettempdir()) / "ebrowse-eval-runtime" / runtime_key
+        cache_dir = run_dir / "cache"
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        full_env["XDG_RUNTIME_DIR"] = str(runtime_dir)
+        if "PLAYWRIGHT_BROWSERS_PATH" not in full_env:
+            shared_browsers = Path.home() / ".cache" / "ms-playwright"
+            if shared_browsers.is_dir():
+                full_env["PLAYWRIGHT_BROWSERS_PATH"] = str(shared_browsers)
+        full_env["XDG_CACHE_HOME"] = str(cache_dir)
+        return full_env, runtime_dir
 
-        The shim is the ONE place in the whole harness that runs at exactly the
-        right moment for post-action state: synchronously after each ebrowse
-        call, before the agent's next turn. With capture on it (a) numbers the
-        call, (b) exports EBROWSE_REQUEST_ID=call-<n> so the daemon's debug
-        events join deterministically to this call, and (c) spools a
-        debug-capture payload to capture/<n>.json. EBROWSE_EVAL_NOHOOK skips
-        the instrumentation (used for our own setup calls below)."""
-        target = self._shim_target()
-        shim_dir = run_dir / "bin"
-        shim_dir.mkdir(parents=True, exist_ok=True)
-        shim = shim_dir / "ebrowse"
-        if self.capture:
-            spool = run_dir / SPOOL_DIR
-            spool.mkdir(parents=True, exist_ok=True)
-            # The agent drives commands serially, so the naive counter file is
-            # race-free in practice; a torn read only skips a spool slot.
-            shim.write_text(
-                "#!/usr/bin/env bash\n"
-                f'if [ -n "$EBROWSE_EVAL_NOHOOK" ]; then exec {target} "$@"; fi\n'
-                f'ctr="{spool}/seq"\n'
-                'n=$(( $(cat "$ctr" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$ctr"\n'
-                'export EBROWSE_REQUEST_ID="call-$n"\n'
-                f'{target} "$@"\n'
-                "rc=$?\n"
-                f'"{sys.executable}" -m ebrowse_evals.capture_hook "{spool}/$n.json" || true\n'
-                "exit $rc\n"
-            )
-            # The daemon reads its config env at startup; it inherits ours via
-            # the first shimmed call (we stop any old daemon below).
-            env["EBROWSE_DEBUG_LOG"] = str(run_dir / DEBUG_LOG_FILE)
-        else:
-            shim.write_text(f'#!/usr/bin/env bash\nexec {target} "$@"\n')
-        shim.chmod(0o755)
-        env["PATH"] = f"{shim_dir}{os.pathsep}{env.get('PATH', os.defpath)}"
-        # Free the socket so the agent's first call restarts the daemon on the
-        # shimmed code/env (local venv and/or EBROWSE_DEBUG_LOG).
+    @staticmethod
+    def _stop_ebrowse_daemon(
+        executable: str,
+        prefix: list[str],
+        env: dict[str, str],
+        timeout_s: float = 15.0,
+    ) -> None:
+        """Stop and wait for full cleanup, including Chromium profile release.
+
+        The stop response only acknowledges the shutdown request. The daemon
+        removes its socket after awaiting every browser session's close, making
+        socket disappearance the lifecycle boundary safe for a replacement.
+        """
         subprocess.run(
-            [str(shim), "daemon", "stop"],
-            env={**env, "EBROWSE_EVAL_NOHOOK": "1"},
+            [executable, *prefix, "daemon", "stop"],
+            env=env,
             capture_output=True,
             check=False,
         )
+        socket_file = Path(env["XDG_RUNTIME_DIR"]) / "ebrowse.sock"
+        deadline = time.monotonic() + timeout_s
+        while socket_file.exists():
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"ebrowse daemon did not release its socket within {timeout_s:g}s"
+                )
+            time.sleep(0.05)
+
+    def prepare_run(
+        self,
+        env: dict[str, str],
+        run_dir: Path,
+        start_url: str | None,
+        config: dict[str, Any],
+    ) -> None:
+        """Discover redirect scope before the runner writes authoritative metadata."""
+        if self.tool != "ebrowse" or config.get("navigation_policy") != "task-redirects":
+            return
+        if config.get("navigation_bootstrap"):
+            return
+        domains = resolve_navigation_domains(
+            start_url,
+            "task-redirects",
+            _string_list_config(config, "navigation_allowed_domains"),
+        )
+        assert start_url is not None
+        full_env, runtime_dir = self._eval_env(run_dir, env)
+        executable, prefix = self._ebrowse_target()
+        bootstrap_timeout = float(config.get("navigation_bootstrap_timeout_s", 15.0))
+        bootstrap_max_hosts = int(config.get("navigation_bootstrap_max_hosts", 5))
+        if bootstrap_timeout <= 0 or bootstrap_max_hosts <= 0:
+            raise ValueError("navigation bootstrap timeout and max hosts must be positive")
+        full_env.pop("EBROWSE_SECURITY_ALLOWED_DOMAINS", None)
+        full_env["EBROWSE_SECURITY_BOOTSTRAP_NAVIGATION"] = "true"
+        full_env["EBROWSE_SECURITY_BOOTSTRAP_MAX_HOSTS"] = str(bootstrap_max_hosts)
+        full_env["EBROWSE_SECURITY_BLOCK_PRIVATE_NETWORK"] = (
+            "false" if _local_task_url(start_url) else "true"
+        )
+        self._stop_ebrowse_daemon(executable, prefix, full_env)
+        try:
+            bootstrap_open = subprocess.run(
+                [executable, *prefix, "open", start_url],
+                env=full_env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=bootstrap_timeout,
+            )
+            bootstrap_error = (
+                bootstrap_open.stdout + bootstrap_open.stderr
+                if bootstrap_open.returncode != 0
+                else None
+            )
+        except subprocess.TimeoutExpired as exc:
+            bootstrap_error = f"navigation bootstrap timed out: {exc}"
+        payload: dict[str, Any] = {}
+        try:
+            from ebrowse_evals.capture import DaemonCaptureClient
+
+            payload = DaemonCaptureClient(
+                socket_path=runtime_dir / "ebrowse.sock", timeout_s=10
+            ).debug_capture()
+        except Exception as exc:  # noqa: BLE001 - recorded, then scope freezes safely
+            bootstrap_error = bootstrap_error or f"capture failed: {type(exc).__name__}: {exc}"
+        observed_urls, final_url = _navigation_urls(payload, start_url)
+        observed_hosts = [
+            host.lower().rstrip(".") for url in observed_urls if (host := urlsplit(url).hostname)
+        ]
+        observed_hosts = list(dict.fromkeys(observed_hosts))
+        if len(observed_hosts) > bootstrap_max_hosts:
+            raise ValueError(
+                f"navigation bootstrap observed {len(observed_hosts)} hosts; "
+                f"limit is {bootstrap_max_hosts}"
+            )
+        domains = list(dict.fromkeys([*observed_hosts, *domains]))
+        bootstrap_record = {
+            "requested_url": start_url,
+            "observed_urls": observed_urls,
+            "final_url": final_url,
+            "observed_hosts": observed_hosts,
+            "resolved_domains": domains,
+            "timeout_s": bootstrap_timeout,
+            "max_hosts": bootstrap_max_hosts,
+            "error": bootstrap_error,
+        }
+        (run_dir / NAVIGATION_BOOTSTRAP_FILE).write_text(
+            json.dumps(bootstrap_record, indent=2) + "\n", encoding="utf-8"
+        )
+        config["navigation_bootstrap"] = bootstrap_record
+        config["resolved_navigation_domains"] = domains
+        self._stop_ebrowse_daemon(executable, prefix, full_env)
 
     def run(
         self,
@@ -314,41 +570,81 @@ class PiHarness:
         run_dir: Path,
         start_url: str | None = None,
         tool_call_limit: int | None = None,
+        config: dict[str, Any] | None = None,
     ) -> HarnessResult:
         if shutil.which(self.pi_bin) is None:
             raise FileNotFoundError(
                 f"'{self.pi_bin}' not on PATH — npm i -g @earendil-works/pi-coding-agent"
             )
-        full_env = {**os.environ, **env}
-        # Every eval run owns its daemon socket, Chromium profile, and caches.
-        # This makes parallel runs independent and prevents one run's setup or
-        # teardown from stopping another run's browser.
-        # Unix socket paths are capped at roughly 108 bytes on Linux, while
-        # descriptive eval run paths are routinely longer. Keep only the
-        # socket runtime under a short, deterministic /tmp path.
-        runtime_key = hashlib.sha256(str(run_dir).encode()).hexdigest()[:16]
-        runtime_dir = Path(tempfile.gettempdir()) / "ebrowse-eval-runtime" / runtime_key
-        cache_dir = run_dir / "cache"
-        runtime_dir.mkdir(parents=True, exist_ok=True)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        full_env["XDG_RUNTIME_DIR"] = str(runtime_dir)
-        # Playwright normally derives its downloaded-browser location from
-        # XDG_CACHE_HOME. Preserve the existing shared installation while the
-        # browser profile and ebrowse caches remain isolated per run.
-        if "PLAYWRIGHT_BROWSERS_PATH" not in full_env:
-            shared_browsers = Path.home() / ".cache" / "ms-playwright"
-            if shared_browsers.is_dir():
-                full_env["PLAYWRIGHT_BROWSERS_PATH"] = str(shared_browsers)
-        full_env["XDG_CACHE_HOME"] = str(cache_dir)
-        if self.worktree or self.capture:
-            self._install_shim(run_dir, full_env)
-        ebrowse_cmd = shutil.which("ebrowse", path=full_env.get("PATH"))
+        config = config or {}
+        navigation_mode = str(config.get("navigation_policy", "task-host"))
+        if navigation_mode == "task-redirects" and not config.get("navigation_bootstrap"):
+            # Direct callers retain redirect discovery. The runner invokes it
+            # earlier so run_meta is visible before the long-running Pi call.
+            self.prepare_run(env, run_dir, start_url, config)
+        full_env, _runtime_dir = self._eval_env(run_dir, env)
+        ebrowse_target: tuple[str, list[str]] | None = None
+        if self.tool == "ebrowse":
+            ebrowse_target = self._ebrowse_target()
+            resolved = config.get("resolved_navigation_domains")
+            domains = (
+                _string_list_config(config, "resolved_navigation_domains")
+                if resolved is not None
+                else resolve_navigation_domains(
+                    start_url,
+                    navigation_mode,
+                    _string_list_config(config, "navigation_allowed_domains"),
+                )
+            )
+            executable, prefix = ebrowse_target
+            full_env.pop("EBROWSE_SECURITY_BOOTSTRAP_NAVIGATION", None)
+            full_env.pop("EBROWSE_SECURITY_BOOTSTRAP_MAX_HOSTS", None)
+            if navigation_mode == "task-redirects" and start_url is not None:
+                full_env["EBROWSE_SECURITY_BLOCK_PRIVATE_NETWORK"] = (
+                    "false" if _local_task_url(start_url) else "true"
+                )
+            if domains:
+                full_env["EBROWSE_SECURITY_ALLOWED_DOMAINS"] = ",".join(domains)
+            else:
+                full_env.pop("EBROWSE_SECURITY_ALLOWED_DOMAINS", None)
+            if self.capture:
+                full_env["EBROWSE_DEBUG_LOG"] = str(run_dir / DEBUG_LOG_FILE)
+            self._stop_ebrowse_daemon(executable, prefix, full_env)
+            allowed_verbs = _string_list_config(config, "ebrowse_allowed_verbs")
+            from ebrowse_evals.pi_tool import DEFAULT_ALLOWED_VERBS
+
+            if not allowed_verbs:
+                allowed_verbs = list(DEFAULT_ALLOWED_VERBS)
+            policy_path = run_dir / TOOL_POLICY_FILE
+            policy_path.write_text(
+                json.dumps(
+                    {
+                        "executable": executable,
+                        "argv_prefix": prefix,
+                        "run_dir": str(run_dir),
+                        "allowed_verbs": allowed_verbs,
+                        "allowed_domains": domains,
+                        "timeout_s": float(config.get("ebrowse_tool_timeout_s", 150.0)),
+                        "max_args_bytes": int(config.get("ebrowse_tool_args_max_bytes", 16_384)),
+                        "max_output_bytes": int(
+                            config.get("ebrowse_tool_output_max_bytes", 262_144)
+                        ),
+                        "capture": self.capture,
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            full_env["EBROWSE_EVAL_TOOL_POLICY"] = str(policy_path)
+            full_env["EBROWSE_EVAL_PYTHON"] = sys.executable
         opened = False
-        if start_url and self.tool == "ebrowse" and ebrowse_cmd:
+        if start_url and ebrowse_target is not None:
+            executable, prefix = ebrowse_target
             try:
                 initial = subprocess.run(
-                    [ebrowse_cmd, "open", start_url],
-                    env={**full_env, "EBROWSE_EVAL_NOHOOK": "1"},
+                    [executable, *prefix, "open", start_url],
+                    env=full_env,
                     capture_output=True,
                     text=True,
                     check=False,
@@ -372,8 +668,9 @@ class PiHarness:
             )
         if self.tool == "ebrowse":
             site_instruction += (
-                "Invoke the browser CLI directly as `ebrowse ...`. Do not prefix it with "
-                "`uv run` and do not use `python -m ebrowse`.\n"
+                "Use the `ebrowse` tool and omit the `ebrowse` prefix from its command. "
+                'For example, `ebrowse outline` is {"command":"outline"}. Shell '
+                "operators, redirection, and expansion are unavailable.\n"
             )
         full_prompt = f"{self.tool_preamble()}{site_instruction}\n# Task\n{prompt}"
         (run_dir / PROMPT_FILE).write_text(full_prompt, encoding="utf-8")
@@ -390,11 +687,36 @@ class PiHarness:
             str(session_dir),
             "--name",
             run_dir.name,
-            "--mode",
-            "json",
-            "-p",
-            full_prompt,
         ]
+        if self.tool == "ebrowse":
+            cmd.extend(
+                [
+                    "--system-prompt",
+                    BROWSER_SYSTEM_PROMPT,
+                    "--no-builtin-tools",
+                    "--no-extensions",
+                    "--no-skills",
+                    "--no-prompt-templates",
+                    "--no-context-files",
+                    "--no-approve",
+                    "--offline",
+                ]
+            )
+        system_prompts_path = run_dir / SYSTEM_PROMPTS_FILE
+        observer = Path(__file__).resolve().parents[2] / "pi_extensions" / "trace-observer.ts"
+        if observer.is_file():
+            cmd.extend(["--extension", str(observer)])
+            full_env["EBROWSE_EVAL_SYSTEM_PROMPTS"] = str(system_prompts_path)
+        if self.tool == "ebrowse":
+            browser_extension = (
+                Path(__file__).resolve().parents[2] / "pi_extensions" / "ebrowse-tool.ts"
+            )
+            if not browser_extension.is_file():
+                raise FileNotFoundError(f"missing Pi browser extension: {browser_extension}")
+            cmd.extend(["--extension", str(browser_extension), "--tools", "ebrowse"])
+        elif self.tool == "agent-browser":
+            cmd.extend(["--tools", "bash"])
+        cmd.extend(["--mode", "json", "-p", full_prompt])
         timed_out = False
         tool_limit_hit = False
         # Stream stdout/stderr straight to files: a timeout kill then loses
@@ -511,6 +833,13 @@ class PiHarness:
         if not any(e.get("type") == "message" for e in entries):
             entries = fallback_entries
         result = parse_pi_session(entries)
+        result.start_prompt = full_prompt
+        for entry in _jsonl(system_prompts_path):
+            value = entry.get("systemPrompt")
+            if isinstance(value, str) and (
+                not result.system_prompts or value != result.system_prompts[-1]
+            ):
+                result.system_prompts.append(value)
         # A very fast subprocess can enqueue another event before SIGTERM is
         # delivered. Keep the trace and reported total at the configured
         # boundary even if those bytes were already buffered in stdout.
@@ -521,11 +850,8 @@ class PiHarness:
         result.exit_code = exit_code
         result.timed_out = timed_out
         result.tool_limit_hit = tool_limit_hit
-        if ebrowse_cmd:
-            subprocess.run(
-                [ebrowse_cmd, "daemon", "stop"],
-                env={**full_env, "EBROWSE_EVAL_NOHOOK": "1"},
-                capture_output=True,
-                check=False,
-            )
+        if ebrowse_target is not None:
+            executable, prefix = ebrowse_target
+            with suppress(TimeoutError):
+                self._stop_ebrowse_daemon(executable, prefix, full_env)
         return result

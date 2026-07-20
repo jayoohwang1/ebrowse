@@ -3,3 +3,5 @@ name = "online-mind2web-hard-smoke"
 
 [config]
 timeout_s = 900
+tool_call_limit = 200
+navigation_policy = "task-redirects"

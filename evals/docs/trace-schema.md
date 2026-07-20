@@ -25,7 +25,8 @@ Blob refs are `"sha256:<hex>"`. Content addressing dedupes identical payloads
 2. **Large payloads go through the blob store**, never inline —
    `events.jsonl` stays skimmable/greppable.
 3. **Everything is keyed by entities**: `step` (1-based agent tool-call
-   index), plus `request_id` / `ref` / `sid` in fields where applicable.
+   index), conversation `message_id` / `tool_call_id`, plus `request_id` /
+   `ref` / `sid` in fields where applicable.
    Investigations are entity-centric ("trace @e12"), not log-centric.
 4. **Two logging tiers.** Tier 1 (always on, small): step facts, timings,
    ref lifecycle, diff verdicts, action execution, `anomaly` records.
@@ -39,7 +40,9 @@ Blob refs are `"sha256:<hex>"`. Content addressing dedupes identical payloads
 | type | one per | carries |
 |---|---|---|
 | `run_meta` | run (first record) | ids, prompt, fully **resolved** config, agent/model, git sha, ebrowse version + worktree/installed mode |
-| `step` | agent tool-call | exact command, verbatim output, tokens/latency, per-phase `timing`, post-action `browser` state, `screenshot`/`dom_snapshot` blob refs (captured **unconditionally**), `request_id`, structured `error` |
+| `prompt_snapshot` | prompt revision | exact starting prompt, or Pi's effective system prompt captured at `agent_start`; SHA-256 plus an optional blob ref for unusually large prompts |
+| `agent_message` | finalized message | ordered, unflattened content blocks for every user/assistant/tool-result message; ids, role, turn, model/usage, tool-result join, and error state |
+| `step` | agent tool-call | exact command, verbatim output, tokens/latency, per-phase `timing`, post-action `browser` state, `screenshot`/`dom_snapshot` blob refs, `request_id`, structured `error`, and conversation message/tool-call ids |
 | `browser_event` | page event | console / network_failure / dialog / navigation since previous step — unrecoverable if not captured live |
 | `ebrowse_log` | internal event | `module` + `event` + structured `fields` (not prose), `level`, `request_id` joining it to a step |
 | `anomaly` | pipeline surprise | the triage layer — a run's list should fit on one screen (ref_rebound, snapshot_truncated, element_moved, wait_timeout, section_reshaped, …) |
@@ -48,6 +51,14 @@ Blob refs are `"sha256:<hex>"`. Content addressing dedupes identical payloads
 
 A crashed run is still a readable trace: the reader tolerates a torn final
 line and `validate` reports missing `run_meta`/blobs instead of failing.
+
+Pi traces use the saved session's finalized messages as transcript ground
+truth. Streaming `message_update` snapshots are never persisted. An eval-owned
+Pi extension observes `ctx.getSystemPrompt()` at `agent_start`, after Pi has
+assembled tools, context files, skills, and per-run prompt modifications.
+Browser-policy rejections remain finalized tool results and set the owning
+`step.error` to `{class: "policy_block", verb, reason}`. They have no browser
+capture because the trusted launcher did not execute a browser command.
 
 ## Tooling
 

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,7 @@ from ebrowse_evals.trace.store import BlobStore, TraceReader
 _MAX_INLINE_JSON = 200_000
 
 _PHASE_COLORS = ["#4c8dd6", "#57a773", "#c9a227", "#b06ab3", "#d0684f", "#5aa7a7", "#8a8fd0"]
+_EBROWSE_COMMAND = re.compile(r"(?:^|[;&|(]|\$\(|`)\s*(?:[\w./\-]*/)?ebrowse\b")
 
 
 def _e(text: object) -> str:
@@ -272,11 +274,202 @@ def _summary_marker(rec: dict[str, Any]) -> str:
     )
 
 
+def _message_content(
+    content: Any,
+    content_ref: str | None,
+    blobs: BlobStore,
+    blob_url: Callable[[str], str] | None,
+) -> str:
+    if content_ref:
+        if blob_url is not None:
+            return (
+                f'<details class="content-lazy" data-url="{_e(blob_url(content_ref))}">'
+                "<summary>Large message content — open to load</summary>"
+                '<pre class="muted">not loaded</pre></details>'
+            )
+        try:
+            content = json.loads(blobs.get(content_ref).decode("utf-8"))
+        except (FileNotFoundError, UnicodeDecodeError, json.JSONDecodeError):
+            return '<p class="muted">large message content blob unavailable</p>'
+    if isinstance(content, str):
+        return f'<div class="message-text">{_e(content)}</div>'
+    blocks: list[str] = []
+    for block in content if isinstance(content, list) else [content]:
+        if not isinstance(block, dict):
+            blocks.append(
+                f'<pre class="raw-block">{_e(json.dumps(block, ensure_ascii=False))}</pre>'
+            )
+            continue
+        kind = block.get("type")
+        if kind == "thinking":
+            blocks.append(
+                '<details class="thinking"><summary>Thinking</summary>'
+                f'<div class="message-text">{_e(block.get("thinking", ""))}</div></details>'
+            )
+        elif kind == "text":
+            blocks.append(f'<div class="message-text">{_e(block.get("text", ""))}</div>')
+        elif kind == "toolCall":
+            args = block.get("arguments") or {}
+            blocks.append(
+                '<div class="tool-call"><div><strong>Tool call</strong> '
+                f"<code>{_e(block.get('name', '?'))}</code> "
+                f'<span class="muted">{_e(block.get("id", ""))}</span></div>'
+                f"<pre>{_e(json.dumps(args, indent=2, ensure_ascii=False))}</pre></div>"
+            )
+        else:
+            blocks.append(
+                f'<pre class="raw-block">{_e(json.dumps(block, indent=2, ensure_ascii=False))}</pre>'
+            )
+    return "".join(blocks)
+
+
+def _browser_side(
+    step: dict[str, Any] | None,
+    attached: dict[str, list[dict[str, Any]]],
+    blobs: BlobStore,
+    blob_url: Callable[[str], str] | None,
+) -> str:
+    if step is None or not (
+        step.get("browser")
+        or step.get("screenshot")
+        or step.get("dom_snapshot")
+        or (
+            step.get("tool_name") in (None, "bash")
+            and _EBROWSE_COMMAND.search(str(step.get("command", "")))
+        )
+    ):
+        return (
+            '<aside class="browser-side browser-empty" aria-label="No browser interaction"></aside>'
+        )
+    browser = step.get("browser", {}) if isinstance(step.get("browser"), dict) else {}
+    url, title = browser.get("url", ""), browser.get("title", "")
+    detail: list[str] = []
+    if browser:
+        detail.append("<h4>browser state</h4>" + _kv_table(browser))
+    detail.append("<h4>blobs</h4>" + _dom_snapshot_block(step.get("dom_snapshot"), blobs, blob_url))
+    events = attached.get("browser_event", [])
+    if events:
+        detail.append(
+            "<h4>browser events</h4><ul class='events'>"
+            + "".join(_browser_event_html(event, None) for event in events)
+            + "</ul>"
+        )
+    logs = attached.get("ebrowse_log", [])
+    if logs:
+        detail.append("<h4>ebrowse log</h4>" + _log_rows(logs))
+    error = step.get("error")
+    if isinstance(error, dict):
+        detail.append("<h4>error</h4><div class='error-box'>" + _kv_table(error) + "</div>")
+    unknown = attached.get("_unknown", [])
+    if unknown:
+        detail.append(
+            "<h4>other records</h4><pre>"
+            + _e("\n".join(json.dumps(record, ensure_ascii=False) for record in unknown))
+            + "</pre>"
+        )
+    return (
+        f'<aside class="browser-side"><div class="browser-label">Browser after action · step {_e(step.get("step", "?"))}</div>'
+        + _screenshot_cell(step.get("screenshot"), blobs, blob_url)
+        + f'<div class="pageid"><strong>{_e(title)}</strong><br><span class="url">{_e(url)}</span></div>'
+        + _timing_bar(step.get("timing", {}) or {})
+        + (
+            f'<div class="badges">{_anomaly_badges(attached.get("anomaly", []))}</div>'
+            if attached.get("anomaly")
+            else ""
+        )
+        + "<details class='internals'><summary>browser details</summary>"
+        + "".join(detail)
+        + "</details></aside>"
+    )
+
+
+def _conversation_row(
+    message: dict[str, Any],
+    step: dict[str, Any] | None,
+    attached: dict[str, list[dict[str, Any]]],
+    blobs: BlobStore,
+    blob_url: Callable[[str], str] | None,
+) -> str:
+    role = str(message.get("role", "message"))
+    label = "Starting prompt" if message.get("is_start") else role
+    turn = f" · turn {_e(message['turn'])}" if message.get("turn") is not None else ""
+    meta: list[str] = []
+    usage = message.get("usage")
+    if isinstance(usage, dict) and usage:
+        meta.append(" / ".join(f"{_e(k)} {_e(v)}" for k, v in usage.items() if k != "cost"))
+    if message.get("stop_reason"):
+        meta.append(f"stop {_e(message['stop_reason'])}")
+    if message.get("is_error"):
+        meta.append("error")
+    metadata = message.get("metadata")
+    anchor = f' id="step-{_e(step.get("step"))}"' if step else ""
+    return (
+        f'<section class="conversation-row role-{_e(role)}"{anchor}>'
+        '<article class="conversation-main">'
+        f'<div class="message-head"><strong>{_e(label)}</strong>{turn} '
+        f'<span class="muted">{_e(message.get("message_id", ""))}</span></div>'
+        + _message_content(
+            message.get("content"),
+            message.get("content_ref"),
+            blobs,
+            None if message.get("is_start") else blob_url,
+        )
+        + (f'<div class="stats">{" &middot; ".join(meta)}</div>' if meta else "")
+        + (
+            '<details class="message-metadata"><summary>message metadata</summary><pre>'
+            + _e(json.dumps(metadata, indent=2, ensure_ascii=False))
+            + "</pre></details>"
+            if isinstance(metadata, dict) and metadata
+            else ""
+        )
+        + "</article>"
+        + _browser_side(step, attached, blobs, blob_url)
+        + "</section>"
+    )
+
+
+def _prompt_text(
+    prompt: dict[str, Any], blobs: BlobStore, blob_url: Callable[[str], str] | None
+) -> str:
+    ref = prompt.get("text_ref")
+    if not ref:
+        return f"<pre>{_e(prompt.get('text', ''))}</pre>"
+    if blob_url is not None:
+        return f'<pre class="prompt-lazy muted" data-url="{_e(blob_url(ref))}">open to load</pre>'
+    try:
+        return f"<pre>{_e(blobs.get(ref).decode('utf-8'))}</pre>"
+    except (FileNotFoundError, UnicodeDecodeError):
+        return '<pre class="muted">prompt blob unavailable</pre>'
+
+
+def _prompt_panels(
+    prompts: list[dict[str, Any]],
+    blobs: BlobStore,
+    blob_url: Callable[[str], str] | None,
+) -> str:
+    systems = [prompt for prompt in prompts if prompt.get("kind") == "system"]
+    if not systems:
+        return ""
+    return (
+        '<div class="system-prompts">'
+        + "".join(
+            '<details class="system-prompt"><summary>Effective system prompt'
+            + (f" · revision {_e(prompt.get('sequence'))}" if len(systems) > 1 else "")
+            + f' <span class="muted">sha256:{_e(str(prompt.get("sha256", ""))[:12])}</span></summary>'
+            + _prompt_text(prompt, blobs, blob_url)
+            + "</details>"
+            for prompt in systems
+        )
+        + "</div>"
+    )
+
+
 def _header(
     meta: dict[str, Any] | None,
     end: dict[str, Any] | None,
     anomalies: list[dict[str, Any]],
     n_steps: int,
+    show_legacy_prompt: bool = True,
 ) -> str:
     meta = meta or {}
     end = end or {}
@@ -318,7 +511,7 @@ def _header(
     )
     return f"""<header>
 <h1>{_e(meta.get("task_id", "trace"))} <span class="outcome outcome-{_e(outcome)}">{_e(outcome)}</span></h1>
-<p class="prompt">{_e(meta.get("prompt", ""))}</p>
+{f'<p class="prompt">{_e(meta.get("prompt", ""))}</p>' if show_legacy_prompt else ""}
 <table class="kv">{fact_rows}</table>
 {config_block}
 <div class="totals">{n_steps} steps &middot; {totals_line}</div>
@@ -397,6 +590,26 @@ body:not(.show-debug) .log-debug { display:none; }
 .compact-page { color:var(--muted); } .compact-step code { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 @media (max-width:800px) { .compact-step { grid-template-columns:4.5rem 1fr; }
   .compact-thought,.compact-step code { grid-column:2; } }
+.system-prompts { margin:.8rem 0 1rem; }
+.system-prompt { background:var(--panel); border:1px solid var(--line); border-radius:6px;
+  padding:.4rem .65rem; }
+.system-prompt summary { cursor:pointer; font-weight:600; }
+.conversation-row { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:1.2rem;
+  border-bottom:1px solid var(--line); align-items:start; }
+.conversation-main,.browser-side { min-width:0; padding:1rem 0; }
+.browser-side { border-left:1px solid var(--line); padding-left:1.2rem; }
+.browser-empty { min-height:4rem; background:linear-gradient(90deg,color-mix(in srgb,var(--panel) 45%,transparent),transparent); }
+.message-head,.browser-label { color:var(--muted); font-size:.8rem; margin-bottom:.45rem; }
+.message-head strong { color:var(--fg); text-transform:capitalize; }
+.message-text { white-space:pre-wrap; overflow-wrap:anywhere; margin:.35rem 0; }
+.thinking { background:var(--panel); border-radius:6px; padding:.35rem .6rem; margin:.4rem 0; }
+.thinking summary { cursor:pointer; color:var(--muted); }
+.tool-call { border-left:3px solid var(--accent); padding:.4rem .65rem; margin:.5rem 0;
+  background:var(--panel); border-radius:0 6px 6px 0; }
+.tool-call pre,.raw-block { max-height:30rem; }
+.role-toolResult .conversation-main { background:color-mix(in srgb,var(--panel) 45%,transparent); padding:.8rem; }
+@media (max-width:800px) { .conversation-row { grid-template-columns:minmax(0,1fr) 180px; gap:.6rem; }
+  .browser-side { padding-left:.6rem; } }
 """
 
 _JS = """
@@ -404,12 +617,20 @@ document.getElementById('show-debug').addEventListener('change', function () {
   document.body.classList.toggle('show-debug', this.checked);
 });
 document.addEventListener('toggle', async function (event) {
-  const box = event.target.closest?.('.dom-lazy');
-  if (!box || !box.open || box.dataset.loaded) return;
-  box.dataset.loaded = '1';
-  const pre = box.querySelector('pre');
-  try { const response = await fetch(box.dataset.url); pre.textContent = await response.text(); }
-  catch (error) { pre.textContent = 'failed to load DomSnapshot: ' + error; }
+  const box = event.target.closest?.('.dom-lazy,.content-lazy');
+  if (box && box.open && !box.dataset.loaded) {
+    box.dataset.loaded = '1'; const pre = box.querySelector('pre');
+    try { const response = await fetch(box.dataset.url); pre.textContent = await response.text(); }
+    catch (error) { pre.textContent = 'failed to load content: ' + error; }
+  }
+  const system = event.target.closest?.('.system-prompt');
+  const prompt = system?.querySelector('.prompt-lazy');
+  if (system?.open && prompt && !prompt.dataset.loaded) {
+    prompt.dataset.loaded = '1';
+    try { const response = await fetch(prompt.dataset.url); prompt.textContent = await response.text();
+      prompt.classList.remove('muted'); }
+    catch (error) { prompt.textContent = 'failed to load system prompt: ' + error; }
+  }
 }, true);
 document.addEventListener('click', async function (event) {
   const button = event.target.closest?.('.load-chunk');
@@ -491,6 +712,11 @@ def render_run(
     meta = next((r for r in records if r.get("type") == "run_meta"), None)
     end = next((r for r in records if r.get("type") == "run_end"), None)
     steps = [r for r in records if r.get("type") == "step"]
+    messages = sorted(
+        (r for r in records if r.get("type") == "agent_message"),
+        key=lambda record: record.get("sequence", 0),
+    )
+    prompts = [r for r in records if r.get("type") == "prompt_snapshot"]
     anomalies = [r for r in records if r.get("type") == "anomaly"]
     summaries = [r for r in records if r.get("type") == "summary"]
     t0 = meta.get("ts") if meta and isinstance(meta.get("ts"), (int, float)) else None
@@ -507,14 +733,81 @@ def render_run(
     body: list[str] = []
     if back_href:
         body.append(f'<nav class="back"><a href="{_e(back_href)}">&larr; all runs</a></nav>')
-    body.append(_header(meta, end, anomalies, len(steps)))
+    body.append(_header(meta, end, anomalies, len(steps), show_legacy_prompt=not messages))
+    body.append(_prompt_panels(prompts, reader.blobs, blob_url))
 
     def full_step(step: dict[str, Any]) -> None:
         n = step.get("step")
         body.append(_step_row(step, attached.get(n, {}), reader.blobs, t0, blob_url))
         body.extend(markers_after.pop(n, []))
 
-    if compact_middle and fragment_url is not None and len(steps) > 35:
+    if messages:
+        start_prompt = next((p for p in prompts if p.get("kind") == "start"), None)
+        if start_prompt and not any(message.get("is_start") for message in messages):
+            start_text = str(start_prompt.get("text", ""))
+            if start_prompt.get("text_ref"):
+                try:
+                    start_text = reader.blobs.get(str(start_prompt["text_ref"])).decode("utf-8")
+                except (FileNotFoundError, UnicodeDecodeError):
+                    start_text = "starting prompt blob unavailable"
+            messages.insert(
+                0,
+                {
+                    "type": "agent_message",
+                    "sequence": 0,
+                    "message_id": "harness-start-prompt",
+                    "role": "user",
+                    "content": [{"type": "text", "text": start_text}],
+                    "is_start": True,
+                },
+            )
+        by_call = {
+            str(step.get("tool_call_id")): step
+            for step in steps
+            if step.get("tool_call_id") is not None
+        }
+        rendered_steps: set[Any] = set()
+        for message in messages:
+            step = (
+                by_call.get(str(message.get("tool_call_id")))
+                if message.get("tool_call_id")
+                else None
+            )
+            if step is not None:
+                rendered_steps.add(step.get("step"))
+            body.append(
+                _conversation_row(
+                    message,
+                    step,
+                    attached.get(step.get("step"), {}) if step else {},
+                    reader.blobs,
+                    blob_url,
+                )
+            )
+            if step is not None:
+                body.extend(markers_after.pop(step.get("step"), []))
+        for step in steps:
+            if step.get("step") in rendered_steps:
+                continue
+            fallback = {
+                "role": "toolResult",
+                "message_id": step.get("tool_call_id") or f"legacy-step-{step.get('step')}",
+                "content": [{"type": "text", "text": step.get("output", "")}],
+                "tool_call_id": step.get("tool_call_id"),
+                "tool_name": step.get("tool_name"),
+                "is_error": bool(step.get("error")),
+            }
+            body.append(
+                _conversation_row(
+                    fallback,
+                    step,
+                    attached.get(step.get("step"), {}),
+                    reader.blobs,
+                    blob_url,
+                )
+            )
+            body.extend(markers_after.pop(step.get("step"), []))
+    elif compact_middle and fragment_url is not None and len(steps) > 35:
         for step in steps[:25]:
             full_step(step)
         middle_end = len(steps) - 10
