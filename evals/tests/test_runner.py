@@ -53,7 +53,17 @@ class FakeHarness:
     def describe(self):
         return {"harness": "fake", "provider": "test", "model": "test-model"}
 
-    def run(self, prompt, workdir, env, timeout_s, run_dir, start_url=None, tool_call_limit=None):
+    def run(
+        self,
+        prompt,
+        workdir,
+        env,
+        timeout_s,
+        run_dir,
+        start_url=None,
+        tool_call_limit=None,
+        config=None,
+    ):
         self.calls.append(
             {
                 "prompt": prompt,
@@ -61,6 +71,7 @@ class FakeHarness:
                 "timeout_s": timeout_s,
                 "start_url": start_url,
                 "tool_call_limit": tool_call_limit,
+                "config": config,
             }
         )
         return self.result
@@ -151,6 +162,34 @@ def test_run_task_outcomes(tmp_path):
     assert run_task(task, capped, {}, tmp_path / "d").outcome == "tool_limit"
 
 
+def test_run_task_persists_structured_policy_block(tmp_path):
+    task = load_task(BENCH / "list-count")
+    harness = FakeHarness(
+        HarnessResult(
+            steps=[
+                ParsedStep(
+                    command="ebrowse eval document.title",
+                    output="blocked",
+                    is_error=True,
+                    tool_name="ebrowse",
+                    details={
+                        "error_class": "policy_block",
+                        "verb": "eval",
+                        "reason": "not enabled",
+                    },
+                )
+            ]
+        )
+    )
+    run_task(task, harness, {}, tmp_path / "policy")
+    step = TraceReader(tmp_path / "policy").steps()[0]
+    assert step.error == {
+        "class": "policy_block",
+        "verb": "eval",
+        "reason": "not enabled",
+    }
+
+
 def test_run_task_invokes_custom_evaluator_on_trace(tmp_path):
     task = load_task(BENCH / "custom-eval")
     harness = FakeHarness(
@@ -237,7 +276,7 @@ def test_pi_harness_stops_at_tool_call_limit(tmp_path):
     assert len(result.steps) == 2
 
 
-def test_pi_browser_harness_allows_only_bash_builtin(tmp_path):
+def test_pi_browser_harness_loads_only_custom_ebrowse_tool(tmp_path):
     argv_file = tmp_path / "argv.json"
     pi = tmp_path / "fake-pi"
     pi.write_text(
@@ -248,13 +287,28 @@ def test_pi_browser_harness_allows_only_bash_builtin(tmp_path):
     pi.chmod(0o755)
     run_dir = tmp_path / "run"
     run_dir.mkdir()
-    PiHarness(provider="p", model="m", tool="ebrowse", pi_bin=str(pi)).run(
-        "go", run_dir / "work", {}, 10, run_dir
+    ebrowse = tmp_path / "fake-ebrowse"
+    ebrowse.write_text("#!/bin/sh\nexit 0\n")
+    ebrowse.chmod(0o755)
+    PiHarness(
+        provider="p", model="m", tool="ebrowse", pi_bin=str(pi), ebrowse_bin=str(ebrowse)
+    ).run(
+        "go",
+        run_dir / "work",
+        {},
+        10,
+        run_dir,
+        config={"navigation_policy": "unrestricted"},
     )
     argv = json.loads(argv_file.read_text())
     tools_at = argv.index("--tools")
-    assert argv[tools_at + 1] == "bash"
-    assert "edit" not in argv and "write" not in argv
+    assert argv[tools_at + 1] == "ebrowse"
+    assert "--no-builtin-tools" in argv
+    assert "--no-extensions" in argv
+    assert "--no-skills" in argv
+    assert "--no-prompt-templates" in argv
+    assert "--no-context-files" in argv
+    assert "bash" not in argv and "edit" not in argv and "write" not in argv
 
 
 def test_pi_harness_filters_cumulative_updates_and_keeps_fallback(tmp_path):
@@ -366,6 +420,45 @@ def test_parse_pi_session_sample_fixture():
     assert step.tool_call_id == "tool-1"
     assert step.tool_name == "bash"
     assert result.messages[2].tool_call_id == "tool-1"
+
+
+def test_parse_custom_ebrowse_call_and_policy_details():
+    entries = [
+        {
+            "type": "message",
+            "id": "a1",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "toolCall",
+                        "id": "c1",
+                        "name": "ebrowse",
+                        "arguments": {"command": "eval document.title"},
+                    }
+                ],
+            },
+        },
+        {
+            "type": "message",
+            "id": "r1",
+            "message": {
+                "role": "toolResult",
+                "toolCallId": "c1",
+                "toolName": "ebrowse",
+                "content": [{"type": "text", "text": "blocked"}],
+                "isError": True,
+                "details": {
+                    "error_class": "policy_block",
+                    "verb": "eval",
+                    "reason": "not allowed",
+                },
+            },
+        },
+    ]
+    result = parse_pi_session(entries)
+    assert result.steps[0].command == "ebrowse eval document.title"
+    assert result.steps[0].details["error_class"] == "policy_block"
 
 
 def test_run_task_persists_prompts_messages_and_step_links(tmp_path):

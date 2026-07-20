@@ -8,6 +8,11 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- Pi/ebrowse evals now expose one shell-free custom browser tool instead of
+  Bash. A configurable verb/argument/output/timeout policy blocks `eval`, file
+  upload, process control, CDP attachment, session overrides, and caller-chosen
+  paths by default; task-host navigation is enforced for explicit opens,
+  clicks, redirects, and popups, with structured policy errors retained in traces.
 - Eval traces now preserve the exact starting prompt, Pi's effective system
   prompt, and every finalized conversation message/content block. The viewer is
   conversation-first with a fixed browser-state side lane on every row and
@@ -39,7 +44,7 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   fully resolved into `run_meta` alongside git sha/dirty + ebrowse version/mode,
   a generic `AgentHarness` protocol with a `PiHarness` implementation (tool-guide
   prepending, `experiments/.env` defaults, JSON event + pi session capture,
-  isolated per-run workdir, `--worktree` PATH shim with daemon stop), and one
+  isolated per-run workdir, fixed worktree executable with daemon stop), and one
   Step trace record per agent tool-call with a `StepCapture` hook for the
   browser-state capture layer. Per-task `eval.py` (or declarative `expected`)
   results land in `run_end`.
@@ -66,7 +71,7 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   stored DomSnapshot blob through pure core). Concise deterministic plain text,
   `--json` everywhere; documented in `evals/docs/inspect.md`.
 - **Phase 2 wiring: capture + debug log flow into `ebrowse-eval run` traces.**
-  The runner's ebrowse shim now instruments every call (on by default for
+  The trusted browser-tool launcher instruments every allowed call (on by default for
   ebrowse runs; `--no-capture` to disable): per-call `EBROWSE_REQUEST_ID=call-<n>`,
   a synchronous post-call debug-capture spool, and the daemon debug log enabled
   via env. `ebrowse_evals.ingest` joins both back to steps ordinally after the

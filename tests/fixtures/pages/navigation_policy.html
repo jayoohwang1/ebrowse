@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Navigation policy fixture</title></head>
+<body>
+  <main>
+    <h1>Navigation policy fixture</h1>
+    <a id="leave" href="/form.html">Leave through another hostname</a>
+    <button id="popup">Open another-host popup</button>
+  </main>
+  <script>
+    const outside = `http://localhost:${location.port}/form.html`;
+    document.querySelector('#leave').href = outside;
+    document.querySelector('#popup').addEventListener('click', () => window.open(outside, '_blank'));
+  </script>
+</body>
+</html>

@@ -2,3 +2,7 @@
 prompt = "Check the specifications of the best-selling HP FHD laptop with 16 GB RAM and core i7 running on Windows 11."
 url = "https://www.bestbuy.com/"
 tags = ["online-mind2web", "hard", "reachable"]
+
+[config]
+# Geo redirect observed from the Edmonton test machine.
+navigation_allowed_domains = ["www.bestbuy.ca", "assets.bbystatic.com"]

@@ -36,13 +36,13 @@ the previous verb's observation when no possibly-mutating verb ran since. Any
 capture failure degrades to a partial step plus an `anomaly` record; it never
 raises into the runner. Details in `src/ebrowse_evals/capture.py`.
 
-For pi runs the capture moment is the **instrumented shim**: `run` (unless
-`--no-capture`; ebrowse-only) wraps the `ebrowse` command so each invocation
-is numbered, stamped with `EBROWSE_REQUEST_ID=call-<n>`, and followed
-synchronously by a debug-capture spool to `capture/<n>.json`; the shim env also
+For Pi runs the capture moment is the **browser-only tool launcher**: `run`
+(unless `--no-capture`; ebrowse-only) numbers each allowed invocation, stamps it
+with `EBROWSE_REQUEST_ID=call-<n>`, and follows it synchronously with a
+debug-capture spool to `capture/<n>.json`; the launcher env also
 enables the daemon's tier-1 debug log (`ebrowse-debug.jsonl`). After the run,
-`ingest.py` joins both back to trace steps *ordinally* (the n-th
-ebrowse-invoking step is call n — no timestamp heuristics; mismatches surface
+`ingest.py` joins both back to trace steps *ordinally* (the n-th executed,
+non-policy-blocked ebrowse step is call n — no timestamp heuristics; mismatches surface
 as a `join_mismatch` anomaly), fills each step's browser/screenshot/DomSnapshot
 fields, re-emits daemon events as `ebrowse_log` records, promotes warn-level
 anomaly events to `anomaly` records, and rolls phase timings into `step.timing`.
@@ -69,11 +69,16 @@ finalized conversation message, and every tool result. The viewer aligns each
 browser-interacting result with post-action browser state in a fixed side lane;
 see [docs/viewer.md](docs/viewer.md).
 
+Pi/ebrowse runs expose no Bash or filesystem tools. They use one shell-free custom
+tool with a standard browser-verb allowlist and task-host navigation restriction;
+`eval`, upload, process control, CDP attachment, and caller-selected paths are blocked
+by default. See [docs/pi-browser-policy.md](docs/pi-browser-policy.md).
+
 `run` selects tasks (`--task` globs OR, `--tag` AND, `--sample N --seed S`),
 layers config (harness defaults → benchmark `[config]` → task `[config]` →
 flags), and persists the resolved config + git sha + ebrowse version/mode in
-each run's `run_meta`. `--worktree` is the port of `run-agent.sh -w`: it shims
-`ebrowse` to this checkout's `.venv` and stops any running daemon first. The
+each run's `run_meta`. `--worktree` selects this checkout's `.venv` as the fixed
+ebrowse target and stops any running per-run daemon first. The
 agent boundary is the `AgentHarness` protocol (`harness.py`); `runner.StepCapture`
 is the hook where the capture layer enriches each step.
 

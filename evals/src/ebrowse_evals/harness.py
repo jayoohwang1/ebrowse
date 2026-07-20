@@ -4,7 +4,7 @@ The runner talks to agents only through the ``AgentHarness`` protocol: give it
 a prompt, a working dir, env, and a timeout; get back parsed steps + totals.
 ``PiHarness`` is the concrete implementation, a port of
 ``experiments/run-agent.sh`` — tool-guide prepending, pi invocation, JSON
-event capture, and the worktree PATH shim. Tests use a fake harness; nothing
+event capture, and the browser-only Pi extension. Tests use a fake harness; nothing
 in the runner or trace layer knows what "pi" is.
 
 Session parsing mirrors ``experiments/inspect-session.py``: each assistant
@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
+from urllib.parse import urlsplit
 
 PROMPT_FILE = "prompt.txt"
 PI_EVENTS_FILE = "pi-events.jsonl"
@@ -39,7 +40,14 @@ SESSION_DIR = "session"
 SPOOL_DIR = "capture"  # per-call debug-capture payloads: capture/<n>.json
 DEBUG_LOG_FILE = "ebrowse-debug.jsonl"  # daemon tier-1 events (EBROWSE_DEBUG_LOG)
 SYSTEM_PROMPTS_FILE = "system-prompts.jsonl"
+TOOL_POLICY_FILE = "browser-tool-policy.json"
 DEFAULT_PI_EVENTS_MAX_BYTES = 64 * 1024 * 1024
+
+BROWSER_SYSTEM_PROMPT = """You are a browser automation agent completing one assigned task.
+Use only the provided ebrowse tool to inspect and interact with the task website.
+Do not claim success unless the browser state supports it. If a tool action is
+blocked by policy, do not try to bypass the restriction; use the standard
+browser operations available to you or explain that the task could not be completed."""
 
 
 @dataclass(slots=True)
@@ -56,6 +64,7 @@ class ParsedStep:
     tool_call_id: str | None = None
     tool_name: str | None = None
     call_index: int | None = None
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -111,6 +120,7 @@ class AgentHarness(Protocol):
         run_dir: Path,
         start_url: str | None = None,
         tool_call_limit: int | None = None,
+        config: dict[str, Any] | None = None,
     ) -> HarnessResult:
         """Execute one task. Artifacts (prompt, events, session) land in run_dir."""
         ...
@@ -170,7 +180,10 @@ def parse_pi_session(entries: list[dict[str, Any]]) -> HarnessResult:
                 if isinstance(c, dict) and c.get("type") == "toolCall":
                     call_index += 1
                     args = c.get("arguments") or {}
-                    command = args.get("command") or json.dumps(args)
+                    if c.get("name") == "ebrowse" and isinstance(args.get("command"), str):
+                        command = f"ebrowse {args['command']}"
+                    else:
+                        command = args.get("command") or json.dumps(args)
                     call_id = str(c.get("id"))
                     step = ParsedStep(
                         command=str(command),
@@ -194,6 +207,7 @@ def parse_pi_session(entries: list[dict[str, Any]]) -> HarnessResult:
             if step is not None:
                 step.output = _text(m.get("content"))
                 step.is_error = bool(m.get("isError"))
+                step.details = dict(m.get("details") or {})
                 done = _ts(m.get("timestamp"))
                 begun = issued_at.get(call_id)
                 if done is not None and begun is not None:
@@ -271,6 +285,40 @@ def load_env_file(path: Path) -> dict[str, str]:
     return env
 
 
+def resolve_navigation_domains(
+    start_url: str | None,
+    mode: str,
+    configured: list[str] | tuple[str, ...],
+) -> list[str]:
+    """Resolve task navigation scope to ebrowse's allowed-domain format."""
+    extras = [str(value).strip().lower().rstrip(".") for value in configured if str(value).strip()]
+    if mode == "unrestricted":
+        return []
+    if mode not in {"task-host", "allowlist"}:
+        raise ValueError(
+            f"unknown navigation_policy {mode!r} (want task-host|allowlist|unrestricted)"
+        )
+    domains = list(extras)
+    if mode == "task-host":
+        host = urlsplit(start_url or "").hostname
+        if not host:
+            raise ValueError(
+                "navigation_policy='task-host' requires task.url — set a URL, use "
+                "'allowlist' with navigation_allowed_domains, or choose 'unrestricted'"
+            )
+        domains.insert(0, host.lower().rstrip("."))
+    if not domains:
+        raise ValueError("navigation allowlist is empty — configure navigation_allowed_domains")
+    return list(dict.fromkeys(domains))
+
+
+def _string_list_config(config: dict[str, Any], key: str) -> list[str]:
+    value = config.get(key) or []
+    if not isinstance(value, (list, tuple)) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"{key} must be an array of strings")
+    return list(value)
+
+
 @dataclass(slots=True)
 class PiHarness:
     """Drives the pi coding agent as a subprocess, like run-agent.sh does."""
@@ -291,6 +339,7 @@ class PiHarness:
             "provider": self.provider,
             "model": self.model,
             "tool": self.tool,
+            "tool_mode": "browser-only" if self.tool == "ebrowse" else "builtin",
         }
 
     def tool_preamble(self) -> str:
@@ -312,68 +361,22 @@ class PiHarness:
             return ""
         raise ValueError(f"unknown tool: {self.tool} (want ebrowse|agent-browser|none)")
 
-    def _shim_target(self) -> str:
-        """The real ebrowse invocation the shim wraps (quoted shell fragment)."""
+    def _ebrowse_target(self) -> tuple[str, list[str]]:
+        """Fixed executable + prefix used by setup and the policy launcher."""
         if self.worktree:
             venv_py = self.repo_root / ".venv" / "bin" / "python"
             if not venv_py.exists():
                 raise FileNotFoundError(
                     f"no venv at {venv_py} — run 'uv sync' in {self.repo_root} first"
                 )
-            return f'"{venv_py}" -m ebrowse.cli.main'
+            return str(venv_py), ["-m", "ebrowse.cli.main"]
         real = self.ebrowse_bin or shutil.which("ebrowse")
         if real is None:
             raise FileNotFoundError(
                 "no `ebrowse` on PATH to instrument — install it (uv tool install) "
                 "or pass --worktree to use this checkout's venv"
             )
-        return f'"{real}"'
-
-    def _install_shim(self, run_dir: Path, env: dict[str, str]) -> None:
-        """Wrap `ebrowse` for worktree redirection and/or per-call capture.
-
-        The shim is the ONE place in the whole harness that runs at exactly the
-        right moment for post-action state: synchronously after each ebrowse
-        call, before the agent's next turn. With capture on it (a) numbers the
-        call, (b) exports EBROWSE_REQUEST_ID=call-<n> so the daemon's debug
-        events join deterministically to this call, and (c) spools a
-        debug-capture payload to capture/<n>.json. EBROWSE_EVAL_NOHOOK skips
-        the instrumentation (used for our own setup calls below)."""
-        target = self._shim_target()
-        shim_dir = run_dir / "bin"
-        shim_dir.mkdir(parents=True, exist_ok=True)
-        shim = shim_dir / "ebrowse"
-        if self.capture:
-            spool = run_dir / SPOOL_DIR
-            spool.mkdir(parents=True, exist_ok=True)
-            # The agent drives commands serially, so the naive counter file is
-            # race-free in practice; a torn read only skips a spool slot.
-            shim.write_text(
-                "#!/usr/bin/env bash\n"
-                f'if [ -n "$EBROWSE_EVAL_NOHOOK" ]; then exec {target} "$@"; fi\n'
-                f'ctr="{spool}/seq"\n'
-                'n=$(( $(cat "$ctr" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$ctr"\n'
-                'export EBROWSE_REQUEST_ID="call-$n"\n'
-                f'{target} "$@"\n'
-                "rc=$?\n"
-                f'"{sys.executable}" -m ebrowse_evals.capture_hook "{spool}/$n.json" || true\n'
-                "exit $rc\n"
-            )
-            # The daemon reads its config env at startup; it inherits ours via
-            # the first shimmed call (we stop any old daemon below).
-            env["EBROWSE_DEBUG_LOG"] = str(run_dir / DEBUG_LOG_FILE)
-        else:
-            shim.write_text(f'#!/usr/bin/env bash\nexec {target} "$@"\n')
-        shim.chmod(0o755)
-        env["PATH"] = f"{shim_dir}{os.pathsep}{env.get('PATH', os.defpath)}"
-        # Free the socket so the agent's first call restarts the daemon on the
-        # shimmed code/env (local venv and/or EBROWSE_DEBUG_LOG).
-        subprocess.run(
-            [str(shim), "daemon", "stop"],
-            env={**env, "EBROWSE_EVAL_NOHOOK": "1"},
-            capture_output=True,
-            check=False,
-        )
+        return str(real), []
 
     def run(
         self,
@@ -384,12 +387,14 @@ class PiHarness:
         run_dir: Path,
         start_url: str | None = None,
         tool_call_limit: int | None = None,
+        config: dict[str, Any] | None = None,
     ) -> HarnessResult:
         if shutil.which(self.pi_bin) is None:
             raise FileNotFoundError(
                 f"'{self.pi_bin}' not on PATH — npm i -g @earendil-works/pi-coding-agent"
             )
         full_env = {**os.environ, **env}
+        config = config or {}
         # Every eval run owns its daemon socket, Chromium profile, and caches.
         # This makes parallel runs independent and prevents one run's setup or
         # teardown from stopping another run's browser.
@@ -410,15 +415,62 @@ class PiHarness:
             if shared_browsers.is_dir():
                 full_env["PLAYWRIGHT_BROWSERS_PATH"] = str(shared_browsers)
         full_env["XDG_CACHE_HOME"] = str(cache_dir)
-        if self.worktree or self.capture:
-            self._install_shim(run_dir, full_env)
-        ebrowse_cmd = shutil.which("ebrowse", path=full_env.get("PATH"))
+        ebrowse_target: tuple[str, list[str]] | None = None
+        if self.tool == "ebrowse":
+            ebrowse_target = self._ebrowse_target()
+            domains = resolve_navigation_domains(
+                start_url,
+                str(config.get("navigation_policy", "task-host")),
+                _string_list_config(config, "navigation_allowed_domains"),
+            )
+            if domains:
+                full_env["EBROWSE_SECURITY_ALLOWED_DOMAINS"] = ",".join(domains)
+            else:
+                full_env.pop("EBROWSE_SECURITY_ALLOWED_DOMAINS", None)
+            if self.capture:
+                full_env["EBROWSE_DEBUG_LOG"] = str(run_dir / DEBUG_LOG_FILE)
+            executable, prefix = ebrowse_target
+            subprocess.run(
+                [executable, *prefix, "daemon", "stop"],
+                env=full_env,
+                capture_output=True,
+                check=False,
+            )
+            allowed_verbs = _string_list_config(config, "ebrowse_allowed_verbs")
+            from ebrowse_evals.pi_tool import DEFAULT_ALLOWED_VERBS
+
+            if not allowed_verbs:
+                allowed_verbs = list(DEFAULT_ALLOWED_VERBS)
+            policy_path = run_dir / TOOL_POLICY_FILE
+            policy_path.write_text(
+                json.dumps(
+                    {
+                        "executable": executable,
+                        "argv_prefix": prefix,
+                        "run_dir": str(run_dir),
+                        "allowed_verbs": allowed_verbs,
+                        "allowed_domains": domains,
+                        "timeout_s": float(config.get("ebrowse_tool_timeout_s", 150.0)),
+                        "max_args_bytes": int(config.get("ebrowse_tool_args_max_bytes", 16_384)),
+                        "max_output_bytes": int(
+                            config.get("ebrowse_tool_output_max_bytes", 262_144)
+                        ),
+                        "capture": self.capture,
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            full_env["EBROWSE_EVAL_TOOL_POLICY"] = str(policy_path)
+            full_env["EBROWSE_EVAL_PYTHON"] = sys.executable
         opened = False
-        if start_url and self.tool == "ebrowse" and ebrowse_cmd:
+        if start_url and ebrowse_target is not None:
+            executable, prefix = ebrowse_target
             try:
                 initial = subprocess.run(
-                    [ebrowse_cmd, "open", start_url],
-                    env={**full_env, "EBROWSE_EVAL_NOHOOK": "1"},
+                    [executable, *prefix, "open", start_url],
+                    env=full_env,
                     capture_output=True,
                     text=True,
                     check=False,
@@ -442,8 +494,9 @@ class PiHarness:
             )
         if self.tool == "ebrowse":
             site_instruction += (
-                "Invoke the browser CLI directly as `ebrowse ...`. Do not prefix it with "
-                "`uv run` and do not use `python -m ebrowse`.\n"
+                "Use the `ebrowse` tool and omit the `ebrowse` prefix from its command. "
+                'For example, `ebrowse outline` is {"command":"outline"}. Shell '
+                "operators, redirection, and expansion are unavailable.\n"
             )
         full_prompt = f"{self.tool_preamble()}{site_instruction}\n# Task\n{prompt}"
         (run_dir / PROMPT_FILE).write_text(full_prompt, encoding="utf-8")
@@ -461,12 +514,33 @@ class PiHarness:
             "--name",
             run_dir.name,
         ]
+        if self.tool == "ebrowse":
+            cmd.extend(
+                [
+                    "--system-prompt",
+                    BROWSER_SYSTEM_PROMPT,
+                    "--no-builtin-tools",
+                    "--no-extensions",
+                    "--no-skills",
+                    "--no-prompt-templates",
+                    "--no-context-files",
+                    "--no-approve",
+                    "--offline",
+                ]
+            )
         system_prompts_path = run_dir / SYSTEM_PROMPTS_FILE
         observer = Path(__file__).resolve().parents[2] / "pi_extensions" / "trace-observer.ts"
         if observer.is_file():
             cmd.extend(["--extension", str(observer)])
             full_env["EBROWSE_EVAL_SYSTEM_PROMPTS"] = str(system_prompts_path)
-        if self.tool in {"ebrowse", "agent-browser"}:
+        if self.tool == "ebrowse":
+            browser_extension = (
+                Path(__file__).resolve().parents[2] / "pi_extensions" / "ebrowse-tool.ts"
+            )
+            if not browser_extension.is_file():
+                raise FileNotFoundError(f"missing Pi browser extension: {browser_extension}")
+            cmd.extend(["--extension", str(browser_extension), "--tools", "ebrowse"])
+        elif self.tool == "agent-browser":
             cmd.extend(["--tools", "bash"])
         cmd.extend(["--mode", "json", "-p", full_prompt])
         timed_out = False
@@ -602,10 +676,11 @@ class PiHarness:
         result.exit_code = exit_code
         result.timed_out = timed_out
         result.tool_limit_hit = tool_limit_hit
-        if ebrowse_cmd:
+        if ebrowse_target is not None:
+            executable, prefix = ebrowse_target
             subprocess.run(
-                [ebrowse_cmd, "daemon", "stop"],
-                env={**full_env, "EBROWSE_EVAL_NOHOOK": "1"},
+                [executable, *prefix, "daemon", "stop"],
+                env=full_env,
                 capture_output=True,
                 check=False,
             )

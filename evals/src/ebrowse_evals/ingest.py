@@ -1,14 +1,14 @@
-"""Post-run join: shim capture spool + daemon debug log -> trace records.
+"""Post-run join: browser-tool capture spool + daemon debug log -> trace records.
 
-The shim (harness.py) numbers every ebrowse invocation: call n spools its
+The trusted policy launcher numbers every executed ebrowse invocation: call n spools its
 debug-capture payload to capture/<n>.json and stamps EBROWSE_REQUEST_ID=call-<n>
 on the daemon request. The join back to trace steps is therefore *ordinal and
-deterministic*: the n-th ebrowse-invoking step in the parsed session is call n.
+deterministic*: the n-th executed ebrowse step in the parsed session is call n.
 No timestamp heuristics — a count mismatch is reported as a ``join_mismatch``
 anomaly rather than silently mis-attributed.
 
-Non-ebrowse steps (plain shell commands) get no capture fields: the browser
-state cannot have changed, and the viewer's filmstrip carries the previous
+Policy-blocked custom-tool calls and non-ebrowse steps get no capture fields:
+the browser state cannot have changed, and the viewer carries the previous
 step's screenshot forward visually.
 """
 
@@ -48,9 +48,13 @@ def ebrowse_call_steps(steps: list[Step]) -> dict[int, Step]:
     out: dict[int, Step] = {}
     n = 0
     for step in steps:
-        # Only bash can invoke the CLI. JSON arguments to edit/write tools can
-        # contain quoted `ebrowse ...` examples and must not consume a slot.
-        if step.tool_name in (None, "bash") and _EBROWSE_CMD.search(step.command):
+        custom_call = step.tool_name == "ebrowse" and (
+            not step.error or step.error.get("class") != "policy_block"
+        )
+        # Legacy traces used bash. JSON arguments to edit/write tools can contain
+        # quoted `ebrowse ...` examples and must not consume a capture slot.
+        legacy_call = step.tool_name in (None, "bash") and _EBROWSE_CMD.search(step.command)
+        if custom_call or legacy_call:
             n += 1
             out[n] = step
     return out

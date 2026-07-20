@@ -1,4 +1,4 @@
-# 0014 — Eval harness: in-repo package, replay over logging, ordinal shim join
+# 0014 — Eval harness: in-repo package, replay over logging, ordinal command join
 
 Status: accepted (2026-07-18)
 
@@ -23,13 +23,13 @@ reader.
    (`ebrowse-eval replay`) rather than logged. Only what live replay cannot
    reproduce is recorded at run time: timings, action execution, ref
    lifecycle, diff verdicts, anomalies, page events.
-3. **Ordinal shim join, no timestamp heuristics.** pi runs to completion and
+3. **Ordinal command join, no timestamp heuristics.** pi runs to completion and
    steps are parsed post-hoc, so the runner cannot hook tool-calls live.
-   Instead the PATH shim that already wraps `ebrowse` numbers every
+   Instead the trusted wrapper around `ebrowse` numbers every
    invocation: it exports `EBROWSE_REQUEST_ID=call-<n>`, then synchronously
    spools a `debug-capture` payload to `capture/<n>.json` — the only moment
    post-action state is observable. After the run, `ingest.py` joins both to
-   trace steps ordinally (the n-th ebrowse-invoking step is call n); a count
+   trace steps ordinally (the n-th executed ebrowse step is call n); a count
    mismatch is surfaced as a `join_mismatch` anomaly, never silently
    mis-attributed.
 
@@ -37,7 +37,7 @@ reader.
 
 - Traces are self-sufficient for offline analysis: new render/split/diff code
   can be evaluated against every stored trajectory without re-running agents.
-- Capture and debug logging apply only to ebrowse-driven runs (the shim is
+- Capture and debug logging apply only to ebrowse-driven runs (the wrapper is
   the instrumentation point); other tools get agent-side records only.
 - Paths embedded in the shim/subprocess args must be absolute (the agent's
   cwd differs); pi's session lands only at exit, so the streamed event log is

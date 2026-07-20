@@ -197,6 +197,7 @@ def test_allowed_domains_enforced_on_landed_urls():
     cfg.security.allowed_domains = ["example.com"]
     s = Session("t", cfg)
     s._check_url_allowed("https://example.com/x")  # exact domain ok
+    s._check_url_allowed("https://example.com:8443/x")  # ports do not change the domain
     s._check_url_allowed("https://shop.example.com/")  # subdomain ok
     s._check_url_allowed("about:blank", landed=True)  # non-http landed pages skip
     with pytest.raises(CommandError) as ei:

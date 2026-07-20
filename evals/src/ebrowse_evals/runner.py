@@ -34,7 +34,13 @@ HARNESS_DEFAULTS: dict[str, Any] = {
     "timeout_s": 600.0,
     "tool_call_limit": 200,
     "jobs": 1,
-    "capture": True,  # instrument the ebrowse shim (spool + debug log); ebrowse-only
+    "capture": True,  # browser tool spools post-call state + debug log; ebrowse-only
+    "navigation_policy": "task-host",
+    "navigation_allowed_domains": [],
+    "ebrowse_allowed_verbs": [],  # empty resolves to the browser-only standard profile
+    "ebrowse_tool_timeout_s": 150.0,
+    "ebrowse_tool_args_max_bytes": 16_384,
+    "ebrowse_tool_output_max_bytes": 262_144,
 }
 _MAX_INLINE_TRANSCRIPT_BYTES = 200_000
 
@@ -165,6 +171,7 @@ def run_task(
         run_dir=run_dir,
         start_url=task.url,
         tool_call_limit=config.get("tool_call_limit"),
+        config=config,
     )
     if result.start_prompt:
         start_bytes = result.start_prompt.encode()
@@ -231,10 +238,26 @@ def run_task(
             step=i,
             command=ps.command,
             output=ps.output,
+            exit_code=(
+                int(ps.details["exit_code"])
+                if isinstance(ps.details.get("exit_code"), int)
+                else None
+            ),
             agent_text=ps.agent_text,
             tokens=ps.tokens,
             latency_s=ps.latency_s,
-            error={"class": "tool_error"} if ps.is_error else None,
+            error=(
+                {
+                    "class": str(ps.details.get("error_class") or "tool_error"),
+                    **{
+                        key: ps.details[key]
+                        for key in ("verb", "reason", "exit_code", "timed_out")
+                        if ps.details.get(key) is not None
+                    },
+                }
+                if ps.is_error
+                else None
+            ),
             message_id=ps.message_id,
             tool_call_id=ps.tool_call_id,
             tool_name=ps.tool_name,

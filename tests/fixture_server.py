@@ -22,6 +22,15 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:
         pass
 
+    def do_GET(self) -> None:
+        if self.path == "/redirect-to-localhost":
+            port = self.server.server_address[1]
+            self.send_response(302)
+            self.send_header("Location", f"http://localhost:{port}/form.html")
+            self.end_headers()
+            return
+        super().do_GET()
+
 
 class FixtureServer:
     def __init__(self, port: int = 0) -> None:

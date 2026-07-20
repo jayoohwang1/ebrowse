@@ -56,6 +56,9 @@ Pi traces use the saved session's finalized messages as transcript ground
 truth. Streaming `message_update` snapshots are never persisted. An eval-owned
 Pi extension observes `ctx.getSystemPrompt()` at `agent_start`, after Pi has
 assembled tools, context files, skills, and per-run prompt modifications.
+Browser-policy rejections remain finalized tool results and set the owning
+`step.error` to `{class: "policy_block", verb, reason}`. They have no browser
+capture because the trusted launcher did not execute a browser command.
 
 ## Tooling
 

@@ -1,14 +1,11 @@
-"""Post-run join of shim spool + debug log into the trace (ingest.py), and the
-instrumented shim itself (harness._install_shim) executed against a stub."""
+"""Post-run join of browser-tool capture spool + debug log into the trace."""
 
 import base64
 import json
-import os
-import subprocess
 from pathlib import Path
 
 from ebrowse_evals import ingest
-from ebrowse_evals.harness import DEBUG_LOG_FILE, SPOOL_DIR, PiHarness
+from ebrowse_evals.harness import DEBUG_LOG_FILE, SPOOL_DIR
 from ebrowse_evals.trace.records import Anomaly, BrowserEvent, EbrowseLog, RunMeta, Step
 from ebrowse_evals.trace.store import TraceReader, TraceWriter
 
@@ -41,6 +38,20 @@ def test_ebrowse_call_steps_ignores_non_bash_tool_arguments():
         Step(step=2, tool_name="bash", command="ebrowse outline"),
     ]
     assert ingest.ebrowse_call_steps(steps) == {1: steps[1]}
+
+
+def test_ebrowse_call_steps_custom_tool_skips_policy_blocks():
+    steps = [
+        Step(step=1, tool_name="ebrowse", command="ebrowse outline"),
+        Step(
+            step=2,
+            tool_name="ebrowse",
+            command="ebrowse eval 1+1",
+            error={"class": "policy_block"},
+        ),
+        Step(step=3, tool_name="ebrowse", command="ebrowse click @e1"),
+    ]
+    assert ingest.ebrowse_call_steps(steps) == {1: steps[0], 2: steps[2]}
 
 
 def test_attach_spool_fills_steps_and_events(tmp_path):
@@ -130,35 +141,6 @@ def test_attach_debug_log_joins_and_promotes(tmp_path):
     assert steps[0].timing == {"capture": 0.2}
 
 
-def test_instrumented_shim_end_to_end(tmp_path):
-    """Execute the generated shim against a stub target: counter increments,
-    EBROWSE_REQUEST_ID is stamped per call, spool entries appear, NOHOOK skips."""
-    stub = tmp_path / "stub-ebrowse"
-    log = tmp_path / "calls.log"
-    stub.write_text(f'#!/usr/bin/env bash\necho "$EBROWSE_REQUEST_ID $@" >> "{log}"\n')
-    stub.chmod(0o755)
-    h = PiHarness(provider="p", model="m", tool="ebrowse", capture=True, ebrowse_bin=str(stub))
-    run_dir = tmp_path / "run"
-    env: dict[str, str] = {"PATH": os.defpath}
-    h._install_shim(run_dir, env)
-    assert env["EBROWSE_DEBUG_LOG"] == str(run_dir / DEBUG_LOG_FILE)
-
-    shim = run_dir / "bin" / "ebrowse"
-    subprocess.run([str(shim), "open", "http://x"], env=env, check=True, timeout=30)
-    subprocess.run([str(shim), "click", "@e1"], env=env, check=True, timeout=30)
-    calls = log.read_text().splitlines()
-    # setup's `daemon stop` ran with NOHOOK: no request id, no spool slot
-    assert calls[0].split() == ["daemon", "stop"]
-    assert calls[1].split() == ["call-1", "open", "http://x"]
-    assert calls[2].split() == ["call-2", "click", "@e1"]
-    spool = run_dir / SPOOL_DIR
-    assert (spool / "seq").read_text().strip() == "2"
-    # no daemon running -> the hook spools hook_error payloads, exit code still 0
-    for n in (1, 2):
-        payload = json.loads((spool / f"{n}.json").read_text())
-        assert "hook_error" in payload or "browser" in payload
-
-
 def _written(run_dir: Path):
     from ebrowse_evals.trace.records import record_from_dict
 
@@ -178,7 +160,15 @@ def test_run_task_ingests_shim_artifacts(tmp_path):
             return {"harness": "fake"}
 
         def run(
-            self, prompt, workdir, env, timeout_s, run_dir, start_url=None, tool_call_limit=None
+            self,
+            prompt,
+            workdir,
+            env,
+            timeout_s,
+            run_dir,
+            start_url=None,
+            tool_call_limit=None,
+            config=None,
         ):
             _spool(run_dir / SPOOL_DIR, 1, {"browser": {"url": "http://x"}})
             (run_dir / DEBUG_LOG_FILE).write_text(
