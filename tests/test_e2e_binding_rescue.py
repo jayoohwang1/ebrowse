@@ -121,3 +121,80 @@ def test_dead_binding_error_names_reoutline(server, env):
     r = ebrowse(env, "click", button)
     assert r.returncode == 0, r.stderr
     assert "search-clicked: replaced" in r.stdout
+
+
+def test_identical_siblings_reorder_witness_picks_bound_node(server, env):
+    """Three descriptor-identical Buy buttons; a delayed reorder (past the
+    quiescence window) shifts nth positions while identity facts still verify.
+    The witness geometry check must act on the BOUND node: Alpha's old ref
+    buys Alpha (now last), not whatever sits at nth 0 now."""
+    r = ebrowse(env, "open", server.url("identical_row.html"))
+    assert r.returncode == 0, r.stderr
+    out = ebrowse(env, "outline").stdout
+    sids = re.findall(r"^(s\d+) ", out, re.M)
+    buys: list[str] = []
+    for sid in sids:
+        text = ebrowse(env, "expand", sid, "--all").stdout
+        buys += re.findall(r"\[Buy \((@e\d+)\)\]", text)
+    assert len(buys) == 3, buys
+    r = ebrowse(env, "click", ref_anywhere_in(env, sids, r"Reverse order"))
+    assert r.returncode == 0, r.stderr
+    time.sleep(3.5)  # the delayed reorder fires; no ebrowse command runs
+    r = ebrowse(env, "click", buys[0])  # Alpha's ref; nth 0 is now Gamma
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "bought: Alpha" in r.stdout, r.stdout
+
+
+def ref_anywhere_in(env, sids: list[str], pattern: str) -> str:
+    for sid in sids:
+        text = ebrowse(env, "expand", sid, "--all").stdout
+        m = re.search(pattern + r"[^)\]]*\((@e\d+)", text)
+        if m:
+            return m.group(1)
+    raise AssertionError(f"no element matching {pattern!r}")
+
+
+@pytest.fixture(scope="module")
+def env_binding_first(tmp_path_factory):
+    home = tmp_path_factory.mktemp("ebrowse_home_bf")
+    real_browsers = Path(os.environ.get("HOME", "~")).expanduser() / ".cache" / "ms-playwright"
+    e = os.environ.copy()
+    e.update(
+        {
+            "HOME": str(home),
+            "XDG_CACHE_HOME": str(home / ".cache"),
+            "XDG_CONFIG_HOME": str(home / ".config"),
+            "XDG_RUNTIME_DIR": str(home / ".run"),
+            "PLAYWRIGHT_BROWSERS_PATH": os.environ.get(
+                "PLAYWRIGHT_BROWSERS_PATH", str(real_browsers)
+            ),
+            "EBROWSE_SUMMARIZER_ENABLED": "false",
+            "EBROWSE_BROWSER_ACT_VIA_BINDING": "true",
+        }
+    )
+    (home / ".run").mkdir()
+    yield e
+    subprocess.run(
+        [sys.executable, "-m", "ebrowse.cli.main", "daemon", "stop"],
+        env=e,
+        capture_output=True,
+        timeout=15,
+    )
+
+
+def test_binding_first_flag_smoke(server, env_binding_first):
+    """act_via_binding=true: ordinary named-element verbs work through the
+    binding-first path end to end (fill dispatches, diff reflects the value)."""
+    env = env_binding_first
+    r = ebrowse(env, "open", server.url("anonymous.html"))
+    assert r.returncode == 0, r.stderr
+    out = ebrowse(env, "outline").stdout
+    sids = re.findall(r"^(s\d+) ", out, re.M)
+    search = ref_anywhere_in(env, sids, r"Search terms")
+    r = ebrowse(env, "fill", search, "kitten")
+    assert r.returncode == 0, r.stderr
+    assert '"kitten"' in r.stdout, r.stdout
+    button, _ = anonymous_refs(env)
+    r = ebrowse(env, "click", button)
+    assert r.returncode == 0, r.stderr
+    assert "search-clicked: kitten" in r.stdout, r.stdout

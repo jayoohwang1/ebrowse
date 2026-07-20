@@ -19,6 +19,7 @@ cdp_url = ""                    # used when mode = "cdp" or set via `ebrowse con
 profile_dir = ""                # default: ~/.cache/ebrowse/profiles/<session>
 viewport = [1280, 1280]
 capture_engine = "cdp"          # "cdp" (no JS in page, node bindings; ADR 0015) | "js" (temporary fallback)
+act_via_binding = false         # act on the node binding FIRST for every ref (eval A/B soak; ADR 0015)
 
 [summarizer]
 enabled = true                  # degrades to deterministic labels if unreachable

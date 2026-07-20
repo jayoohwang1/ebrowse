@@ -189,8 +189,24 @@ class ActionsMixin(InteractionMixin):
             if n == 0:
                 raise CommandError(f"no element matches CSS '{target}'", ExitCode.USAGE)
             return loc.first, desc
+        # binding-first (browser.act_via_binding, eval A/B; ADR 0015): act on
+        # the exact bound node whenever the binding is alive, descriptors only
+        # as fallback. Default remains descriptor-first with binding rescue.
+        if self.cfg.browser.act_via_binding:
+            fast = None
+            with contextlib.suppress(Exception):
+                fast = await rescue_target(
+                    self._binding_bridge(), self.ref_bindings, element.ref, element.desc.tag
+                )
+            if fast is not None:
+                return fast, desc
+        witness = None
+        bid = self.ref_bindings.get(element.ref or "")
+        if bid is not None:
+            with contextlib.suppress(Exception):
+                witness = CdpTarget(self._binding_bridge(), bid, element.ref)
         try:
-            return await resolve(self.page, element.desc, ref=element.ref), desc
+            return await resolve(self.page, element.desc, ref=element.ref, witness=witness), desc
         except CommandError:
             # descriptor chain refused — rescue via the capture-time node
             # binding (ADR 0015): acts on the exact node the outline described,

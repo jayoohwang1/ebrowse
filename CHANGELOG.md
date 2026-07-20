@@ -20,6 +20,11 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   on the exact node the outline described (ADR 0015). Previously such refs
   failed forever with a re-outline hint that could not help; a dead binding
   now fails loudly and a re-outline genuinely re-binds.
+- Suspicious descriptor picks (nth-disambiguated, `.first`-collapsed, or made
+  after an identity mismatch) are geometry-checked against the ref's node
+  binding; on disagreement the bound node is acted on instead — reorders of
+  fully identical siblings no longer misbind. `browser.act_via_binding = true`
+  switches to binding-first resolution for eval A/B comparison.
 
 - Eval tasks now start on their declared target URL, stop at a configurable
   200 tool calls by default, and support isolated parallel execution with

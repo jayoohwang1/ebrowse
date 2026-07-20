@@ -82,6 +82,33 @@ def identity_mismatch(desc: ElementDesc, live: dict) -> str | None:
     return None
 
 
+_WITNESS_TOLERANCE_PX = 3.0
+
+
+async def _witness_override(picked, witness, ref: str | None, strategy: int):
+    """Geometry cross-check of a suspicious pick against the ref's node
+    binding. Returns the witness (act on the exact observed node) when both
+    have live boxes that materially disagree; None means keep the pick
+    (agreement, or no usable witness — dead binding, hidden element)."""
+    if witness is None:
+        return None
+    try:
+        wbox = await witness.bounding_box()
+        if wbox is None:
+            return None
+        pbox = await picked.bounding_box(timeout=2000)
+        if pbox is None:
+            return None
+    except Exception:
+        return None
+    delta = max(abs(pbox[k] - wbox[k]) for k in ("x", "y", "width", "height"))
+    if delta <= _WITNESS_TOLERANCE_PX:
+        return None
+    debug.emit("locate", "binding_witness_override", level="warn", ref=ref,
+               strategy=strategy, delta_px=round(delta, 1))  # fmt: skip
+    return witness
+
+
 async def _live_facts(loc) -> dict | None:
     """One evaluate fetching identity facts; None if the element is gone or
     the evaluate fails (the action itself will then surface the real error)."""
@@ -91,20 +118,28 @@ async def _live_facts(loc) -> dict | None:
         return None
 
 
-async def resolve(page, desc: ElementDesc, ref: str | None = None):
-    """Return a single-element locator for desc or raise CommandError(2)."""
+async def resolve(page, desc: ElementDesc, ref: str | None = None, witness=None):
+    """Return a single-element locator for desc or raise CommandError(2).
+
+    `witness` is the ref's capture-time CDP node binding (a CdpTarget or
+    None): any SUSPICIOUS pick — nth-disambiguated, .first-collapsed, or made
+    after a mismatch — is compared against the witness's live geometry, and
+    on disagreement the witness wins (it is the exact node the outline
+    described; ADR 0015). This closes the identical-siblings reorder hole the
+    identity facts cannot see. The zero-cost happy path is unchanged.
+    """
     scope = _frame_scope(page, desc)
-    candidates = []
+    candidates: list[tuple] = []  # (locator, collapsed_first)
     if desc.id:
-        candidates.append(scope.locator(f"#{_css_escape(desc.id)}"))
+        candidates.append((scope.locator(f"#{_css_escape(desc.id)}"), False))
     if desc.testid:
         for attr in ("data-testid", "data-qa", "data-test"):
-            candidates.append(scope.locator(f'[{attr}="{desc.testid}"]'))
+            candidates.append((scope.locator(f'[{attr}="{desc.testid}"]'), False))
     if desc.role and desc.name:
-        candidates.append(scope.get_by_role(desc.role, name=desc.name, exact=True))
-        candidates.append(scope.get_by_role(desc.role, name=desc.name))
+        candidates.append((scope.get_by_role(desc.role, name=desc.name, exact=True), False))
+        candidates.append((scope.get_by_role(desc.role, name=desc.name), False))
     if desc.placeholder:
-        candidates.append(scope.get_by_placeholder(desc.placeholder, exact=True))
+        candidates.append((scope.get_by_placeholder(desc.placeholder, exact=True), False))
     if desc.role and desc.text_head:
         # roles like link/menuitem/option/tab take their accessible name from
         # text content, which discovery stores in text_head rather than name.
@@ -112,17 +147,22 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None):
         # match many links, and nth_hint counts identical DESCRIPTORS, not
         # href matches — resolving 'Products' as the 0th 'a[href$="#"]' once
         # hovered the Home link while reporting 'link "Products"'.
-        candidates.append(scope.get_by_role(desc.role, name=desc.text_head, exact=True))
+        candidates.append((scope.get_by_role(desc.role, name=desc.text_head, exact=True), False))
     if desc.href:
         base = scope.locator(f'a[href$="{desc.href}"]')
         # same wrong-element risk: constrain repeated hrefs by the link text
-        candidates.append(base.filter(has_text=desc.text_head[:60]) if desc.text_head else base)
+        candidates.append(
+            (base.filter(has_text=desc.text_head[:60]) if desc.text_head else base, False)
+        )
         if "?" in desc.href:
-            candidates.append(scope.locator(f'a[href$="{desc.href.split("?")[0]}"]'))
+            candidates.append((scope.locator(f'a[href$="{desc.href.split("?")[0]}"]'), False))
     if desc.text_head and desc.tag in ("a", "button", "summary"):
-        candidates.append(scope.locator(desc.tag).filter(has_text=desc.text_head[:60]).first)
+        # .first collapses a multi-match to count()==1 — always suspicious
+        candidates.append(
+            (scope.locator(desc.tag).filter(has_text=desc.text_head[:60]).first, True)
+        )
     if desc.text_head:
-        candidates.append(scope.locator(desc.tag, has_text=desc.text_head[:60]))
+        candidates.append((scope.locator(desc.tag, has_text=desc.text_head[:60]), False))
 
     # Pre-act verification (issue #12): a unique match with no earlier
     # suspicion returns at zero cost; any disambiguated pick — and every pick
@@ -131,11 +171,10 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None):
     # descriptor with ONE evaluate. On mismatch we try the next candidate,
     # which often recovers the right element (e.g. an exact-text candidate
     # after a too-broad name match); only if none verifies do we refuse.
-    # NOTE: siblings whose descriptors are FULLY identical (no id/testid,
-    # same text) are indistinguishable by identity facts; a reorder among
-    # them still misbinds. Detecting that would need extra stored state.
+    # Reorders among FULLY identical siblings are invisible to identity facts;
+    # those are caught by the witness geometry check on suspicious picks below.
     mismatch: str | None = None
-    for i, loc in enumerate(candidates):
+    for i, (loc, collapsed) in enumerate(candidates):
         try:
             n = await loc.count()
         except Exception:
@@ -143,7 +182,7 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None):
         if n == 0:
             continue
         if n == 1:
-            if mismatch is None:
+            if mismatch is None and not collapsed:
                 debug.emit("locate", "resolved", ref=ref, strategy=i, matches=1, verified=False)
                 return loc  # happy path: unique match, nothing suspicious
             picked = loc
@@ -154,6 +193,11 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None):
         facts = await _live_facts(picked)
         reason = identity_mismatch(desc, facts) if facts is not None else None
         if reason is None:
+            # identity facts are blind to reorders among FULLY identical
+            # siblings — the witness geometry check catches those (ADR 0015)
+            override = await _witness_override(picked, witness, ref, i)
+            if override is not None:
+                return override
             debug.emit(
                 "locate", "resolved", ref=ref, strategy=i, matches=n,
                 nth=desc.nth_hint if n > 1 else 0, verified=facts is not None,

@@ -53,6 +53,12 @@ a persistent CDP session, and bind every discovered element to its
   elements with the least verifiable identity). Since every verb re-observes,
   bindings self-heal: a re-outline (or any action) re-binds, so the stale-ref
   recovery hint is now genuinely actionable even for anonymous elements.
+  Additionally, the binding serves as a **witness** on every suspicious
+  descriptor pick (nth-disambiguated, `.first`-collapsed, or made after a
+  mismatch): when the pick's live geometry materially disagrees with the bound
+  node's, the binding wins — closing the reorder-of-fully-identical-siblings
+  misbind that identity facts cannot see. `browser.act_via_binding = true`
+  flips to binding-first for eval A/B soak ahead of a possible default flip.
 - `CdpTarget` duck-types the Locator/ElementHandle slice the verbs and the
   interaction pipeline use; its page-side evaluates run in a private isolated
   world (`Page.createIsolatedWorld`), never the main world, and its input goes

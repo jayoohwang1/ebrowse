@@ -34,6 +34,10 @@ class BrowserConfig:
     # node bindings (ADR 0015). "js": the discover.js walk — temporary escape
     # hatch until eval runs establish parity, then removed.
     capture_engine: str = "cdp"  # "cdp" | "js"
+    # act on the CDP node binding FIRST for every ref (descriptors as
+    # fallback) instead of the default descriptor-first + binding rescue.
+    # Exists for eval A/B soak before a possible default flip (ADR 0015).
+    act_via_binding: bool = False
 
 
 @dataclass(slots=True)
