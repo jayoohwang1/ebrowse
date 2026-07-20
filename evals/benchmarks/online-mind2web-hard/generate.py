@@ -22,11 +22,23 @@ from pathlib import Path
 
 BENCH_DIR = Path(__file__).parent
 LEVEL = "hard"
-# Homepages that stopped local, non-stealth ebrowse Chromium at a bot challenge
-# (checked 2026-07-18). Every other hard-task homepage was verified reachable
-# 2026-07-20 (real title + usable outline via `python -m ebrowse.dev <url>
-# outline`; some redirect to regional storefronts, which task-redirects covers).
-BLOCKED_HOSTS = {"www.cars.com", "sourceforge.net", "www.apartments.com"}
+# Hosts that block local, non-stealth ebrowse Chromium — tagged `blocked-site`,
+# not dropped, so a run can skip them (`--tag open`) while the benchmark stays
+# complete. Two flavors:
+#   - homepage stopped at a bot challenge (checked 2026-07-18): cars.com,
+#     sourceforge.net, apartments.com.
+#   - homepage loads but interior task pages wall the automation (observed in
+#     the 2026-07-20 hard batch): cvs.com (Akamai "Access Denied" on all search
+#     pages, run qwen-hard-afcebfed), healthline.com (CloudFront 403 on ~half of
+#     visited pages, run qwen-hard-dcd26e66). These pass a homepage-only reach
+#     check, so they must be listed here explicitly.
+BLOCKED_HOSTS = {
+    "www.cars.com",
+    "sourceforge.net",
+    "www.apartments.com",
+    "www.cvs.com",
+    "www.healthline.com",
+}
 # Hosts deliberately dropped from the benchmark (not bot walls — a decision to
 # exclude the site). bestbuy.com: aggressive HTTP/2 protocol errors on product
 # pages block the tasks unpredictably (see runs qwen-hard-4464a842, -fc53ddd3).

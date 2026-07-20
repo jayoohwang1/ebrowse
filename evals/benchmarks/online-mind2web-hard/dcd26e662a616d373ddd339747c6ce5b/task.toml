@@ -1,4 +1,4 @@
 [task]
 prompt = "Take a weight management quiz to find a motivating article for a non-exercising, mostly eating out and can't control portions and cravings, and who has a strong support system, enjoys traveling, loves family time and cooking."
 url = "https://www.healthline.com/"
-tags = ["online-mind2web", "hard", "open"]
+tags = ["online-mind2web", "hard", "blocked-site"]
