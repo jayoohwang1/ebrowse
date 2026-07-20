@@ -35,6 +35,14 @@ def test_ebrowse_call_steps_matching():
     assert {n: s.step for n, s in calls.items()} == {1: 1, 2: 3, 3: 5}
 
 
+def test_ebrowse_call_steps_ignores_non_bash_tool_arguments():
+    steps = [
+        Step(step=1, tool_name="edit", command='{"newText": "example: ebrowse outline"}'),
+        Step(step=2, tool_name="bash", command="ebrowse outline"),
+    ]
+    assert ingest.ebrowse_call_steps(steps) == {1: steps[1]}
+
+
 def test_attach_spool_fills_steps_and_events(tmp_path):
     writer = TraceWriter(tmp_path / "run")
     steps = _steps()

@@ -48,7 +48,9 @@ def ebrowse_call_steps(steps: list[Step]) -> dict[int, Step]:
     out: dict[int, Step] = {}
     n = 0
     for step in steps:
-        if _EBROWSE_CMD.search(step.command):
+        # Only bash can invoke the CLI. JSON arguments to edit/write tools can
+        # contain quoted `ebrowse ...` examples and must not consume a slot.
+        if step.tool_name in (None, "bash") and _EBROWSE_CMD.search(step.command):
             n += 1
             out[n] = step
     return out

@@ -38,6 +38,7 @@ INITIAL_OPEN_FILE = "initial-open.txt"
 SESSION_DIR = "session"
 SPOOL_DIR = "capture"  # per-call debug-capture payloads: capture/<n>.json
 DEBUG_LOG_FILE = "ebrowse-debug.jsonl"  # daemon tier-1 events (EBROWSE_DEBUG_LOG)
+SYSTEM_PROMPTS_FILE = "system-prompts.jsonl"
 DEFAULT_PI_EVENTS_MAX_BYTES = 64 * 1024 * 1024
 
 
@@ -51,11 +52,40 @@ class ParsedStep:
     agent_text: str | None = None
     tokens: dict[str, Any] = field(default_factory=dict)
     latency_s: float | None = None
+    message_id: str | None = None
+    tool_call_id: str | None = None
+    tool_name: str | None = None
+    call_index: int | None = None
+
+
+@dataclass(slots=True)
+class ParsedMessage:
+    """One finalized agent transcript message."""
+
+    sequence: int
+    message_id: str
+    parent_id: str | None
+    role: str
+    content: Any
+    ts: float | None = None
+    turn: int | None = None
+    tool_call_id: str | None = None
+    tool_name: str | None = None
+    model: str | None = None
+    provider: str | None = None
+    usage: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    stop_reason: str | None = None
+    is_error: bool | None = None
+    is_start: bool = False
 
 
 @dataclass(slots=True)
 class HarnessResult:
     steps: list[ParsedStep] = field(default_factory=list)
+    messages: list[ParsedMessage] = field(default_factory=list)
+    start_prompt: str = ""
+    system_prompts: list[str] = field(default_factory=list)
     final_answer: str = ""
     totals: dict[str, Any] = field(default_factory=dict)
     exit_code: int = 0
@@ -115,14 +145,19 @@ def parse_pi_session(entries: list[dict[str, Any]]) -> HarnessResult:
     result = HarnessResult()
     pending: dict[str, ParsedStep] = {}  # toolCallId -> awaiting its result
     issued_at: dict[str, float] = {}
+    call_turn: dict[str, int] = {}
     out_tok = in_tok = peak = turns = 0
+    first_user = True
     for e in entries:
         if e.get("type") != "message":
             continue
         m = e["message"]
         role = m.get("role")
+        message_id = str(e.get("id") or f"message-{len(result.messages) + 1}")
+        turn: int | None = turns or None
         if role == "assistant":
             turns += 1
+            turn = turns
             u = m.get("usage") or {}
             out_tok += u.get("output", 0)
             in_tok += u.get("input", 0)
@@ -130,32 +165,67 @@ def parse_pi_session(entries: list[dict[str, Any]]) -> HarnessResult:
             txt = _text(m.get("content"))
             if txt:
                 result.final_answer = txt
+            call_index = 0
             for c in m.get("content") or []:
                 if isinstance(c, dict) and c.get("type") == "toolCall":
+                    call_index += 1
                     args = c.get("arguments") or {}
                     command = args.get("command") or json.dumps(args)
+                    call_id = str(c.get("id"))
                     step = ParsedStep(
                         command=str(command),
                         agent_text=txt or None,
                         tokens={k: u[k] for k in ("input", "output", "totalTokens") if k in u},
+                        message_id=message_id,
+                        tool_call_id=call_id,
+                        tool_name=str(c.get("name", "")),
+                        call_index=call_index,
                     )
                     result.steps.append(step)
-                    call_id = str(c.get("id"))
                     pending[call_id] = step
+                    call_turn[call_id] = turns
                     at = _ts(m.get("timestamp"))
                     if at is not None:
                         issued_at[call_id] = at
         elif role == "toolResult":
             call_id = str(m.get("toolCallId"))
+            turn = call_turn.get(call_id, turns or None)
             step = pending.pop(call_id, None)
-            if step is None:
-                continue
-            step.output = _text(m.get("content"))
-            step.is_error = bool(m.get("isError"))
-            done = _ts(m.get("timestamp"))
-            begun = issued_at.get(call_id)
-            if done is not None and begun is not None:
-                step.latency_s = done - begun
+            if step is not None:
+                step.output = _text(m.get("content"))
+                step.is_error = bool(m.get("isError"))
+                done = _ts(m.get("timestamp"))
+                begun = issued_at.get(call_id)
+                if done is not None and begun is not None:
+                    step.latency_s = done - begun
+        if role in {"user", "assistant", "toolResult"}:
+            is_start = role == "user" and first_user
+            if is_start:
+                first_user = False
+            result.messages.append(
+                ParsedMessage(
+                    sequence=len(result.messages) + 1,
+                    message_id=message_id,
+                    parent_id=str(e["parentId"]) if e.get("parentId") is not None else None,
+                    role=str(role),
+                    content=m.get("content", ""),
+                    ts=_ts(e.get("timestamp")) or _ts(m.get("timestamp")),
+                    turn=turn,
+                    tool_call_id=(str(m.get("toolCallId")) if m.get("toolCallId") else None),
+                    tool_name=(str(m.get("toolName")) if m.get("toolName") else None),
+                    model=(str(m.get("model")) if m.get("model") else None),
+                    provider=(str(m.get("provider")) if m.get("provider") else None),
+                    usage=dict(m.get("usage") or {}),
+                    metadata={
+                        key: value
+                        for key, value in m.items()
+                        if key not in {"role", "content", "timestamp", "usage"}
+                    },
+                    stop_reason=(str(m.get("stopReason")) if m.get("stopReason") else None),
+                    is_error=(bool(m.get("isError")) if role == "toolResult" else None),
+                    is_start=is_start,
+                )
+            )
     result.totals = {
         "turns": turns,
         "tool_calls": len(result.steps),
@@ -390,11 +460,15 @@ class PiHarness:
             str(session_dir),
             "--name",
             run_dir.name,
-            "--mode",
-            "json",
-            "-p",
-            full_prompt,
         ]
+        system_prompts_path = run_dir / SYSTEM_PROMPTS_FILE
+        observer = Path(__file__).resolve().parents[2] / "pi_extensions" / "trace-observer.ts"
+        if observer.is_file():
+            cmd.extend(["--extension", str(observer)])
+            full_env["EBROWSE_EVAL_SYSTEM_PROMPTS"] = str(system_prompts_path)
+        if self.tool in {"ebrowse", "agent-browser"}:
+            cmd.extend(["--tools", "bash"])
+        cmd.extend(["--mode", "json", "-p", full_prompt])
         timed_out = False
         tool_limit_hit = False
         # Stream stdout/stderr straight to files: a timeout kill then loses
@@ -511,6 +585,13 @@ class PiHarness:
         if not any(e.get("type") == "message" for e in entries):
             entries = fallback_entries
         result = parse_pi_session(entries)
+        result.start_prompt = full_prompt
+        for entry in _jsonl(system_prompts_path):
+            value = entry.get("systemPrompt")
+            if isinstance(value, str) and (
+                not result.system_prompts or value != result.system_prompts[-1]
+            ):
+                result.system_prompts.append(value)
         # A very fast subprocess can enqueue another event before SIGTERM is
         # delivered. Keep the trace and reported total at the configured
         # boundary even if those bytes were already buffered in stdout.

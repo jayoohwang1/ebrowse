@@ -15,7 +15,7 @@ traderjoes.com; design record in
 [ADR 0014](../docs/adr/0014-eval-harness-design.md)) — schema, task model,
 `ebrowse-eval validate`/`tasks`, the runner (`ebrowse-eval run` drives the pi
 harness over a benchmark or single task and writes a fully-joined trace per
-run), the per-step capture layer (below), the `view` trace viewer, and the
+run), the per-step capture layer (below), the conversation-first `view` trace viewer, and the
 inspection queries (`overview`, `anomalies`, `errors`, `step`, `trace-ref`,
 `trace-section`, `timing`, `grep`, `replay`). The legacy scripts in
 `../experiments/` still cover one gap — `summarize-run.py`'s side-by-side
@@ -63,6 +63,11 @@ uv run ebrowse-eval view evals/tests/fixtures/sample-trace --open
 uv run ebrowse-eval overview evals/tests/fixtures/sample-trace
 uv run ebrowse-eval trace-ref evals/tests/fixtures/sample-trace @e1
 ```
+
+Pi runs record the exact starting prompt, effective system prompt, every
+finalized conversation message, and every tool result. The viewer aligns each
+browser-interacting result with post-action browser state in a fixed side lane;
+see [docs/viewer.md](docs/viewer.md).
 
 `run` selects tasks (`--task` globs OR, `--tag` AND, `--sample N --seed S`),
 layers config (harness defaults → benchmark `[config]` → task `[config]` →

@@ -11,10 +11,11 @@ uv run ebrowse-eval serve runs/online-mind2web --port 9000
 
 The index is generated dynamically, so newly completed or currently running
 traces appear on refresh. Each row shows task, outcome, model, step/anomaly
-counts, and last update time. Opening a row renders the full two-lane trace and
+counts, and last update time. Opening a new trace renders the full conversation and
 provides a link back to the index.
 
-For long traces, the server renders the first 25 and last 10 steps in full.
+Legacy step-only traces retain the first-25/last-10 optimization.
+For those traces, the server renders the first 25 and last 10 steps in full.
 Middle steps remain visible as compact one-line summaries of page, agent
 thought, and action. They are grouped in sets of 10; **Expand steps …** fetches
 that group's full two-lane rows without reloading the page. Screenshots are
@@ -39,9 +40,27 @@ uv run ebrowse-eval view runs/my-run              # writes runs/my-run/trace.htm
 uv run ebrowse-eval view runs/my-run -o /tmp/t.html --open
 ```
 
-## Layout
+## Conversation layout
 
-A vertical log of the trajectory, one row per step, **two lanes**:
+New traces preserve every finalized Pi message and its original content-block
+order. The exact starting prompt is the first, fully visible user row. Pi's
+effective system prompt is shown above it behind a collapsed expander and is
+omitted when capture was unavailable. Thinking, ordinary assistant text, every
+tool call, every tool result, and final assistant-only answers are retained;
+non-ebrowse tools no longer disappear from the browser-oriented view.
+
+Every row uses the same two-column grid. Conversation content is on the left;
+the right column is always reserved for post-action browser state. Rows without
+a browser interaction keep an intentionally empty browser lane so screenshots,
+URL changes, and other browser transitions stand out while scrolling. A tool
+result joined to an ebrowse step shows the screenshot, URL/title, timings,
+anomalies, and expandable browser internals in that lane. Large transcript
+blocks and browser blobs remain content-addressed and lazy-loaded.
+
+## Legacy layout
+
+A vertical log of the trajectory, one row per step, **two lanes**, remains the
+fallback for traces created before conversation records were added:
 
 - **Right lane — what the agent saw.** Assistant text for the turn, the exact
   command, tool output verbatim (monospace, whitespace preserved), tokens and

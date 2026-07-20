@@ -12,6 +12,8 @@ enrich each Step record and append its own records before the step is written.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import random
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -23,7 +25,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from ebrowse_evals.harness import AgentHarness, HarnessResult
 from ebrowse_evals.tasks import Benchmark, EvalResult, Task
-from ebrowse_evals.trace.records import RunEnd, RunMeta, Step
+from ebrowse_evals.trace.records import AgentMessage, PromptSnapshot, RunEnd, RunMeta, Step
 from ebrowse_evals.trace.store import TraceReader, TraceWriter
 
 HARNESS_DEFAULTS: dict[str, Any] = {
@@ -34,6 +36,7 @@ HARNESS_DEFAULTS: dict[str, Any] = {
     "jobs": 1,
     "capture": True,  # instrument the ebrowse shim (spool + debug log); ebrowse-only
 }
+_MAX_INLINE_TRANSCRIPT_BYTES = 200_000
 
 
 @runtime_checkable
@@ -163,6 +166,66 @@ def run_task(
         start_url=task.url,
         tool_call_limit=config.get("tool_call_limit"),
     )
+    if result.start_prompt:
+        start_bytes = result.start_prompt.encode()
+        writer.write(
+            PromptSnapshot(
+                kind="start",
+                text=result.start_prompt
+                if len(start_bytes) <= _MAX_INLINE_TRANSCRIPT_BYTES
+                else "",
+                text_ref=(
+                    writer.put_blob(start_bytes, ".txt")
+                    if len(start_bytes) > _MAX_INLINE_TRANSCRIPT_BYTES
+                    else None
+                ),
+                sha256=hashlib.sha256(start_bytes).hexdigest(),
+            )
+        )
+    for sequence, system_prompt in enumerate(result.system_prompts, 1):
+        system_bytes = system_prompt.encode()
+        writer.write(
+            PromptSnapshot(
+                kind="system",
+                text=system_prompt if len(system_bytes) <= _MAX_INLINE_TRANSCRIPT_BYTES else "",
+                text_ref=(
+                    writer.put_blob(system_bytes, ".txt")
+                    if len(system_bytes) > _MAX_INLINE_TRANSCRIPT_BYTES
+                    else None
+                ),
+                sha256=hashlib.sha256(system_bytes).hexdigest(),
+                sequence=sequence,
+            )
+        )
+    for message in result.messages:
+        content_bytes = json.dumps(message.content, ensure_ascii=False).encode()
+        writer.write(
+            AgentMessage(
+                ts=message.ts,
+                sequence=message.sequence,
+                message_id=message.message_id,
+                parent_id=message.parent_id,
+                turn=message.turn,
+                role=message.role,
+                content=message.content
+                if len(content_bytes) <= _MAX_INLINE_TRANSCRIPT_BYTES
+                else [],
+                content_ref=(
+                    writer.put_blob(content_bytes, ".json")
+                    if len(content_bytes) > _MAX_INLINE_TRANSCRIPT_BYTES
+                    else None
+                ),
+                tool_call_id=message.tool_call_id,
+                tool_name=message.tool_name,
+                model=message.model,
+                provider=message.provider,
+                usage=message.usage,
+                metadata=message.metadata,
+                stop_reason=message.stop_reason,
+                is_error=message.is_error,
+                is_start=message.is_start,
+            )
+        )
     steps = [
         Step(
             step=i,
@@ -172,6 +235,10 @@ def run_task(
             tokens=ps.tokens,
             latency_s=ps.latency_s,
             error={"class": "tool_error"} if ps.is_error else None,
+            message_id=ps.message_id,
+            tool_call_id=ps.tool_call_id,
+            tool_name=ps.tool_name,
+            call_index=ps.call_index,
         )
         for i, ps in enumerate(result.steps, 1)
     ]

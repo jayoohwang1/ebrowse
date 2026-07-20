@@ -8,6 +8,10 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- Eval traces now preserve the exact starting prompt, Pi's effective system
+  prompt, and every finalized conversation message/content block. The viewer is
+  conversation-first with a fixed browser-state side lane on every row and
+  retains the legacy step renderer for older runs.
 - Eval tasks now start on their declared target URL, stop at a configurable
   200 tool calls by default, and support isolated parallel execution with
   `ebrowse-eval run --jobs N`.

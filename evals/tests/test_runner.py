@@ -10,6 +10,7 @@ from pathlib import Path
 from ebrowse_evals.harness import (
     PI_EVENTS_FILE,
     HarnessResult,
+    ParsedMessage,
     ParsedStep,
     PiHarness,
     parse_pi_session,
@@ -22,7 +23,7 @@ from ebrowse_evals.runner import (
     select_tasks,
 )
 from ebrowse_evals.tasks import load_benchmark, load_task
-from ebrowse_evals.trace.records import Step
+from ebrowse_evals.trace.records import AgentMessage, PromptSnapshot, Step
 from ebrowse_evals.trace.store import TraceReader, TraceWriter
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -236,6 +237,26 @@ def test_pi_harness_stops_at_tool_call_limit(tmp_path):
     assert len(result.steps) == 2
 
 
+def test_pi_browser_harness_allows_only_bash_builtin(tmp_path):
+    argv_file = tmp_path / "argv.json"
+    pi = tmp_path / "fake-pi"
+    pi.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, pathlib, sys\n"
+        f"pathlib.Path({str(argv_file)!r}).write_text(json.dumps(sys.argv))\n"
+    )
+    pi.chmod(0o755)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    PiHarness(provider="p", model="m", tool="ebrowse", pi_bin=str(pi)).run(
+        "go", run_dir / "work", {}, 10, run_dir
+    )
+    argv = json.loads(argv_file.read_text())
+    tools_at = argv.index("--tools")
+    assert argv[tools_at + 1] == "bash"
+    assert "edit" not in argv and "write" not in argv
+
+
 def test_pi_harness_filters_cumulative_updates_and_keeps_fallback(tmp_path):
     pi = tmp_path / "fake-pi"
     pi.write_text(
@@ -334,3 +355,82 @@ def test_parse_pi_session_sample_fixture():
         "input_tokens": 250,
         "peak_context": 160,
     }
+    assert [message.role for message in result.messages] == [
+        "user",
+        "assistant",
+        "toolResult",
+        "assistant",
+    ]
+    assert result.messages[0].is_start is True
+    assert result.messages[1].content[0]["type"] == "thinking"
+    assert step.tool_call_id == "tool-1"
+    assert step.tool_name == "bash"
+    assert result.messages[2].tool_call_id == "tool-1"
+
+
+def test_run_task_persists_prompts_messages_and_step_links(tmp_path):
+    task = load_task(BENCH / "list-count")
+    harness = FakeHarness(
+        HarnessResult(
+            start_prompt="exact starting prompt",
+            system_prompts=["effective system prompt"],
+            messages=[
+                ParsedMessage(
+                    1,
+                    "u1",
+                    None,
+                    "user",
+                    [{"type": "text", "text": "exact starting prompt"}],
+                    is_start=True,
+                ),
+                ParsedMessage(
+                    2,
+                    "a1",
+                    "u1",
+                    "assistant",
+                    [
+                        {
+                            "type": "toolCall",
+                            "id": "call-1",
+                            "name": "bash",
+                            "arguments": {"command": "ebrowse outline"},
+                        }
+                    ],
+                    turn=1,
+                ),
+                ParsedMessage(
+                    3,
+                    "r1",
+                    "a1",
+                    "toolResult",
+                    [{"type": "text", "text": "PAGE Example"}],
+                    turn=1,
+                    tool_call_id="call-1",
+                    tool_name="bash",
+                ),
+            ],
+            steps=[
+                ParsedStep(
+                    command="ebrowse outline",
+                    output="PAGE Example",
+                    message_id="a1",
+                    tool_call_id="call-1",
+                    tool_name="bash",
+                    call_index=1,
+                )
+            ],
+            final_answer="32 products",
+        )
+    )
+    run_task(task, harness, {}, tmp_path / "run")
+    records = list(TraceReader(tmp_path / "run").records())
+    prompts = [record for record in records if isinstance(record, PromptSnapshot)]
+    messages = [record for record in records if isinstance(record, AgentMessage)]
+    step = next(record for record in records if isinstance(record, Step))
+    assert [(prompt.kind, prompt.text) for prompt in prompts] == [
+        ("start", "exact starting prompt"),
+        ("system", "effective system prompt"),
+    ]
+    assert [message.message_id for message in messages] == ["u1", "a1", "r1"]
+    assert step.message_id == "a1"
+    assert step.tool_call_id == "call-1"

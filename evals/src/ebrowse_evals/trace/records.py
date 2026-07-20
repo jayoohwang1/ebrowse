@@ -81,6 +81,43 @@ class RunEnd(Record):
 
 
 @dataclass(slots=True)
+class PromptSnapshot(Record):
+    """Exact prompt text used by the agent harness."""
+
+    TYPE: ClassVar[str] = "prompt_snapshot"
+
+    kind: str = ""  # "start" | "system"
+    text: str = ""
+    text_ref: str | None = None
+    sha256: str = ""
+    sequence: int | None = None  # system-prompt revision, when applicable
+
+
+@dataclass(slots=True)
+class AgentMessage(Record):
+    """One finalized conversation message, preserving content-block order."""
+
+    TYPE: ClassVar[str] = "agent_message"
+
+    sequence: int = 0
+    message_id: str = ""
+    parent_id: str | None = None
+    turn: int | None = None
+    role: str = ""
+    content: Any = field(default_factory=list)
+    content_ref: str | None = None
+    tool_call_id: str | None = None
+    tool_name: str | None = None
+    model: str | None = None
+    provider: str | None = None
+    usage: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    stop_reason: str | None = None
+    is_error: bool | None = None
+    is_start: bool = False
+
+
+@dataclass(slots=True)
 class Step(Record):
     """One agent tool-call: what the agent did/saw + post-action browser state.
 
@@ -101,6 +138,10 @@ class Step(Record):
     dom_snapshot: str | None = None  # blob ref
     request_id: str | None = None  # joins ebrowse_log records to this step
     error: dict[str, Any] | None = None  # class/message/recovery action
+    message_id: str | None = None  # owning assistant message
+    tool_call_id: str | None = None  # joins conversation tool call/result
+    tool_name: str | None = None
+    call_index: int | None = None  # tool call position within the assistant message
 
 
 @dataclass(slots=True)
@@ -154,7 +195,18 @@ class Summary(Record):
 
 
 RECORD_TYPES: dict[str, type[Record]] = {
-    cls.TYPE: cls for cls in (RunMeta, RunEnd, Step, BrowserEvent, EbrowseLog, Anomaly, Summary)
+    cls.TYPE: cls
+    for cls in (
+        RunMeta,
+        RunEnd,
+        PromptSnapshot,
+        AgentMessage,
+        Step,
+        BrowserEvent,
+        EbrowseLog,
+        Anomaly,
+        Summary,
+    )
 }
 
 
