@@ -449,6 +449,34 @@ class PiHarness:
         full_env["XDG_CACHE_HOME"] = str(cache_dir)
         return full_env, runtime_dir
 
+    @staticmethod
+    def _stop_ebrowse_daemon(
+        executable: str,
+        prefix: list[str],
+        env: dict[str, str],
+        timeout_s: float = 15.0,
+    ) -> None:
+        """Stop and wait for full cleanup, including Chromium profile release.
+
+        The stop response only acknowledges the shutdown request. The daemon
+        removes its socket after awaiting every browser session's close, making
+        socket disappearance the lifecycle boundary safe for a replacement.
+        """
+        subprocess.run(
+            [executable, *prefix, "daemon", "stop"],
+            env=env,
+            capture_output=True,
+            check=False,
+        )
+        socket_file = Path(env["XDG_RUNTIME_DIR"]) / "ebrowse.sock"
+        deadline = time.monotonic() + timeout_s
+        while socket_file.exists():
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"ebrowse daemon did not release its socket within {timeout_s:g}s"
+                )
+            time.sleep(0.05)
+
     def prepare_run(
         self,
         env: dict[str, str],
@@ -479,12 +507,7 @@ class PiHarness:
         full_env["EBROWSE_SECURITY_BLOCK_PRIVATE_NETWORK"] = (
             "false" if _local_task_url(start_url) else "true"
         )
-        subprocess.run(
-            [executable, *prefix, "daemon", "stop"],
-            env=full_env,
-            capture_output=True,
-            check=False,
-        )
+        self._stop_ebrowse_daemon(executable, prefix, full_env)
         try:
             bootstrap_open = subprocess.run(
                 [executable, *prefix, "open", start_url],
@@ -536,12 +559,7 @@ class PiHarness:
         )
         config["navigation_bootstrap"] = bootstrap_record
         config["resolved_navigation_domains"] = domains
-        subprocess.run(
-            [executable, *prefix, "daemon", "stop"],
-            env=full_env,
-            capture_output=True,
-            check=False,
-        )
+        self._stop_ebrowse_daemon(executable, prefix, full_env)
 
     def run(
         self,
@@ -591,12 +609,7 @@ class PiHarness:
                 full_env.pop("EBROWSE_SECURITY_ALLOWED_DOMAINS", None)
             if self.capture:
                 full_env["EBROWSE_DEBUG_LOG"] = str(run_dir / DEBUG_LOG_FILE)
-            subprocess.run(
-                [executable, *prefix, "daemon", "stop"],
-                env=full_env,
-                capture_output=True,
-                check=False,
-            )
+            self._stop_ebrowse_daemon(executable, prefix, full_env)
             allowed_verbs = _string_list_config(config, "ebrowse_allowed_verbs")
             from ebrowse_evals.pi_tool import DEFAULT_ALLOWED_VERBS
 
@@ -839,10 +852,6 @@ class PiHarness:
         result.tool_limit_hit = tool_limit_hit
         if ebrowse_target is not None:
             executable, prefix = ebrowse_target
-            subprocess.run(
-                [executable, *prefix, "daemon", "stop"],
-                env=full_env,
-                capture_output=True,
-                check=False,
-            )
+            with suppress(TimeoutError):
+                self._stop_ebrowse_daemon(executable, prefix, full_env)
         return result

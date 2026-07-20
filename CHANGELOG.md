@@ -15,6 +15,8 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   throughout agent execution without later metadata correction records.
 - Pi's injected ebrowse operating guide now describes the dedicated custom tool
   instead of telling the browser-only agent to invoke the CLI through a shell.
+- Redirect bootstrap now waits for the old daemon socket to disappear after browser
+  cleanup before restarting, preventing Chromium persistent-profile lock races.
 
 - Pi/ebrowse evals now expose one shell-free custom browser tool instead of
   Bash. A configurable verb/argument/output/timeout policy blocks `eval`, file

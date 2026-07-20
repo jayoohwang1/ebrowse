@@ -7,6 +7,7 @@ import json
 import time
 from pathlib import Path
 
+import ebrowse_evals.harness as harness_module
 from ebrowse_evals.harness import (
     PI_EVENTS_FILE,
     HarnessResult,
@@ -343,6 +344,25 @@ def test_pi_browser_harness_loads_only_custom_ebrowse_tool(tmp_path):
     assert "--no-prompt-templates" in argv
     assert "--no-context-files" in argv
     assert "bash" not in argv and "edit" not in argv and "write" not in argv
+
+
+def test_pi_harness_waits_for_daemon_socket_removal(tmp_path, monkeypatch):
+    runtime = tmp_path / "run"
+    runtime.mkdir()
+    socket_file = runtime / "ebrowse.sock"
+    socket_file.touch()
+    sleeps = 0
+
+    def fake_sleep(_seconds):
+        nonlocal sleeps
+        sleeps += 1
+        if sleeps == 2:
+            socket_file.unlink()
+
+    monkeypatch.setattr(harness_module.subprocess, "run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(harness_module.time, "sleep", fake_sleep)
+    PiHarness._stop_ebrowse_daemon("ebrowse", [], {"XDG_RUNTIME_DIR": str(runtime)})
+    assert sleeps == 2
 
 
 def test_pi_harness_filters_cumulative_updates_and_keeps_fallback(tmp_path):
