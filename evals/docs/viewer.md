@@ -1,6 +1,36 @@
-# Trace viewer (`ebrowse-eval view`)
+# Trace viewer (`ebrowse-eval serve`)
 
-Renders a run directory into one self-contained HTML file — all CSS/JS inline,
+The normal interface is a central local application that recursively discovers
+trace runs and organizes them by their directory under a runs root:
+
+```bash
+uv run ebrowse-eval serve runs --open
+# custom location/port:
+uv run ebrowse-eval serve runs/online-mind2web --port 9000
+```
+
+The index is generated dynamically, so newly completed or currently running
+traces appear on refresh. Each row shows task, outcome, model, step/anomaly
+counts, and last update time. Opening a row renders the full two-lane trace and
+provides a link back to the index.
+
+For long traces, the server renders the first 25 and last 10 steps in full.
+Middle steps remain visible as compact one-line summaries of page, agent
+thought, and action. They are grouped in sets of 10; **Expand steps …** fetches
+that group's full two-lane rows without reloading the page. Screenshots are
+lazy-loaded from the content-addressed blob store, and DomSnapshot JSON is not
+fetched until its internals expander is opened. Standalone exports remain fully
+self-contained and render every step.
+
+Runs can be selected individually, or all runs in a directory can be selected
+from its heading checkbox. **Move selected to trash** asks for confirmation and
+uses the system `trash-put` command; it never permanently deletes a run. The
+server revalidates that every submitted directory is a trace beneath the
+configured runs root before moving anything.
+
+## Standalone export
+
+`ebrowse-eval view` remains available to export one self-contained HTML file — all CSS/JS inline,
 screenshots embedded as data URIs, no CDN — so a trace can be opened anywhere,
 attached to an issue, or diffed by eye against another run.
 

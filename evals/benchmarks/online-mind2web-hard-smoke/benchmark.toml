@@ -1,0 +1,5 @@
+[benchmark]
+name = "online-mind2web-hard-smoke"
+
+[config]
+timeout_s = 900

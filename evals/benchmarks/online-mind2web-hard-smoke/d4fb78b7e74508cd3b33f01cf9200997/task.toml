@@ -1,0 +1,4 @@
+[task]
+prompt = "Show the figure comparing Occupational Fatalities Trends between Ohio and New York."
+url = "https://www.americashealthrankings.org/"
+tags = ["online-mind2web", "hard", "reachable"]

@@ -99,6 +99,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
         "tool": args.tool,
         "worktree": True if args.worktree else None,
         "timeout_s": args.timeout,
+        "tool_call_limit": args.tool_call_limit,
+        "jobs": args.jobs,
         "capture": False if args.no_capture else None,
     }
     # Harness identity (provider/model/tool/worktree) is run-level, not per-task,
@@ -109,6 +111,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     # default on there (rich traces are the point) unless explicitly disabled.
     capture = bool(base.get("capture", True)) and tool == "ebrowse"
     cli_config["capture"] = capture
+    cli_config["jobs"] = int(base.get("jobs", 1))
     harness = PiHarness(
         provider=str(base["provider"]),
         model=str(base["model"]),
@@ -154,6 +157,17 @@ def _cmd_view(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_serve(args: argparse.Namespace) -> int:
+    from ebrowse_evals.viewer_server import serve_runs
+
+    try:
+        serve_runs(Path(args.runs_dir), args.host, args.port, args.open)
+    except (FileNotFoundError, OSError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ebrowse-eval", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -189,6 +203,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_run.add_argument("--timeout", type=float, help="per-task timeout in seconds")
     p_run.add_argument(
+        "--tool-call-limit",
+        type=int,
+        help="maximum agent tool calls per task (default: 200; 0 disables)",
+    )
+    p_run.add_argument(
+        "--jobs", type=int, default=None, help="number of tasks to run concurrently (default: 1)"
+    )
+    p_run.add_argument(
         "--no-capture",
         action="store_true",
         help="skip per-step browser-state capture + ebrowse debug-log ingestion",
@@ -202,6 +224,13 @@ def main(argv: list[str] | None = None) -> int:
     p_view.add_argument("-o", "--output", help="output path (default: <run-dir>/trace.html)")
     p_view.add_argument("--open", action="store_true", help="open the page in a browser")
     p_view.set_defaults(func=_cmd_view)
+
+    p_serve = sub.add_parser("serve", help="browse all trace runs in a central local web app")
+    p_serve.add_argument("runs_dir", nargs="?", default="runs", help="runs root (default: runs)")
+    p_serve.add_argument("--host", default="127.0.0.1")
+    p_serve.add_argument("--port", type=int, default=8765)
+    p_serve.add_argument("--open", action="store_true", help="open the app in the default browser")
+    p_serve.set_defaults(func=_cmd_serve)
 
     # -- inspection queries (evals/docs/inspect.md) --------------------------
     from ebrowse_evals import inspect as _inspect

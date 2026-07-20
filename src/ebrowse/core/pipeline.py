@@ -23,6 +23,7 @@ from ebrowse.core.clickable import (
 from ebrowse.core.fingerprint import (
     RefRegistry,
     content_hash,
+    locator_class_tokens,
     normalize_href,
     section_fingerprint,
 )
@@ -45,7 +46,8 @@ _MIN_IMG_PX = 80  # images smaller than this (either side) get no @i ref
 
 def _desc_for(node: DomNode, page_url: str) -> ElementDesc:
     a = node.attrs
-    return ElementDesc(
+    text_head = (node.identity_text or node.subtree_text(cap=_TEXT_HEAD_LEN * 2))[:_TEXT_HEAD_LEN]
+    desc = ElementDesc(
         tag=node.tag,
         role=implicit_role(node.tag, a),
         id=a.get("id"),
@@ -54,11 +56,16 @@ def _desc_for(node: DomNode, page_url: str) -> ElementDesc:
         placeholder=a.get("ph"),
         href=normalize_href(a.get("href", ""), page_url),
         input_type=a.get("typ"),
-        text_head=(node.identity_text or node.subtree_text(cap=_TEXT_HEAD_LEN * 2))[
-            :_TEXT_HEAD_LEN
-        ],
+        text_head=text_head,
         iframe_path=node.iframe_path,
+        cls=" ".join(locator_class_tokens(a.get("cls", ""))),
     )
+    # custom-attr hints only for fully anonymous elements (capture attaches
+    # xa under the same no-identity condition, minus the text check done here)
+    if a.get("xa") and not (desc.id or desc.testid or desc.name or desc.placeholder
+                            or desc.href or text_head):  # fmt: skip
+        desc.attrs = tuple(sorted(a["xa"].items()))
+    return desc
 
 
 def _state_for(node: DomNode) -> ElementState:
@@ -181,7 +188,11 @@ def build_page(
         elements = []
         for node in nodes:
             desc = descs[i]
-            elements.append(Element(ref=refs[i], desc=desc, state=_state_for(node)))
+            elements.append(
+                Element(
+                    ref=refs[i], desc=desc, state=_state_for(node), node_id=node.backend_node_id
+                )
+            )
             i += 1
 
         heading = section_heading(raw)

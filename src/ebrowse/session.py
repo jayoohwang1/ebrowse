@@ -129,6 +129,10 @@ class Session(CompoundMixin, ActionsMixin):
         # observation state
         self.page_mem: PageMem | None = None
         self.raw_by_sid: dict[str, RawSection] = {}
+        # act-time node bindings (ADR 0015): ref -> backendNodeId from the
+        # latest cdp-engine capture; consumed by the locate rescue path
+        self.ref_bindings: dict[str, int] = {}
+        self._cdp_bridge = None  # CdpBridge | None, lazy, per active page
         self.nav_id = 0
         self._notes: list[str] = []  # dialog/popup events surfaced in the next diff
         # set by a click's occlusion pre-check when a modal blocks the page WITHOUT
@@ -275,6 +279,7 @@ class Session(CompoundMixin, ActionsMixin):
             self._page = None
             self.page_mem = None
             self.raw_by_sid = {}
+            self.ref_bindings = {}
             self._notes.append("the active tab closed; no tabs remain — run 'ebrowse open <url>'")
             return
         fallback = live[0]
@@ -282,6 +287,7 @@ class Session(CompoundMixin, ActionsMixin):
         self.last_snapshot = None
         self.page_mem = None
         self.raw_by_sid = {}
+        self.ref_bindings = {}
         self.nav_id += 1
         self._notes.append(
             f"the active tab closed; switched to the most recent live tab: {fallback.url[:100]}"
@@ -355,6 +361,8 @@ class Session(CompoundMixin, ActionsMixin):
         self.page_mem = None
         self.last_snapshot = None
         self.raw_by_sid = {}
+        self.ref_bindings = {}
+        self._cdp_bridge = None
         self._pending_dialogs = {}
         with contextlib.suppress(Exception):
             await self._summarizer.aclose()
@@ -377,7 +385,7 @@ class Session(CompoundMixin, ActionsMixin):
         # redirects can leave the domain even when the opened URL was allowed
         self._check_url_allowed(self.page.url, landed=True)
         with debug.timed("snapshot", "capture"):
-            snap = await capture(self.page)
+            snap = await capture(self.page, self.cfg.browser.capture_engine)
         # retained for debug-capture reuse: fresh as long as no possibly-mutating
         # verb runs after this observation (cmd_seq check in verb_debug_capture)
         self.last_snapshot = snap
@@ -400,6 +408,16 @@ class Session(CompoundMixin, ActionsMixin):
             self.page_mem, self.raw_by_sid = build_page(
                 snap, self.registry, self.cfg.observe, nav_id=self.nav_id
             )
+        # refresh act-time bindings (cdp engine only; js-engine nodes carry
+        # no backend ids and the table stays empty — rescue simply never fires)
+        self.ref_bindings = {
+            n.ref: n.backend_node_id
+            for raw in self.raw_by_sid.values()
+            for n in raw.iter_walk()
+            if n.ref and n.ref.startswith("@e") and n.backend_node_id is not None
+        }
+        if debug.enabled():
+            debug.emit("locate", "bindings_refreshed", count=len(self.ref_bindings))
 
     async def observe(
         self, no_summaries: bool = False, no_glance: bool = False, preview: bool = False
@@ -1043,7 +1061,7 @@ class Session(CompoundMixin, ActionsMixin):
             payload["snapshot_reused"] = True  # nothing possibly-mutating ran since
         else:
             try:
-                snap = await capture(page)
+                snap = await capture(page, self.cfg.browser.capture_engine)
                 self.last_snapshot = snap
                 self._snapshot_cmd_seq = self.cmd_seq
             except Exception as e:

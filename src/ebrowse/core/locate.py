@@ -26,6 +26,11 @@ def _css_escape(s: str) -> str:
     return s.translate(_CSS_ESCAPE)
 
 
+def _css_escape_value(s: str) -> str:
+    """Escape a string for use inside a double-quoted attribute selector."""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def _frame_scope(page, desc: ElementDesc):
     """Resolve the frame the element lives in (iframe_path from discovery).
     fid is the frame's id, title, or src attribute — whichever capture used
@@ -82,6 +87,33 @@ def identity_mismatch(desc: ElementDesc, live: dict) -> str | None:
     return None
 
 
+_WITNESS_TOLERANCE_PX = 3.0
+
+
+async def _witness_override(picked, witness, ref: str | None, strategy: int):
+    """Geometry cross-check of a suspicious pick against the ref's node
+    binding. Returns the witness (act on the exact observed node) when both
+    have live boxes that materially disagree; None means keep the pick
+    (agreement, or no usable witness — dead binding, hidden element)."""
+    if witness is None:
+        return None
+    try:
+        wbox = await witness.bounding_box()
+        if wbox is None:
+            return None
+        pbox = await picked.bounding_box(timeout=2000)
+        if pbox is None:
+            return None
+    except Exception:
+        return None
+    delta = max(abs(pbox[k] - wbox[k]) for k in ("x", "y", "width", "height"))
+    if delta <= _WITNESS_TOLERANCE_PX:
+        return None
+    debug.emit("locate", "binding_witness_override", level="warn", ref=ref,
+               strategy=strategy, delta_px=round(delta, 1))  # fmt: skip
+    return witness
+
+
 async def _live_facts(loc) -> dict | None:
     """One evaluate fetching identity facts; None if the element is gone or
     the evaluate fails (the action itself will then surface the real error)."""
@@ -91,20 +123,28 @@ async def _live_facts(loc) -> dict | None:
         return None
 
 
-async def resolve(page, desc: ElementDesc, ref: str | None = None):
-    """Return a single-element locator for desc or raise CommandError(2)."""
+async def resolve(page, desc: ElementDesc, ref: str | None = None, witness=None):
+    """Return a single-element locator for desc or raise CommandError(2).
+
+    `witness` is the ref's capture-time CDP node binding (a CdpTarget or
+    None): any SUSPICIOUS pick — nth-disambiguated, .first-collapsed, or made
+    after a mismatch — is compared against the witness's live geometry, and
+    on disagreement the witness wins (it is the exact node the outline
+    described; ADR 0015). This closes the identical-siblings reorder hole the
+    identity facts cannot see. The zero-cost happy path is unchanged.
+    """
     scope = _frame_scope(page, desc)
-    candidates = []
+    candidates: list[tuple] = []  # (locator, suspicious, unique_only)
     if desc.id:
-        candidates.append(scope.locator(f"#{_css_escape(desc.id)}"))
+        candidates.append((scope.locator(f"#{_css_escape(desc.id)}"), False, False))
     if desc.testid:
         for attr in ("data-testid", "data-qa", "data-test"):
-            candidates.append(scope.locator(f'[{attr}="{desc.testid}"]'))
+            candidates.append((scope.locator(f'[{attr}="{desc.testid}"]'), False, False))
     if desc.role and desc.name:
-        candidates.append(scope.get_by_role(desc.role, name=desc.name, exact=True))
-        candidates.append(scope.get_by_role(desc.role, name=desc.name))
+        candidates.append((scope.get_by_role(desc.role, name=desc.name, exact=True), False, False))
+        candidates.append((scope.get_by_role(desc.role, name=desc.name), False, False))
     if desc.placeholder:
-        candidates.append(scope.get_by_placeholder(desc.placeholder, exact=True))
+        candidates.append((scope.get_by_placeholder(desc.placeholder, exact=True), False, False))
     if desc.role and desc.text_head:
         # roles like link/menuitem/option/tab take their accessible name from
         # text content, which discovery stores in text_head rather than name.
@@ -112,17 +152,37 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None):
         # match many links, and nth_hint counts identical DESCRIPTORS, not
         # href matches — resolving 'Products' as the 0th 'a[href$="#"]' once
         # hovered the Home link while reporting 'link "Products"'.
-        candidates.append(scope.get_by_role(desc.role, name=desc.text_head, exact=True))
+        candidates.append(
+            (scope.get_by_role(desc.role, name=desc.text_head, exact=True), False, False)
+        )
     if desc.href:
         base = scope.locator(f'a[href$="{desc.href}"]')
         # same wrong-element risk: constrain repeated hrefs by the link text
-        candidates.append(base.filter(has_text=desc.text_head[:60]) if desc.text_head else base)
+        candidates.append(
+            (base.filter(has_text=desc.text_head[:60]) if desc.text_head else base, False, False)
+        )
         if "?" in desc.href:
-            candidates.append(scope.locator(f'a[href$="{desc.href.split("?")[0]}"]'))
+            candidates.append(
+                (scope.locator(f'a[href$="{desc.href.split("?")[0]}"]'), False, False)
+            )
     if desc.text_head and desc.tag in ("a", "button", "summary"):
-        candidates.append(scope.locator(desc.tag).filter(has_text=desc.text_head[:60]).first)
+        # .first collapses a multi-match to count()==1 — always suspicious
+        candidates.append(
+            (scope.locator(desc.tag).filter(has_text=desc.text_head[:60]).first, True, False)
+        )
     if desc.text_head:
-        candidates.append(scope.locator(desc.tag, has_text=desc.text_head[:60]))
+        candidates.append((scope.locator(desc.tag, has_text=desc.text_head[:60]), False, False))
+    # Anonymous-element fallbacks (ADR 0015 follow-up): class tokens and
+    # filtered custom attrs survive node replacement, which kills the CDP
+    # binding. UNIQUE matches only — nth over a class-matched set would not
+    # align with nth_hint (counted over descriptor-identical elements), and
+    # without a live binding there is no witness to catch a misbind.
+    if desc.cls:
+        sel = desc.tag + "".join(f".{t}" for t in desc.cls.split())
+        candidates.append((scope.locator(sel), True, True))
+    if desc.attrs:
+        sel = desc.tag + "".join(f'[{k}="{_css_escape_value(v)}"]' for k, v in desc.attrs)
+        candidates.append((scope.locator(sel), True, True))
 
     # Pre-act verification (issue #12): a unique match with no earlier
     # suspicion returns at zero cost; any disambiguated pick — and every pick
@@ -131,19 +191,20 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None):
     # descriptor with ONE evaluate. On mismatch we try the next candidate,
     # which often recovers the right element (e.g. an exact-text candidate
     # after a too-broad name match); only if none verifies do we refuse.
-    # NOTE: siblings whose descriptors are FULLY identical (no id/testid,
-    # same text) are indistinguishable by identity facts; a reorder among
-    # them still misbinds. Detecting that would need extra stored state.
+    # Reorders among FULLY identical siblings are invisible to identity facts;
+    # those are caught by the witness geometry check on suspicious picks below.
     mismatch: str | None = None
-    for i, loc in enumerate(candidates):
+    for i, (loc, suspicious, unique_only) in enumerate(candidates):
         try:
             n = await loc.count()
         except Exception:
             continue
         if n == 0:
             continue
+        if unique_only and n != 1:
+            continue  # refuse-over-misbind: never nth-guess a fallback match
         if n == 1:
-            if mismatch is None:
+            if mismatch is None and not suspicious:
                 debug.emit("locate", "resolved", ref=ref, strategy=i, matches=1, verified=False)
                 return loc  # happy path: unique match, nothing suspicious
             picked = loc
@@ -154,6 +215,11 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None):
         facts = await _live_facts(picked)
         reason = identity_mismatch(desc, facts) if facts is not None else None
         if reason is None:
+            # identity facts are blind to reorders among FULLY identical
+            # siblings — the witness geometry check catches those (ADR 0015)
+            override = await _witness_override(picked, witness, ref, i)
+            if override is not None:
+                return override
             debug.emit(
                 "locate", "resolved", ref=ref, strategy=i, matches=n,
                 nth=desc.nth_hint if n > 1 else 0, verified=facts is not None,
@@ -169,7 +235,19 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None):
                        strategy=i, reason=reason)  # fmt: skip
         mismatch = mismatch or reason
 
-    debug.emit("locate", "locate_failed", level="warn", ref=ref, mismatch=mismatch or "")
+    debug.emit("locate", "locate_failed", level="warn", ref=ref,
+               mismatch=mismatch or "", candidates=len(candidates))  # fmt: skip
+    if not candidates:
+        # anonymous element (no id/testid/name/text/href): the descriptor has
+        # no locatable identity. Callers rescue via the capture-time node
+        # binding (ADR 0015); this error surfaces only when that is dead too,
+        # and a re-outline mints a fresh binding — the hint is genuine.
+        who = f"{ref} ({desc.short_desc()})" if ref else desc.short_desc()
+        raise CommandError(
+            f"{who} has no locatable identity (icon-only/anonymous element) and its "
+            "node binding from the last outline is gone — run 'ebrowse outline' to re-bind",
+            ExitCode.USAGE,
+        )
     if mismatch:
         who = f"stale ref {ref}" if ref else "stale ref"
         raise CommandError(

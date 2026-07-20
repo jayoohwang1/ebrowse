@@ -8,6 +8,51 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- Page capture now uses CDP `DOMSnapshot.captureSnapshot` by default
+  (`browser.capture_engine = "cdp"`): no JavaScript runs in the page and every
+  discovered element carries a CDP backend-node-id binding for the upcoming
+  act-time fast path (ADR 0015). Outlines are byte-identical to the
+  discover.js engine (cross-engine parity tests on all fixture pages), which
+  remains available as `capture_engine = "js"` until removal.
+- Anonymous elements (icon-only buttons, unlabeled inputs — no id/testid/
+  name/text/placeholder) are now actionable: when descriptor resolution
+  refuses, every verb falls back to the capture-time CDP node binding and acts
+  on the exact node the outline described (ADR 0015). Previously such refs
+  failed forever with a re-outline hint that could not help; a dead binding
+  now fails loudly and a re-outline genuinely re-binds.
+- Anonymous elements now carry descriptor fallbacks that survive node
+  replacement (which kills the CDP binding): session-stable class tokens
+  (hashy build tokens kept — best discriminators) and, for fully anonymous
+  elements, filtered custom attributes. Both resolve on UNIQUE matches only
+  (refuse-over-misbind); ref identity/reuse is unaffected. The binding-rescue
+  trial click also gained Playwright-style retries so transient overlays and
+  entrance animations no longer cause false blocks.
+- Diffs now pair elements across observations by CDP node identity first
+  (`Element.node_id`), descriptors second: state changes attribute to the
+  right sibling after reorders of identical elements, and an in-place relabel
+  ("Add to cart" → "Added ✓") reports as `~ @old → @new label: ...` instead
+  of a remove+add pair (>8 relabels per section still report as a bulk swap).
+  js-engine captures and cross-navigation diffs behave exactly as before.
+- Suspicious descriptor picks (nth-disambiguated, `.first`-collapsed, or made
+  after an identity mismatch) are geometry-checked against the ref's node
+  binding; on disagreement the bound node is acted on instead — reorders of
+  fully identical siblings no longer misbind. `browser.act_via_binding = true`
+  switches to binding-first resolution for eval A/B comparison.
+
+- Eval tasks now start on their declared target URL, stop at a configurable
+  200 tool calls by default, and support isolated parallel execution with
+  `ebrowse-eval run --jobs N`.
+- Added `ebrowse-eval serve`, a central local trace application that discovers
+  runs recursively, groups them by directory, opens traces dynamically, and
+  moves selected runs or whole directory groups to the system trash.
+- Central trace pages now render the first 25 and last 10 steps in full, show
+  compact middle steps expandable in groups of 10, and lazy-load screenshot
+  and DomSnapshot blobs. Standalone exports remain self-contained.
+- The trace server now treats browser-cancelled responses as normal disconnects
+  instead of printing `BrokenPipeError` worker tracebacks.
+- Pi raw-event capture now filters cumulative `message_update` snapshots and
+  has a 64 MiB ceiling without compromising timeout/tool-limit recovery.
+
 - **`evals/` workspace package (`ebrowse-evals`)** — foundation of the evaluation
   harness. Trace schema v1 (typed JSONL records + content-addressed blob store,
   forward-compatible by construction; see `evals/docs/trace-schema.md`), the

@@ -1,0 +1,4 @@
+[task]
+prompt = "Browse the class schedule of graduate-level chemistry courses on Monday afternoons in the winter of 2023."
+url = "https://www.stanford.edu/"
+tags = ["online-mind2web", "hard", "reachable"]

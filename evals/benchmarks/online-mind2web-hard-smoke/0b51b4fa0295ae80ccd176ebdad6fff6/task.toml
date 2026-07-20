@@ -1,0 +1,4 @@
+[task]
+prompt = "Search for a red Toyota Corolla from model years 2018 to 2023 on CarMax."
+url = "https://www.carmax.com/"
+tags = ["online-mind2web", "hard", "reachable"]

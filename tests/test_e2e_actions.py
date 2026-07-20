@@ -755,11 +755,14 @@ def _cart_refs(env, server):
     return expanded
 
 
-def test_shifted_ref_after_reorder_refuses(server, env):
+def test_shifted_ref_after_reorder_acts_on_bound_node(server, env):
     # Positional ids: removing Apple re-renders (delayed past the quiescence
     # window) so the live ids shift while the last observation keeps the old
-    # ones. The old ref for Durian's button then falls through its dead #id
-    # to a broad multi-match; verification must refuse, not click Banana's.
+    # ones. The descriptor chain refuses (dead #id -> broad multi-match ->
+    # identity mismatch, ADR 0003) — and the CDP node binding then rescues by
+    # acting on the exact node the outline described (ADR 0015): the id
+    # reassignment kept the same DOM nodes, so Durian's ref removes DURIAN,
+    # not Banana. Before ADR 0015 the best possible outcome here was a refusal.
     import time
 
     expanded = _cart_refs(env, server)
@@ -769,12 +772,14 @@ def test_shifted_ref_after_reorder_refuses(server, env):
     assert r.returncode == 0, r.stderr
     time.sleep(3.5)  # let the delayed positional re-render fire
     r = ebrowse(env, "click", removes[3])  # Durian's old ref, ids now shifted
-    assert r.returncode == 2, r.stdout + r.stderr
-    assert "stale ref" in r.stderr and "different element" in r.stderr
-    assert "ebrowse outline" in r.stderr
-    # nothing was wrongly removed: the three surviving items are all present
-    r = ebrowse(env, "eval", "document.querySelectorAll('#cart li').length")
-    assert "result: 3" in r.stdout, r.stdout
+    assert r.returncode == 0, r.stdout + r.stderr
+    # the RIGHT item was removed: Durian gone, Banana (the misbind victim
+    # the old refusal protected) still present
+    r = ebrowse(
+        env, "eval", "[...document.querySelectorAll('#cart li')].map(l => l.textContent).join('|')"
+    )
+    assert "Durian" not in r.stdout, r.stdout
+    assert "Banana" in r.stdout, r.stdout
 
 
 def test_nth_disambiguated_ref_still_works(server, env):

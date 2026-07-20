@@ -4,9 +4,16 @@ Pure tests — a fake harness stands in for pi; no network, no browser.
 """
 
 import json
+import time
 from pathlib import Path
 
-from ebrowse_evals.harness import HarnessResult, ParsedStep, parse_pi_session
+from ebrowse_evals.harness import (
+    PI_EVENTS_FILE,
+    HarnessResult,
+    ParsedStep,
+    PiHarness,
+    parse_pi_session,
+)
 from ebrowse_evals.runner import (
     HARNESS_DEFAULTS,
     resolve_config,
@@ -45,8 +52,16 @@ class FakeHarness:
     def describe(self):
         return {"harness": "fake", "provider": "test", "model": "test-model"}
 
-    def run(self, prompt, workdir, env, timeout_s, run_dir):
-        self.calls.append({"prompt": prompt, "workdir": workdir, "timeout_s": timeout_s})
+    def run(self, prompt, workdir, env, timeout_s, run_dir, start_url=None, tool_call_limit=None):
+        self.calls.append(
+            {
+                "prompt": prompt,
+                "workdir": workdir,
+                "timeout_s": timeout_s,
+                "start_url": start_url,
+                "tool_call_limit": tool_call_limit,
+            }
+        )
         return self.result
 
 
@@ -119,6 +134,8 @@ def test_run_task_emits_valid_trace(tmp_path):
     assert result.outcome == "success"
     # task-level timeout (120) beat the harness default
     assert harness.calls[0]["timeout_s"] == 120
+    assert harness.calls[0]["start_url"] == "http://127.0.0.1:8196/list.html"
+    assert harness.calls[0]["tool_call_limit"] == 200
 
 
 def test_run_task_outcomes(tmp_path):
@@ -129,6 +146,8 @@ def test_run_task_outcomes(tmp_path):
     assert run_task(task, crashed, {}, tmp_path / "b").outcome == "error"
     hung = FakeHarness(HarnessResult(timed_out=True, exit_code=-1))
     assert run_task(task, hung, {}, tmp_path / "c").outcome == "timeout"
+    capped = FakeHarness(HarnessResult(tool_limit_hit=True, exit_code=-15))
+    assert run_task(task, capped, {}, tmp_path / "d").outcome == "tool_limit"
 
 
 def test_run_task_invokes_custom_evaluator_on_trace(tmp_path):
@@ -175,6 +194,122 @@ def test_run_tasks_layers_benchmark_and_task_config(tmp_path):
         assert meta.config["fixture_server"] == "127.0.0.1:8196"  # from benchmark [config]
         assert meta.config["tool"] == "none"  # CLI layer
         assert meta.benchmark == "fixtures"
+
+
+def test_run_tasks_can_run_in_parallel_and_preserves_order(tmp_path):
+    bench = load_benchmark(BENCH)
+
+    class SlowHarness(FakeHarness):
+        def run(self, *args, **kwargs):
+            time.sleep(0.2)
+            return super().run(*args, **kwargs)
+
+    begun = time.monotonic()
+    results = run_tasks(bench.tasks, SlowHarness(), bench, {"jobs": 2}, tmp_path)
+    elapsed = time.monotonic() - begun
+    assert elapsed < 0.38
+    assert [r.task_id for r in results] == [t.id for t in bench.tasks]
+    assert len({r.run_dir for r in results}) == 2
+
+
+def test_pi_harness_stops_at_tool_call_limit(tmp_path):
+    pi = tmp_path / "fake-pi"
+    pi.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, time\n"
+        "for i in range(10):\n"
+        " print(json.dumps({'type':'message_end','message':{'role':'assistant',"
+        "'content':[{'type':'toolCall','id':str(i),'arguments':{'command':'echo x'}}]}}),"
+        " flush=True)\n"
+        " print(json.dumps({'type':'message_end','message':{'role':'toolResult',"
+        "'toolCallId':str(i),'content':[{'type':'text','text':'x'}]}}), flush=True)\n"
+        " time.sleep(.05)\n"
+    )
+    pi.chmod(0o755)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    result = PiHarness(provider="p", model="m", pi_bin=str(pi)).run(
+        "go", run_dir / "work", {}, 10, run_dir, tool_call_limit=2
+    )
+    assert result.tool_limit_hit is True
+    assert result.timed_out is False
+    assert len(result.steps) == 2
+
+
+def test_pi_harness_filters_cumulative_updates_and_keeps_fallback(tmp_path):
+    pi = tmp_path / "fake-pi"
+    pi.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json\n"
+        "for i in range(500):\n"
+        " print(json.dumps({'type':'message_update','message':{'role':'assistant',"
+        "'content':'x'*(i+1)}}), flush=True)\n"
+        "print(json.dumps({'type':'message_end','message':{'role':'assistant','content':["
+        "{'type':'toolCall','id':'1','arguments':{'command':'echo bounded'}}],"
+        "'usage':{'input':2,'output':3,'totalTokens':5}}}), flush=True)\n"
+        "print(json.dumps({'type':'message_end','message':{'role':'toolResult',"
+        "'toolCallId':'1','content':[{'type':'text','text':'bounded'}]}}), flush=True)\n"
+    )
+    pi.chmod(0o755)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    result = PiHarness(provider="p", model="m", pi_bin=str(pi)).run(
+        "go", run_dir / "work", {}, 10, run_dir
+    )
+    saved = (run_dir / PI_EVENTS_FILE).read_text()
+    assert "message_update" not in saved
+    assert saved.count('"type": "message_end"') == 2
+    assert len(saved) < 1_000
+    assert [step.command for step in result.steps] == ["echo bounded"]
+    assert result.steps[0].output == "bounded"
+
+
+def test_pi_harness_caps_event_file_but_preserves_in_memory_recovery(tmp_path):
+    pi = tmp_path / "fake-pi"
+    pi.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json\n"
+        "for i in range(20): print(json.dumps({'type':'diagnostic','data':'x'*100}), flush=True)\n"
+        "print(json.dumps({'type':'message_end','message':{'role':'assistant','content':["
+        "{'type':'toolCall','id':'1','arguments':{'command':'echo recovered'}}]}}), flush=True)\n"
+        "print(json.dumps({'type':'message_end','message':{'role':'toolResult',"
+        "'toolCallId':'1','content':[{'type':'text','text':'recovered'}]}}), flush=True)\n"
+    )
+    pi.chmod(0o755)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    result = PiHarness(provider="p", model="m", pi_bin=str(pi), pi_events_max_bytes=512).run(
+        "go", run_dir / "work", {}, 10, run_dir
+    )
+    saved = (run_dir / PI_EVENTS_FILE).read_text()
+    assert (run_dir / PI_EVENTS_FILE).stat().st_size <= 512
+    assert saved.count('"type":"events_truncated"') == 1
+    assert [step.command for step in result.steps] == ["echo recovered"]
+    assert result.steps[0].output == "recovered"
+
+
+def test_pi_harness_timeout_uses_in_memory_message_end_fallback(tmp_path):
+    pi = tmp_path / "fake-pi"
+    pi.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, time\n"
+        "print(json.dumps({'type':'message_update','message':{'content':'partial'}}), flush=True)\n"
+        "print(json.dumps({'type':'message_end','message':{'role':'assistant','content':["
+        "{'type':'toolCall','id':'1','arguments':{'command':'echo before-timeout'}}]}}), flush=True)\n"
+        "print(json.dumps({'type':'message_end','message':{'role':'toolResult',"
+        "'toolCallId':'1','content':[{'type':'text','text':'done'}]}}), flush=True)\n"
+        "time.sleep(5)\n"
+    )
+    pi.chmod(0o755)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    result = PiHarness(provider="p", model="m", pi_bin=str(pi)).run(
+        "go", run_dir / "work", {}, 0.2, run_dir
+    )
+    assert result.timed_out is True
+    assert [step.command for step in result.steps] == ["echo before-timeout"]
+    assert result.steps[0].output == "done"
+    assert "message_update" not in (run_dir / PI_EVENTS_FILE).read_text()
 
 
 # -- pi session parsing ------------------------------------------------------

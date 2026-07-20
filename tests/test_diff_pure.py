@@ -279,3 +279,109 @@ def test_diff_pages_expanded_section_gets_larger_text_budget():
     assert len(plain.sections[0].text_added) <= 500
     assert len(verbose.sections[0].text_added) > 2000
     assert verbose.sections[0].text_added == bulk  # fits the expanded budget whole
+
+
+# ---- node-identity pairing (ADR 0015 follow-up: Element.node_id) ----------
+
+
+def _set_nids(pm, nids: list[int]) -> None:
+    """Assign backend node ids to a page's elements in document order (fixture
+    snapshots carry none — captures on the cdp engine populate them)."""
+    els = [e for s in pm.sections for e in s.elements]
+    assert len(els) == len(nids), (len(els), nids)
+    for e, nid in zip(els, nids, strict=True):
+        e.node_id = nid
+
+
+def _one_section_page(children: list[dict], registry: RefRegistry):
+    raw = {
+        "url": "http://x.test/",
+        "title": "t",
+        "vw": 1280,
+        "vh": 800,
+        "scrollY": 0,
+        "docH": 800,
+        "truncated": False,
+        "root": {
+            "t": "body",
+            "r": [0, 0, 1280, 800],
+            "c": [{"t": "main", "r": [0, 0, 1280, 400], "c": children}],
+        },
+    }
+    return _build(raw, registry)
+
+
+def test_same_node_relabel_reports_label_change_not_remove_add():
+    registry = RefRegistry()
+    btn = {"t": "button", "r": [10, 10, 120, 30], "x": "Add to cart", "k": {"tg": 1}}
+    prev = _one_section_page([btn], registry)
+    new = _one_section_page([{**btn, "x": "Added \u2713"}], registry)
+    _set_nids(prev, [101])
+    _set_nids(new, [101])
+    d = diff_pages(prev, new)
+    assert d.kind == "partial"
+    sd = d.sections[0]
+    assert not sd.added and not sd.removed  # the old output shape for this
+    labels = [c for c in sd.state_changes if c[1] == "label"]
+    assert len(labels) == 1
+    who, _, old_label, new_label = labels[0]
+    assert "\u2192" in who or "→" in who  # "@eOld → @eNew": both refs named
+    assert old_label == "Add to cart" and new_label == "Added \u2713"
+
+
+def test_reorder_of_identical_siblings_attributes_state_to_the_right_node():
+    registry = RefRegistry()
+    box = {"t": "input", "r": [10, 10, 20, 20], "a": {"typ": "checkbox", "chk": 1}, "k": {"tg": 1}}
+    box2 = {**box, "a": {"typ": "checkbox", "chk": 0}, "r": [10, 40, 20, 20]}
+    prev = _one_section_page([box, box2], registry)  # A checked, B unchecked
+    # reorder AND uncheck A: descriptor-identical, so positional key-pairing
+    # would pin the change on the wrong sibling
+    new = _one_section_page(
+        [
+            {**box2, "r": [10, 10, 20, 20]},  # B first now
+            {
+                **box,
+                "a": {"typ": "checkbox", "chk": 0},
+                "r": [10, 40, 20, 20],
+            },  # A, now unchecked
+        ],
+        registry,
+    )
+    _set_nids(prev, [1, 2])  # A=1, B=2
+    _set_nids(new, [2, 1])  # document order now B, A
+    d = diff_pages(prev, new)
+    changes = [c for sd in d.sections for c in sd.state_changes if c[1] == "checked"]
+    assert len(changes) == 1
+    # A sits second in the new document order, so it carries the second ref —
+    # the change must name A's current ref, not the sibling now in A's old spot
+    a_new_ref = [e.ref for s in new.sections for e in s.elements][1]
+    assert changes[0][0] == a_new_ref
+
+
+def test_bulk_relabel_demotes_to_added_removed():
+    registry = RefRegistry()
+    prevs = [
+        {"t": "button", "r": [10, 10 + 40 * i, 120, 30], "x": f"Item {i}", "k": {"tg": 1}}
+        for i in range(10)
+    ]
+    news = [{**b, "x": f"Fresh {i}"} for i, b in enumerate(prevs)]
+    prev = _one_section_page(prevs, registry)
+    new = _one_section_page(news, registry)
+    nids = list(range(1, 11))
+    _set_nids(prev, nids)
+    _set_nids(new, nids)  # same nodes, all-new labels: a bulk content swap
+    d = diff_pages(prev, new)
+    sd = d.sections[0]
+    assert not [c for c in sd.state_changes if c[1] == "label"]  # no relabel wall
+    assert len(sd.added) == 10 and len(sd.removed) == 10
+
+
+def test_no_node_ids_keeps_previous_behavior():
+    registry = RefRegistry()
+    btn = {"t": "button", "r": [10, 10, 120, 30], "x": "Add to cart", "k": {"tg": 1}}
+    prev = _one_section_page([btn], registry)
+    new = _one_section_page([{**btn, "x": "Added"}], registry)
+    d = diff_pages(prev, new)  # fixture path: node_id None everywhere
+    sd = d.sections[0]
+    assert len(sd.added) == 1 and len(sd.removed) == 1  # classic remove+add
+    assert not [c for c in sd.state_changes if c[1] == "label"]

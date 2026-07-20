@@ -15,11 +15,17 @@ so totals report summed output, summed billed input, and *peak* context.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import selectors
 import shutil
+import signal
 import subprocess
 import sys
+import tempfile
+import time
+from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -28,9 +34,11 @@ from typing import Any, Protocol, runtime_checkable
 PROMPT_FILE = "prompt.txt"
 PI_EVENTS_FILE = "pi-events.jsonl"
 STDERR_FILE = "stderr.log"
+INITIAL_OPEN_FILE = "initial-open.txt"
 SESSION_DIR = "session"
 SPOOL_DIR = "capture"  # per-call debug-capture payloads: capture/<n>.json
 DEBUG_LOG_FILE = "ebrowse-debug.jsonl"  # daemon tier-1 events (EBROWSE_DEBUG_LOG)
+DEFAULT_PI_EVENTS_MAX_BYTES = 64 * 1024 * 1024
 
 
 @dataclass(slots=True)
@@ -52,6 +60,7 @@ class HarnessResult:
     totals: dict[str, Any] = field(default_factory=dict)
     exit_code: int = 0
     timed_out: bool = False
+    tool_limit_hit: bool = False
     session_path: Path | None = None  # saved agent-session transcript, if any
 
 
@@ -70,6 +79,8 @@ class AgentHarness(Protocol):
         env: dict[str, str],
         timeout_s: float | None,
         run_dir: Path,
+        start_url: str | None = None,
+        tool_call_limit: int | None = None,
     ) -> HarnessResult:
         """Execute one task. Artifacts (prompt, events, session) land in run_dir."""
         ...
@@ -202,6 +213,7 @@ class PiHarness:
     capture: bool = False  # instrument each ebrowse call (spool + debug log)
     pi_bin: str = "pi"
     ebrowse_bin: str | None = None  # explicit target for the shim (tests)
+    pi_events_max_bytes: int = DEFAULT_PI_EVENTS_MAX_BYTES
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -300,15 +312,70 @@ class PiHarness:
         env: dict[str, str],
         timeout_s: float | None,
         run_dir: Path,
+        start_url: str | None = None,
+        tool_call_limit: int | None = None,
     ) -> HarnessResult:
         if shutil.which(self.pi_bin) is None:
             raise FileNotFoundError(
                 f"'{self.pi_bin}' not on PATH — npm i -g @earendil-works/pi-coding-agent"
             )
         full_env = {**os.environ, **env}
+        # Every eval run owns its daemon socket, Chromium profile, and caches.
+        # This makes parallel runs independent and prevents one run's setup or
+        # teardown from stopping another run's browser.
+        # Unix socket paths are capped at roughly 108 bytes on Linux, while
+        # descriptive eval run paths are routinely longer. Keep only the
+        # socket runtime under a short, deterministic /tmp path.
+        runtime_key = hashlib.sha256(str(run_dir).encode()).hexdigest()[:16]
+        runtime_dir = Path(tempfile.gettempdir()) / "ebrowse-eval-runtime" / runtime_key
+        cache_dir = run_dir / "cache"
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        full_env["XDG_RUNTIME_DIR"] = str(runtime_dir)
+        # Playwright normally derives its downloaded-browser location from
+        # XDG_CACHE_HOME. Preserve the existing shared installation while the
+        # browser profile and ebrowse caches remain isolated per run.
+        if "PLAYWRIGHT_BROWSERS_PATH" not in full_env:
+            shared_browsers = Path.home() / ".cache" / "ms-playwright"
+            if shared_browsers.is_dir():
+                full_env["PLAYWRIGHT_BROWSERS_PATH"] = str(shared_browsers)
+        full_env["XDG_CACHE_HOME"] = str(cache_dir)
         if self.worktree or self.capture:
             self._install_shim(run_dir, full_env)
-        full_prompt = f"{self.tool_preamble()}\n# Task\n{prompt}"
+        ebrowse_cmd = shutil.which("ebrowse", path=full_env.get("PATH"))
+        opened = False
+        if start_url and self.tool == "ebrowse" and ebrowse_cmd:
+            try:
+                initial = subprocess.run(
+                    [ebrowse_cmd, "open", start_url],
+                    env={**full_env, "EBROWSE_EVAL_NOHOOK": "1"},
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=150,
+                )
+            except subprocess.TimeoutExpired as e:
+                initial_text = f"initial navigation timed out: {e}\n"
+                initial_returncode = -1
+            else:
+                initial_text = initial.stdout + initial.stderr
+                initial_returncode = initial.returncode
+            (run_dir / INITIAL_OPEN_FILE).write_text(initial_text, encoding="utf-8")
+            opened = initial_returncode == 0
+        site_instruction = ""
+        if start_url:
+            state = "is already open" if opened else "should be opened"
+            site_instruction = (
+                f"\n# Browser starting state\nThe target website {state} at {start_url}. "
+                "Complete the task on that target website. Do not use search engines or "
+                "unrelated websites.\n"
+            )
+        if self.tool == "ebrowse":
+            site_instruction += (
+                "Invoke the browser CLI directly as `ebrowse ...`. Do not prefix it with "
+                "`uv run` and do not use `python -m ebrowse`.\n"
+            )
+        full_prompt = f"{self.tool_preamble()}{site_instruction}\n# Task\n{prompt}"
         (run_dir / PROMPT_FILE).write_text(full_prompt, encoding="utf-8")
         workdir.mkdir(parents=True, exist_ok=True)
         session_dir = run_dir / SESSION_DIR
@@ -329,28 +396,109 @@ class PiHarness:
             full_prompt,
         ]
         timed_out = False
+        tool_limit_hit = False
         # Stream stdout/stderr straight to files: a timeout kill then loses
         # nothing (subprocess capture buffers would), and the event stream
         # doubles as the step source when pi never got to write its session.
         events_path = run_dir / PI_EVENTS_FILE
-        with (
-            events_path.open("wb") as out_f,
-            (run_dir / STDERR_FILE).open("wb") as err_f,
-        ):
+        fallback_entries: list[dict[str, Any]] = []
+        with events_path.open("wb") as out_f, (run_dir / STDERR_FILE).open("wb") as err_f:
+            proc = subprocess.Popen(
+                cmd,
+                cwd=workdir,
+                env=full_env,
+                stdout=subprocess.PIPE,
+                stderr=err_f,
+                start_new_session=True,
+            )
+            assert proc.stdout is not None
+            selector = selectors.DefaultSelector()
+            selector.register(proc.stdout, selectors.EVENT_READ)
+            deadline = time.monotonic() + timeout_s if timeout_s is not None else None
+            completed_tool_calls = 0
+            persisted_bytes = 0
+            truncation_recorded = False
+            truncation_marker = (
+                json.dumps(
+                    {
+                        "type": "events_truncated",
+                        "max_bytes": self.pi_events_max_bytes,
+                    },
+                    separators=(",", ":"),
+                ).encode()
+                + b"\n"
+            )
+
+            def process_line(line: bytes) -> dict[str, Any] | None:
+                """Keep fallback messages in memory and persist only bounded,
+                non-cumulative diagnostics."""
+                nonlocal persisted_bytes, truncation_recorded
+                try:
+                    event = json.loads(line)
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    event = None
+                if isinstance(event, dict) and event.get("type") == "message_end":
+                    message = event.get("message")
+                    if isinstance(message, dict):
+                        fallback_entries.append({"type": "message", "message": message})
+                # These contain the full message-so-far on every token; saving
+                # them makes the raw event file grow quadratically.
+                if isinstance(event, dict) and event.get("type") == "message_update":
+                    return event
+                if not truncation_recorded:
+                    # Reserve enough space to always explain why the artifact
+                    # stopped when a later event reaches the ceiling.
+                    if (
+                        persisted_bytes + len(line) + len(truncation_marker)
+                        <= self.pi_events_max_bytes
+                    ):
+                        out_f.write(line)
+                        out_f.flush()
+                        persisted_bytes += len(line)
+                    else:
+                        if persisted_bytes + len(truncation_marker) <= self.pi_events_max_bytes:
+                            out_f.write(truncation_marker)
+                            out_f.flush()
+                            persisted_bytes += len(truncation_marker)
+                        truncation_recorded = True
+                return event if isinstance(event, dict) else None
+
+            while proc.poll() is None:
+                if deadline is not None and time.monotonic() >= deadline:
+                    timed_out = True
+                    with suppress(ProcessLookupError):
+                        os.killpg(proc.pid, signal.SIGTERM)
+                    break
+                events = selector.select(timeout=0.25)
+                for _, _ in events:
+                    line = proc.stdout.readline()
+                    if not line:
+                        continue
+                    event = process_line(line)
+                    if event is None:
+                        continue
+                    if event.get("type") != "message_end":
+                        continue
+                    message = event.get("message") or {}
+                    if message.get("role") != "toolResult":
+                        continue
+                    completed_tool_calls += 1
+                    if tool_call_limit and completed_tool_calls >= tool_call_limit:
+                        tool_limit_hit = True
+                        with suppress(ProcessLookupError):
+                            os.killpg(proc.pid, signal.SIGTERM)
+                        break
             try:
-                proc = subprocess.run(
-                    cmd,
-                    cwd=workdir,
-                    env=full_env,
-                    stdout=out_f,
-                    stderr=err_f,
-                    timeout=timeout_s,
-                    check=False,
-                )
-                exit_code = proc.returncode
+                proc.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                timed_out = True
-                exit_code = -1
+                proc.kill()
+                proc.wait()
+            # Drain bytes already written by pi before termination.
+            rest = proc.stdout.read()
+            for line in rest.splitlines(keepends=True):
+                process_line(line)
+            exit_code = proc.returncode
+            selector.close()
         # The session file (written by pi at exit) is the ground truth for
         # steps; on timeout it never lands, so fall back to the live event
         # stream's message_end records (same message payloads).
@@ -361,13 +509,23 @@ class PiHarness:
             session_path = sessions[-1]
             entries = _jsonl(session_path)
         if not any(e.get("type") == "message" for e in entries):
-            entries = [
-                {"type": "message", "message": e["message"]}
-                for e in _jsonl(events_path)
-                if e.get("type") == "message_end" and isinstance(e.get("message"), dict)
-            ]
+            entries = fallback_entries
         result = parse_pi_session(entries)
+        # A very fast subprocess can enqueue another event before SIGTERM is
+        # delivered. Keep the trace and reported total at the configured
+        # boundary even if those bytes were already buffered in stdout.
+        if tool_limit_hit and tool_call_limit and len(result.steps) > tool_call_limit:
+            result.steps = result.steps[:tool_call_limit]
+            result.totals["tool_calls"] = len(result.steps)
         result.session_path = session_path
         result.exit_code = exit_code
         result.timed_out = timed_out
+        result.tool_limit_hit = tool_limit_hit
+        if ebrowse_cmd:
+            subprocess.run(
+                [ebrowse_cmd, "daemon", "stop"],
+                env={**full_env, "EBROWSE_EVAL_NOHOOK": "1"},
+                capture_output=True,
+                check=False,
+            )
         return result
