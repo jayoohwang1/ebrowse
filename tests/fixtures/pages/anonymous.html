@@ -33,6 +33,9 @@
       </button>
     </div>
     <div id="result"></div>
+    <!-- self-relabeling control: same node, new text after click — the diff
+         must report an in-place relabel, not remove+add (node-identity diff) -->
+    <button class="follow" type="button">Follow</button>
 
     <h2>Notes</h2>
     <div class="barefield">
@@ -42,6 +45,9 @@
     <div id="echo"></div>
   </main>
   <script>
+    document.querySelector(".follow").addEventListener("click", (e) => {
+      e.target.textContent = "Following \u2713";
+    });
     document.querySelector(".iconbtn").addEventListener("click", () => {
       document.getElementById("result").textContent =
         "search-clicked: " + (document.querySelector(".searchbar input").value || "(empty)");

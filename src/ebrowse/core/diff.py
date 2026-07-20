@@ -16,6 +16,16 @@ from ebrowse.model import Diff, Element, PageMem, Section, SectionDiff
 
 _TRACKED_STATE = ("value", "checked", "expanded", "disabled", "pressed", "selected")
 
+# Node-identity relabel pairs per section beyond this count are reported as
+# added/removed instead (bulk swap, not an in-place update).
+_MAX_RELABELS = 8
+
+
+def _label(d) -> str:
+    """Un-quoted label for relabel lines (short_desc nests quotes)."""
+    return (d.name or d.placeholder or d.text_head or d.id or d.tag).strip()[:40]
+
+
 # Added-text quoting budgets, in characters (~4 chars/token). The default keeps
 # diffs lean; sections the agent has *expanded* this page get a much larger
 # budget via diff_pages(expanded_fps=...) — it is actively reading them, so
@@ -128,23 +138,59 @@ def _element_delta(
     new_text: str = "",
     text_budget: int = TEXT_BUDGET,
 ) -> SectionDiff | None:
+    # Pass 1 — node identity (ADR 0015): elements sharing a live CDP backend
+    # node id across the two observes are the SAME element regardless of what
+    # their descriptors now say. This fixes state misattribution among
+    # descriptor-identical siblings after a reorder, and lets an in-place
+    # relabel ("Add to cart" -> "Added") report as a change instead of a
+    # remove+add pair. None node ids (js engine, fixtures) skip to pass 2.
+    pairs: list[tuple[Element, Element]] = []
+    prev_by_nid: dict[int, Element] = {e.node_id: e for e in prev.elements if e.node_id is not None}
+    consumed: set[int] = set()
+    unpaired_new: list[Element] = []
+    for e in new.elements:
+        nid = e.node_id
+        old = prev_by_nid.get(nid) if nid is not None else None
+        if nid is not None and old is not None and nid not in consumed:
+            consumed.add(nid)
+            pairs.append((old, e))
+        else:
+            unpaired_new.append(e)
+
+    # A bulk content swap (recycled virtualized rows: same nodes, all-new
+    # descriptors) reads better as added/removed than as a wall of relabel
+    # lines — node pairing only smooths SMALL in-place updates.
+    relabels = [(o, e) for o, e in pairs if o.desc.match_key() != e.desc.match_key()]
+    if len(relabels) > _MAX_RELABELS:
+        demoted = {id(o) for o, _ in relabels}
+        unpaired_new = [e for _, e in relabels] + unpaired_new
+        pairs = [(o, e) for o, e in pairs if id(o) not in demoted]
+        consumed = {o.node_id for o, _ in pairs if o.node_id is not None}
+
+    # Pass 2 — descriptor multiset, as before, over the leftovers
     prev_by_key: dict[tuple, list[Element]] = {}
     for e in prev.elements:
-        prev_by_key.setdefault(e.desc.match_key(), []).append(e)
+        if e.node_id is None or e.node_id not in consumed:
+            prev_by_key.setdefault(e.desc.match_key(), []).append(e)
 
     added: list[Element] = []
-    state_changes: list[tuple[str, str, str, str]] = []
-    for e in new.elements:
+    for e in unpaired_new:
         bucket = prev_by_key.get(e.desc.match_key())
         if bucket:
-            old = bucket.pop(0)
-            for field_name in _TRACKED_STATE:
-                ov, nv = getattr(old.state, field_name), getattr(e.state, field_name)
-                if ov != nv and not (ov is None and nv is None):
-                    state_changes.append((e.ref, field_name, _fmt(ov), _fmt(nv)))
+            pairs.append((bucket.pop(0), e))
         else:
             added.append(e)
     removed = [e.desc for bucket in prev_by_key.values() for e in bucket]
+
+    state_changes: list[tuple[str, str, str, str]] = []
+    for old, e in pairs:
+        if old.desc.match_key() != e.desc.match_key():
+            who = e.ref if old.ref == e.ref else f"{old.ref} → {e.ref}"
+            state_changes.append((who, "label", _label(old.desc), _label(e.desc)))
+        for field_name in _TRACKED_STATE:
+            ov, nv = getattr(old.state, field_name), getattr(e.state, field_name)
+            if ov != nv and not (ov is None and nv is None):
+                state_changes.append((e.ref, field_name, _fmt(ov), _fmt(nv)))
 
     text_changed = prev.content_hash != new.content_hash
     if not added and not removed and not state_changes and not text_changed:

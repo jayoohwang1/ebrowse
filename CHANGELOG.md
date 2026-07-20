@@ -27,6 +27,12 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   (refuse-over-misbind); ref identity/reuse is unaffected. The binding-rescue
   trial click also gained Playwright-style retries so transient overlays and
   entrance animations no longer cause false blocks.
+- Diffs now pair elements across observations by CDP node identity first
+  (`Element.node_id`), descriptors second: state changes attribute to the
+  right sibling after reorders of identical elements, and an in-place relabel
+  ("Add to cart" → "Added ✓") reports as `~ @old → @new label: ...` instead
+  of a remove+add pair (>8 relabels per section still report as a bulk swap).
+  js-engine captures and cross-navigation diffs behave exactly as before.
 - Suspicious descriptor picks (nth-disambiguated, `.first`-collapsed, or made
   after an identity mismatch) are geometry-checked against the ref's node
   binding; on disagreement the bound node is acted on instead — reorders of

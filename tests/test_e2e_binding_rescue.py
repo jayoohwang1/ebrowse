@@ -206,3 +206,20 @@ def test_binding_first_flag_smoke(server, env_binding_first):
     r = ebrowse(env, "click", button)
     assert r.returncode == 0, r.stderr
     assert "search-clicked: kitten" in r.stdout, r.stdout
+
+
+def test_self_relabeling_button_diffs_as_label_change(server, env):
+    """End-to-end node-identity diffing: clicking Follow relabels the SAME
+    node to "Following"; the diff must report `~ @old → @new label:` (real
+    backend ids threaded session-side), not a remove+add pair."""
+    r = ebrowse(env, "open", server.url("anonymous.html") + "?fresh=relabel")
+    assert r.returncode == 0, r.stderr
+    out = ebrowse(env, "outline").stdout
+    sids = re.findall(r"^(s\d+) ", out, re.M)
+    follow = ref_anywhere_in(env, sids, r"Follow")
+    r = ebrowse(env, "click", follow)
+    assert r.returncode == 0, r.stderr
+    m = re.search(r"~ (@e\d+) → (@e\d+) label: \"Follow\" → \"Following", r.stdout)
+    assert m, r.stdout
+    assert m.group(1) == follow  # the old ref is named so the agent can remap
+    assert "element(s) removed" not in r.stdout

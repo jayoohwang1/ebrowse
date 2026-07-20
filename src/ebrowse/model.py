@@ -151,9 +151,19 @@ class Element:
     ref: str  # "@e12" — session-scoped, durable
     desc: ElementDesc
     state: ElementState
+    # CDP backend node id from capture (None on the js engine / from fixtures).
+    # Same-document node identity: diff pairs elements on it first, fixing
+    # misattribution among descriptor-identical siblings and reporting
+    # in-place relabels instead of remove+add pairs (ADR 0015 follow-up).
+    node_id: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"ref": self.ref, "desc": self.desc.to_dict(), "state": self.state.to_dict()}
+        return {
+            "ref": self.ref,
+            "desc": self.desc.to_dict(),
+            "state": self.state.to_dict(),
+            "node_id": self.node_id,
+        }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Element:
@@ -161,6 +171,7 @@ class Element:
             ref=d["ref"],
             desc=ElementDesc.from_dict(d["desc"]),
             state=ElementState.from_dict(d["state"]),
+            node_id=d.get("node_id"),
         )
 
 

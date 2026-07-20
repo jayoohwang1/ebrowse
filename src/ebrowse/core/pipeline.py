@@ -188,7 +188,11 @@ def build_page(
         elements = []
         for node in nodes:
             desc = descs[i]
-            elements.append(Element(ref=refs[i], desc=desc, state=_state_for(node)))
+            elements.append(
+                Element(
+                    ref=refs[i], desc=desc, state=_state_for(node), node_id=node.backend_node_id
+                )
+            )
             i += 1
 
         heading = section_heading(raw)
