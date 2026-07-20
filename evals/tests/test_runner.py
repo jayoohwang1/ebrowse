@@ -150,6 +150,22 @@ def test_run_task_emits_valid_trace(tmp_path):
     assert harness.calls[0]["tool_call_limit"] == 200
 
 
+def test_pi_ebrowse_preamble_adapts_cli_skill_to_custom_tool(tmp_path):
+    (tmp_path / "SKILL.md").write_text(
+        "`ebrowse` is a CLI. Run it via shell. One background daemon owns the browser;\n"
+        "state (page, refs, logins) persists between commands.\n"
+        "Run `ebrowse outline` next.\n"
+    )
+    preamble = PiHarness(
+        provider="p", model="m", tool="ebrowse", repo_root=tmp_path
+    ).tool_preamble()
+    assert "using the `ebrowse` tool" in preamble
+    assert "available through the dedicated `ebrowse` tool" in preamble
+    assert "without the leading `ebrowse` prefix" in preamble
+    assert "Run it via shell" not in preamble
+    assert "Run `ebrowse outline` next" in preamble  # examples remain recognizable
+
+
 def test_run_meta_is_written_after_prepare_but_before_agent_run(tmp_path):
     class PreparingHarness(FakeHarness):
         def prepare_run(self, env, run_dir, start_url, config):

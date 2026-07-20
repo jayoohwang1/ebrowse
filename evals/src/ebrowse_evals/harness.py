@@ -50,6 +50,12 @@ Do not claim success unless the browser state supports it. If a tool action is
 blocked by policy, do not try to bypass the restriction; use the standard
 browser operations available to you or explain that the task could not be completed."""
 
+SKILL_CLI_INTRO = """`ebrowse` is a CLI. Run it via shell. One background daemon owns the browser;
+state (page, refs, logins) persists between commands."""
+SKILL_TOOL_INTRO = """`ebrowse` is available through the dedicated `ebrowse` tool. Pass each documented
+command without the leading `ebrowse` prefix. Browser state (page, refs, logins)
+persists between tool calls."""
+
 
 @dataclass(slots=True)
 class ParsedStep:
@@ -395,7 +401,8 @@ class PiHarness:
         if self.tool == "ebrowse":
             skill = self.repo_root / "SKILL.md"
             guide = skill.read_text(encoding="utf-8") if skill.is_file() else ""
-            return f"You control a web browser using the 'ebrowse' CLI. Its operating guide follows.\n\n{guide}\n"
+            guide = guide.replace(SKILL_CLI_INTRO, SKILL_TOOL_INTRO, 1)
+            return f"You control a web browser using the `ebrowse` tool. Its operating guide follows.\n\n{guide}\n"
         if self.tool == "agent-browser":
             proc = subprocess.run(
                 ["agent-browser", "skills", "get", "core", "--full"],

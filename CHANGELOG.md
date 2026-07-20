@@ -13,6 +13,8 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
   metadata and `navigation-bootstrap.json`. Harness preparation completes before the
   single authoritative `run_meta` record is emitted, so live runs remain discoverable
   throughout agent execution without later metadata correction records.
+- Pi's injected ebrowse operating guide now describes the dedicated custom tool
+  instead of telling the browser-only agent to invoke the CLI through a shell.
 
 - Pi/ebrowse evals now expose one shell-free custom browser tool instead of
   Bash. A configurable verb/argument/output/timeout policy blocks `eval`, file
