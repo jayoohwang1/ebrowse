@@ -1,0 +1,4 @@
+[task]
+prompt = "Find a dog groomer for nail trimming within 100 miles of zip code 10005 and check the detailed service prices of the first one."
+url = "https://www.akc.org/"
+tags = ["online-mind2web", "hard", "open"]

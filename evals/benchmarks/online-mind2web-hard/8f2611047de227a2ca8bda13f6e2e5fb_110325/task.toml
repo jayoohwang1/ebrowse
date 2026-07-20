@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the cheapest used Honda Civic that meets all the following criteria: under $25,000, fewer than 30,000 miles, includes Apple CarPlay, adaptive cruise control, and blind-spot sensors."
+url = "https://www.carvana.com/"
+tags = ["online-mind2web", "hard", "open"]

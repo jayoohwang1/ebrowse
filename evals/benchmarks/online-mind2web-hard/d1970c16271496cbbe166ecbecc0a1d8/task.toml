@@ -1,0 +1,4 @@
+[task]
+prompt = "I'm 25 and located in Texas. Shop for 2020 made dry red wine made in United States priced between 15-20 dollars and add 5 bottles to the cart."
+url = "https://macyswineshop.com/"
+tags = ["online-mind2web", "hard", "open"]

@@ -1,0 +1,4 @@
+[task]
+prompt = "Show me the options for a roundtrip leaving from Las Vegas on flexible dates on the interactive map on united."
+url = "https://www.united.com/"
+tags = ["online-mind2web", "hard", "open"]

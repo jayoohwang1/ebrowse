@@ -1,0 +1,4 @@
+[task]
+prompt = "My name is Mike. I would like to send Christene (christenson@gmail.com) a Dillard’s $100 eGift Card for her birthday. The delivery date should be set for next Monday. Please include the message: “Happy Birthday, wishing you many more years to come.”"
+url = "https://www.dillards.com/"
+tags = ["online-mind2web", "hard", "open"]

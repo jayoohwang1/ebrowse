@@ -8,6 +8,12 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- `evals/benchmarks/online-mind2web-hard` — all 79 hard tasks, generated from
+  the current Online-Mind2Web dataset drop by a checked-in `generate.py`
+  (re-run it on dataset updates; revision-suffixed task ids replace the older
+  directory). Bot-blocked sites tagged `blocked-site`, the rest `open`.
+  The smoke benchmark's WebMD task is updated to its `_070826` revision.
+
 - `ebrowse-eval annotate` — post-hoc LLM trace annotation via a local
   OpenAI-compatible endpoint: a full-trajectory text pass (one-line verdict,
   per-incident issue spans with category/severity, stuck spans) plus a targeted

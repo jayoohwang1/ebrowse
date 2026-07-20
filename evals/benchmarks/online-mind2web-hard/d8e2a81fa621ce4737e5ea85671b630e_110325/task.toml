@@ -1,0 +1,4 @@
+[task]
+prompt = "Search for in-person, full-time jobs within 10 miles of ZIP code 14810 that allow Quick Apply."
+url = "https://ziprecruiter.com/"
+tags = ["online-mind2web", "hard", "open"]

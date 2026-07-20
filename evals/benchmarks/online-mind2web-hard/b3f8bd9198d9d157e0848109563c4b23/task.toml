@@ -1,0 +1,4 @@
+[task]
+prompt = "Find a permanent job in Logistics within 20 miles of New York, zip 11005, in the middle-income range for a high school diploma holder."
+url = "https://ohiomeansjobs.ohio.gov/"
+tags = ["online-mind2web", "hard", "open"]

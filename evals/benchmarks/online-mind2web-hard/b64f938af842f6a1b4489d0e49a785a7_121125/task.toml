@@ -1,0 +1,4 @@
+[task]
+prompt = "Get the frozen vegetarian cheese pizza between 5 to 10 USD on Target."
+url = "https://www.target.com/"
+tags = ["online-mind2web", "hard", "open"]

@@ -1,0 +1,4 @@
+[task]
+prompt = "Estimate the total cost (with basic support) of using 5 million input tokens and 5 million output tokens each for GPT-4o and GPT-4o Mini, both deployed in the US/EU Data Zones under Standard (On-Demand) in the East US region."
+url = "https://azure.microsoft.com/"
+tags = ["online-mind2web", "hard", "open"]

@@ -1,0 +1,4 @@
+[task]
+prompt = "Find obedience trials in the state of New York in the next month."
+url = "https://www.akc.org/"
+tags = ["online-mind2web", "hard", "open"]

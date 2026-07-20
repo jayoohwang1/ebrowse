@@ -1,0 +1,4 @@
+[task]
+prompt = "Browse used Mercedes-Benz cars from model years 2004 to 2012 on KBB and sort by highest price."
+url = "https://www.kbb.com/"
+tags = ["online-mind2web", "hard", "open"]

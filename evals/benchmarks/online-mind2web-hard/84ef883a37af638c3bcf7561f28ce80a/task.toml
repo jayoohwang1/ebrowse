@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the cheapest used hatchback car listing in Madison which has black interiors with a heated seat option and premium sound system."
+url = "https://www.cars.com/"
+tags = ["online-mind2web", "hard", "blocked-site"]

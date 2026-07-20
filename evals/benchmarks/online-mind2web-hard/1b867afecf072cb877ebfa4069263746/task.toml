@@ -1,0 +1,4 @@
+[task]
+prompt = "Display the figure comparing unemployment trends among women in Illinois and Michigan."
+url = "https://www.americashealthrankings.org/"
+tags = ["online-mind2web", "hard", "open"]

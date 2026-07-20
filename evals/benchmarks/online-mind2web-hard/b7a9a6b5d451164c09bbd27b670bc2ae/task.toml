@@ -1,0 +1,4 @@
+[task]
+prompt = "Show me the list of Men's Blazers, Black, Size M on Uniqlo."
+url = "https://www.uniqlo.com/"
+tags = ["online-mind2web", "hard", "open"]

@@ -1,0 +1,4 @@
+[task]
+prompt = "Browse dermatologists within 10 miles of zip code 10019 and filter by only those who accept Blue Medicare Advantage."
+url = "https://www.healthgrades.com/"
+tags = ["online-mind2web", "hard", "open"]

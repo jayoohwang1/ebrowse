@@ -1,0 +1,4 @@
+[task]
+prompt = "Get a part-time job within 5 miles of Moscow, Idaho in the accommodation and food services industry, as a chef, and show jobs for corporate only."
+url = "https://ohiomeansjobs.ohio.gov/"
+tags = ["online-mind2web", "hard", "open"]

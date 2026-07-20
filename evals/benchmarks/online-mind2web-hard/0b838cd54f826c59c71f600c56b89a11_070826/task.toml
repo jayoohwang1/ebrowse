@@ -1,0 +1,4 @@
+[task]
+prompt = "Find all the locations for the second-best-rated used car dealer less than 25 miles from New York."
+url = "https://www.bbb.org/"
+tags = ["online-mind2web", "hard", "open"]

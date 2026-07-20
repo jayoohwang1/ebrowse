@@ -1,0 +1,4 @@
+[task]
+prompt = "Browse the top 250 movies and find one movie that is available on AMC+."
+url = "https://www.imdb.com/"
+tags = ["online-mind2web", "hard", "open", "smoke"]

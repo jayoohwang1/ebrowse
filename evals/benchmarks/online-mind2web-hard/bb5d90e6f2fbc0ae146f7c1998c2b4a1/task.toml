@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the most viewed TED talk on the topic of robots that lasts between 12 and 18 minutes."
+url = "https://www.ted.com/"
+tags = ["online-mind2web", "hard", "open", "smoke"]

@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the most reviewed gluten-free multivitamins from CVS Health Brand under $15."
+url = "https://www.cvs.com/"
+tags = ["online-mind2web", "hard", "open"]

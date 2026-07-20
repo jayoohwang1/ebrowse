@@ -1,0 +1,4 @@
+[task]
+prompt = "Add the best-selling men's T-shirt in large size, short sleeve, and Halloween event style to my cart."
+url = "https://www.jcpenney.com/"
+tags = ["online-mind2web", "hard", "open"]

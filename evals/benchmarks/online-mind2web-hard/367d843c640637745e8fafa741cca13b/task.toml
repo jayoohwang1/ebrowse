@@ -1,0 +1,4 @@
+[task]
+prompt = "Find a condo for rent in Houston, TX, with a monthly rent of no more than 30% of an income of $8000. The condo should have a minimum area of 600 square feet, and the move-in date is the 1st of next month."
+url = "https://www.apartments.com/"
+tags = ["online-mind2web", "hard", "blocked-site"]

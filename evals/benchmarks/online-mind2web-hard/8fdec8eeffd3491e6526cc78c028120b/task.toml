@@ -1,0 +1,4 @@
+[task]
+prompt = "See Nissan and Honda cars for sale near Kentwood, MI 49512 on CarMax."
+url = "https://www.carmax.com/"
+tags = ["online-mind2web", "hard", "open"]

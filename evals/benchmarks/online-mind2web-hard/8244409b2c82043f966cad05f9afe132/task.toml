@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the best Audiologist within 50 miles of New York, NY, with a rating of 4 and above."
+url = "https://doctor.webmd.com/"
+tags = ["online-mind2web", "hard", "open"]

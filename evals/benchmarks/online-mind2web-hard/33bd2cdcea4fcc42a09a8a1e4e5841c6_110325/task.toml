@@ -1,0 +1,4 @@
+[task]
+prompt = "Add a Box Combo to my bag with Diet Coke as the drink, and a Kids Combo with milk as the drink. Select the store closest to ZIP 10001 for pickup tomorrow at 12:00 PM."
+url = "https://raisingcanes.com/"
+tags = ["online-mind2web", "hard", "open"]

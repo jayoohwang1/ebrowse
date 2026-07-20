@@ -1,0 +1,4 @@
+[task]
+prompt = "Discover the trade-in value of my Intel 10th generation i5, 2021, HP laptop in fair condition, which has 8 GB memory and can be powered on, proceed for the in-store trade-in."
+url = "https://www.bestbuy.com/"
+tags = ["online-mind2web", "hard", "open"]
