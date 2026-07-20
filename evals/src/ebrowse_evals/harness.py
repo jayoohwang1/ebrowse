@@ -599,9 +599,13 @@ class PiHarness:
             executable, prefix = ebrowse_target
             full_env.pop("EBROWSE_SECURITY_BOOTSTRAP_NAVIGATION", None)
             full_env.pop("EBROWSE_SECURITY_BOOTSTRAP_MAX_HOSTS", None)
-            if navigation_mode == "task-redirects" and start_url is not None:
+            # Block loopback/private-network targets even under `unrestricted`:
+            # dropping the domain allowlist should not also open localhost /
+            # cloud-metadata to the agent. Local task URLs (fixture servers) opt
+            # out so their own host stays reachable.
+            if navigation_mode in {"task-redirects", "unrestricted"}:
                 full_env["EBROWSE_SECURITY_BLOCK_PRIVATE_NETWORK"] = (
-                    "false" if _local_task_url(start_url) else "true"
+                    "false" if (start_url and _local_task_url(start_url)) else "true"
                 )
             if domains:
                 full_env["EBROWSE_SECURITY_ALLOWED_DOMAINS"] = ",".join(domains)

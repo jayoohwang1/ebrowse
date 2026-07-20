@@ -224,3 +224,25 @@ def test_navigation_bootstrap_blocks_private_and_caps_hosts():
         session._check_url_allowed("https://third.example/")
     with pytest.raises(CommandError, match="private or loopback"):
         session._check_url_allowed("http://127.0.0.1/")
+
+
+def test_private_network_blocked_with_empty_allowlist():
+    """`unrestricted` navigation (empty allowlist) with private-network blocking
+    on must allow any public host but still reject loopback/private targets — an
+    empty allowlist means 'all domains', not 'deny all'."""
+    import pytest
+
+    from ebrowse.errors import CommandError
+    from ebrowse.session import Session
+
+    cfg = Config()
+    cfg.security.allowed_domains = []  # unrestricted
+    cfg.security.block_private_network = True
+    s = Session("open", cfg)
+    s._check_url_allowed("https://example.com/")  # any public host ok
+    s._check_url_allowed("https://awt.cbp.gov/")  # sibling subdomain ok
+    s._check_url_allowed("https://youtubekids.com/")  # cross-domain ok
+    with pytest.raises(CommandError, match="private or loopback"):
+        s._check_url_allowed("http://127.0.0.1/")
+    with pytest.raises(CommandError, match="private or loopback"):
+        s._check_url_allowed("http://localhost:8080/")

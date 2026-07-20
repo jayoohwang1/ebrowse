@@ -6,6 +6,16 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ## [Unreleased]
 
+### Fixed
+
+- `Session._check_url_allowed` treated an empty `allowed_domains` as deny-all
+  whenever security was otherwise active (e.g. private-network blocking on),
+  which would have rejected every navigation under `unrestricted`. An empty
+  allowlist now correctly means "all domains"; private-network blocking still
+  applies. The eval harness enables private-network blocking under
+  `unrestricted` too, so dropping the domain allowlist no longer opens
+  localhost / cloud-metadata to the agent.
+
 ### Added
 
 - `evals/benchmarks/online-mind2web-hard` — all 79 hard tasks, generated from

@@ -1198,7 +1198,11 @@ class Session(CompoundMixin, ActionsMixin):
             hosts.add(host)
             self._bootstrap_navigation_hosts = hosts
             return
-        if not any(host == d or host.endswith("." + d) for d in allowed):
+        # An empty allowlist means "all domains" (config.py: `# empty = all`).
+        # Only enforce the allowlist when it is non-empty — otherwise security
+        # that is active solely for private-network blocking (unrestricted
+        # navigation with block_private_network on) would reject every host.
+        if allowed and not any(host == d or host.endswith("." + d) for d in allowed):
             hint = (
                 "run 'ebrowse back' or edit security.allowed_domains"
                 if landed
