@@ -1,0 +1,4 @@
+[task]
+prompt = "Search for the ovulation calculator and enter the first day of the previous month as the first date of the period and calculate the date of ovulation and pregnancy test day."
+url = "https://www.webmd.com/"
+tags = ["online-mind2web", "hard", "open", "smoke"]

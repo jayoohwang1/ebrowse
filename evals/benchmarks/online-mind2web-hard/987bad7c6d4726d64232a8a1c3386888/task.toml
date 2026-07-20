@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the seller info and seller's notes about the used car model 2011 BMW 135 with a max price of $30000."
+url = "https://www.cars.com/"
+tags = ["online-mind2web", "hard", "blocked-site"]

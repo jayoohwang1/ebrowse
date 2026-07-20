@@ -1,0 +1,4 @@
+[task]
+prompt = "Show me the list of external hard drives for Mac with a capacity greater than 2TB on Micro Center, sorted by price from lowest to highest."
+url = "https://www.microcenter.com/"
+tags = ["online-mind2web", "hard", "open"]

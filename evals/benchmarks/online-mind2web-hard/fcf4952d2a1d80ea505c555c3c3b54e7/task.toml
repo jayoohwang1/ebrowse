@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the cheapest used  8-cylinder bmw made between 2005-2015 and priced from 25,000 to  50,000 dollars with mileage less than 50,000 miles or less."
+url = "https://www.cars.com/"
+tags = ["online-mind2web", "hard", "blocked-site"]

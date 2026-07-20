@@ -1,0 +1,4 @@
+[task]
+prompt = "My baby boy was born on Dec 1, 2025. His weight is 7 lb 8 oz, height is 20 inches, and head circumference is 35 cm. The measurement date is Dec 1, 2025. Can you calculate his growth percentiles using a calculator?"
+url = "https://www.babycenter.com/"
+tags = ["online-mind2web", "hard", "open"]

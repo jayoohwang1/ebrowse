@@ -1,0 +1,4 @@
+[task]
+prompt = "Check if a visa is required to work in the UK for longer than 6 months in Healthcare as an American citizen."
+url = "https://www.gov.uk/"
+tags = ["online-mind2web", "hard", "open", "smoke"]

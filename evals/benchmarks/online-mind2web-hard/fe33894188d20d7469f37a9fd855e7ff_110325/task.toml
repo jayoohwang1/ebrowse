@@ -1,0 +1,4 @@
+[task]
+prompt = "Show me the most popular open-source software on SourceForge that runs on Linux and macOS, belongs to the category of “Agentic AI”, is licensed under MIT, and has a production/stable development status."
+url = "https://sourceforge.net/"
+tags = ["online-mind2web", "hard", "blocked-site"]

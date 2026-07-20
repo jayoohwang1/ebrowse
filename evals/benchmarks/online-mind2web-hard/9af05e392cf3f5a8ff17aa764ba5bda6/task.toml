@@ -1,0 +1,4 @@
+[task]
+prompt = "Get a quote from C and above-rated solar energy equipment company within 10 miles of Miami, Florida."
+url = "https://www.bbb.org/"
+tags = ["online-mind2web", "hard", "open"]

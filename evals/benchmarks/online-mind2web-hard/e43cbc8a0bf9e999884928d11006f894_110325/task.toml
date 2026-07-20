@@ -1,0 +1,4 @@
+[task]
+prompt = "Show me an event to do in Miami for 2 adults, that last between 1 to 3 hours per session, cost under $100 per person, and are available for booking between next Monday and next Friday, have a rating of 4.5+."
+url = "https://www.airbnb.com/"
+tags = ["online-mind2web", "hard", "open"]

@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the top-rated hotel in Manhattan, NY, suitable for 4 guests, and identify the fastest public transportation option from the hotel to LGA airport."
+url = "https://www.google.com/maps/"
+tags = ["online-mind2web", "hard", "open"]

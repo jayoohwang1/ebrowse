@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the SO2 air quality over the past hour for Maine North, County Cork, Ireland."
+url = "https://www.accuweather.com/"
+tags = ["online-mind2web", "hard", "open"]

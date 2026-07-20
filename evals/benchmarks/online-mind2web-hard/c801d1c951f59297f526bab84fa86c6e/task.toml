@@ -1,0 +1,4 @@
+[task]
+prompt = "Browse the latest negative reviews from players with over 100 hours of playtime for the game that won the 2023 VR Game of the Year Award."
+url = "https://store.steampowered.com/"
+tags = ["online-mind2web", "hard", "open", "smoke"]

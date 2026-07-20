@@ -1,0 +1,4 @@
+[task]
+prompt = "Find parking near the San Francisco Museum of Modern Art for next Sunday from 1:00 PM to 5:00 PM. I'm driving a Ford F-150 and need a garage that allows in-and-out privileges. If there are multiple options, show me the details of the one with the lowest price."
+url = "https://spothero.com/"
+tags = ["online-mind2web", "hard", "open"]

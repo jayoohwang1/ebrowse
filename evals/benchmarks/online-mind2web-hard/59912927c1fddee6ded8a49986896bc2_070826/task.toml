@@ -1,0 +1,4 @@
+[task]
+prompt = "Look for the most useful reviews of the highest-rated anti-reflective TVs with screen sizes from 55in to 64in."
+url = "https://www.samsung.com/"
+tags = ["online-mind2web", "hard", "open"]

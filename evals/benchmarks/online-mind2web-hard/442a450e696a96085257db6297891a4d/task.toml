@@ -1,0 +1,4 @@
+[task]
+prompt = "Using a calculator to determine how much I can have in my 401(k) account at retirement, if I work from age 22 to 65, with an annual rate of return of 3%, annual employee contributions of $8,000, and annual employer contributions of $8,000."
+url = "https://www.chase.com/"
+tags = ["online-mind2web", "hard", "open"]

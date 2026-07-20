@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the cheapest hotel + flight + car package from New York to San Francisco, departing tomorrow and returning on the fourth day from departure, for two adults and a six-year-old child. The package should be one room with free breakfast and spa access."
+url = "https://www.booking.com/"
+tags = ["online-mind2web", "hard", "open"]

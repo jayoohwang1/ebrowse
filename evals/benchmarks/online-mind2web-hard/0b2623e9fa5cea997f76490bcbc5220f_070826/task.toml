@@ -1,0 +1,4 @@
+[task]
+prompt = "Find a list of shorthaired dogs available for adoption within 100 miles of zip code 94587 that are good with kids and cats, and have been on Petfinder for over 10 days."
+url = "https://www.petfinder.com/"
+tags = ["online-mind2web", "hard", "open"]

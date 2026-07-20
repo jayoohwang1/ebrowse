@@ -1,0 +1,4 @@
+[task]
+prompt = "Show me the page with average wait times for U.S. citizens arriving at Raleigh-Durham International Airport on 2025-03-12."
+url = "https://www.cbp.gov/"
+tags = ["online-mind2web", "hard", "open"]

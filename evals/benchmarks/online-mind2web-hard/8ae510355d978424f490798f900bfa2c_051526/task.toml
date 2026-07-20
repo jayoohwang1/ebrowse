@@ -1,0 +1,4 @@
+[task]
+prompt = "Show me the private rooms in New York that has a private bathroom, wifi, and gas included in the bills."
+url = "https://www.student.com/"
+tags = ["online-mind2web", "hard", "open"]

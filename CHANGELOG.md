@@ -6,7 +6,31 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ## [Unreleased]
 
+### Fixed
+
+- `Session._check_url_allowed` treated an empty `allowed_domains` as deny-all
+  whenever security was otherwise active (e.g. private-network blocking on),
+  which would have rejected every navigation under `unrestricted`. An empty
+  allowlist now correctly means "all domains"; private-network blocking still
+  applies. The eval harness enables private-network blocking under
+  `unrestricted` too, so dropping the domain allowlist no longer opens
+  localhost / cloud-metadata to the agent.
+
 ### Added
+
+- `evals/benchmarks/online-mind2web-hard` — all 79 hard tasks, generated from
+  the current Online-Mind2Web dataset drop by a checked-in `generate.py`
+  (re-run it on dataset updates; revision-suffixed task ids replace the older
+  directory). Bot-blocked sites tagged `blocked-site`, the rest `open`.
+  The smoke benchmark's WebMD task is updated to its `_070826` revision.
+
+- `ebrowse-eval annotate` — post-hoc LLM trace annotation via a local
+  OpenAI-compatible endpoint: a full-trajectory text pass (one-line verdict,
+  per-incident issue spans with category/severity, stuck spans) plus a targeted
+  vision pass comparing step screenshots against the outline the agent saw.
+  Results are appended as `summary` records (additive `kind`/`category`/
+  `severity`/`screenshot` fields); `ebrowse-eval issues` renders the triage
+  list with executable drill-down commands.
 
 - Page capture now uses CDP `DOMSnapshot.captureSnapshot` by default
   (`browser.capture_engine = "cdp"`), producing the existing DomSnapshot shape

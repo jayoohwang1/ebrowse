@@ -1,0 +1,4 @@
+[task]
+prompt = "Find a flight from Dublin to anywhere under $100 tomorrow on Ryanair."
+url = "https://www.ryanair.com/"
+tags = ["online-mind2web", "hard", "open"]

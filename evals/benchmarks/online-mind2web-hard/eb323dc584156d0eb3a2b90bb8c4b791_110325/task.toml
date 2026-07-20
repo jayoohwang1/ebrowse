@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the cheapest 2 bed and 3+ bath apartment listing for rent in New York."
+url = "https://www.compass.com/"
+tags = ["online-mind2web", "hard", "open"]

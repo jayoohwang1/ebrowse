@@ -1,0 +1,4 @@
+[task]
+prompt = "If I'm 30, plan to retire at 65, and have $30000 as starting balance, with a 3% annual return, 13% current tax rate, and 24% retirement tax rate, show the comparison chart between Traditional and Roth IRA."
+url = "https://www.chase.com/"
+tags = ["online-mind2web", "hard", "open"]

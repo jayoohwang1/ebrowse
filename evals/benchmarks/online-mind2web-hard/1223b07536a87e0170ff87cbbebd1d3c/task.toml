@@ -1,0 +1,4 @@
+[task]
+prompt = "Complete a multiplication quiz on https://www.coolmath4kids.com/, covering multiplication facts for 11-12. The quiz should consist of 10 questions, with unlimited time allowed for each. The goal is to achieve a perfect score of 10 out of 10."
+url = "https://www.coolmath4kids.com/"
+tags = ["online-mind2web", "hard", "open"]

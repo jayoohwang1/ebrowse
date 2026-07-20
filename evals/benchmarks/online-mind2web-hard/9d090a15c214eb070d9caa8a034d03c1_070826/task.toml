@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the lowest-priced housing near Mcgill University which has been priced between 750 to 1200 CAD and has a private bathroom"
+url = "https://www.student.com/"
+tags = ["online-mind2web", "hard", "open"]

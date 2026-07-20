@@ -1,0 +1,4 @@
+[task]
+prompt = "Browse the final skin in the list for the champion Ahri."
+url = "https://www.leagueoflegends.com/"
+tags = ["online-mind2web", "hard", "open"]

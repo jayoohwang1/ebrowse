@@ -1,0 +1,4 @@
+[task]
+prompt = "What are the benefits and financial support a single person living in England, over the state pension age, unemployed, with no health conditions, or caring for someone with one, can get?"
+url = "https://www.gov.uk/"
+tags = ["online-mind2web", "hard", "open"]

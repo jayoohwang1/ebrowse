@@ -15,9 +15,12 @@ traderjoes.com; design record in
 [ADR 0014](../docs/adr/0014-eval-harness-design.md)) — schema, task model,
 `ebrowse-eval validate`/`tasks`, the runner (`ebrowse-eval run` drives the pi
 harness over a benchmark or single task and writes a fully-joined trace per
-run), the per-step capture layer (below), the conversation-first `view` trace viewer, and the
-inspection queries (`overview`, `anomalies`, `errors`, `step`, `trace-ref`,
-`trace-section`, `timing`, `grep`, `replay`). The legacy scripts in
+run), the per-step capture layer (below), the conversation-first `view` trace viewer, the
+inspection queries (`overview`, `issues`, `anomalies`, `errors`, `step`,
+`trace-ref`, `trace-section`, `timing`, `grep`, `replay`), and the LLM
+annotation pass (`annotate` writes cheap-model verdicts/issue-spans/vision
+findings back as `summary` records that `issues` renders — see
+[docs/inspect.md](docs/inspect.md)). The legacy scripts in
 `../experiments/` still cover one gap — `summarize-run.py`'s side-by-side
 token comparison — and retire once that's ported.
 

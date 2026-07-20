@@ -1,0 +1,4 @@
+[task]
+prompt = "Search for a job in Miami, Florida, in Human Resources on target."
+url = "https://www.target.com/"
+tags = ["online-mind2web", "hard", "open", "smoke"]

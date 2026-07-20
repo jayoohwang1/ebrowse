@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the latest Doraemon video in MP4 format that is over 20 minutes long and has a medium file size."
+url = "https://www.4shared.com/"
+tags = ["online-mind2web", "hard", "open"]

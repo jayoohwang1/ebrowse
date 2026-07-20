@@ -1,0 +1,4 @@
+[task]
+prompt = "Filter handbags to show evening bags that are gold, made of satin, and priced under $100."
+url = "https://www.jcpenney.com/"
+tags = ["online-mind2web", "hard", "open", "smoke"]

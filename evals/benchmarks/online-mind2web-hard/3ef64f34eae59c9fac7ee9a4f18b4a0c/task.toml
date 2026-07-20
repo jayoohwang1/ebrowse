@@ -1,0 +1,4 @@
+[task]
+prompt = "Find and open an animal learning course on YouTube Kids for my 6-year-old without login in. As a parent born in 1992, I would prefer not to enable search."
+url = "https://www.youtube.com/"
+tags = ["online-mind2web", "hard", "open"]

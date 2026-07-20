@@ -1,0 +1,4 @@
+[task]
+prompt = "Get the women's black swimsuit, size large, with the lowest price, and add it to my cart."
+url = "https://us.speedo.com/"
+tags = ["online-mind2web", "hard", "open"]

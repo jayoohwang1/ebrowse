@@ -1,0 +1,4 @@
+[task]
+prompt = "Book 4 tickets in the upper for any BTS show near New York in the next six months and view ticket prices with estimated fees."
+url = "https://www.stubhub.com/"
+tags = ["online-mind2web", "hard", "open"]

@@ -1,0 +1,4 @@
+[task]
+prompt = "Find an Airbnb in Cleveland for three nights. The check-in date is the day after tomorrow. We have 2 adults, 2 kids, and 1 pet. The budget is $100 to $300 per night. Essential amenities include free parking, a washer, and a gym."
+url = "https://www.airbnb.com/"
+tags = ["online-mind2web", "hard", "open"]

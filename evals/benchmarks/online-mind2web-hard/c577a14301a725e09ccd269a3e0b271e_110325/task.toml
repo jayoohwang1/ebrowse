@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the page for the highest critic-scored red or white wine, from Oregon, priced under $40, that pairs well with fish or dessert."
+url = "https://www.wineaccess.com/"
+tags = ["online-mind2web", "hard", "open"]

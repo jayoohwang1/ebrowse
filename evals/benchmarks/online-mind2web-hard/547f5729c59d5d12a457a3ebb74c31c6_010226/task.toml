@@ -1,0 +1,4 @@
+[task]
+prompt = "Search for 3 bedroom condos with 2+ bathrooms within $1500- $2500 range in NYC."
+url = "https://www.apartments.com/"
+tags = ["online-mind2web", "hard", "blocked-site"]

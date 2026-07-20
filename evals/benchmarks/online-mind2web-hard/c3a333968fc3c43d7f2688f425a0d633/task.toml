@@ -1,0 +1,4 @@
+[task]
+prompt = "Find the cheapest certified pre-owned Porsche 911 with a model year of 2019 or newer, within a 200-mile radius of ZIP code 97007."
+url = "https://www.porsche.com/"
+tags = ["online-mind2web", "hard", "open"]
