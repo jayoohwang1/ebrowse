@@ -331,6 +331,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--force", action="store_true", help="replace existing annotations instead of skipping"
     )
+    p.add_argument(
+        "--context-limit",
+        type=int,
+        default=None,
+        help="annotator context budget in tokens; long trajectories are windowed (default: 110000)",
+    )
     p.set_defaults(func=_cmd_annotate)
 
     p = sub.add_parser("grep", help="regex over trace records (escape hatch)")
@@ -359,6 +365,7 @@ def main(argv: list[str] | None = None) -> int:
 def _cmd_annotate(args: argparse.Namespace) -> int:
     from ebrowse_evals.annotate import (
         DEFAULT_API_BASE,
+        DEFAULT_CONTEXT_TOKENS,
         LlamaClient,
         annotate_run,
         strip_summaries,
@@ -394,6 +401,7 @@ def _cmd_annotate(args: argparse.Namespace) -> int:
                 model,
                 vision=not args.no_vision,
                 max_vision=args.max_vision,
+                context_tokens=args.context_limit or DEFAULT_CONTEXT_TOKENS,
                 log=lambda m, n=run_dir.name: print(f"  [{n}] {m}"),
             )
         except (RuntimeError, ValueError) as e:

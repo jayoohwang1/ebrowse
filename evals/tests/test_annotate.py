@@ -122,6 +122,74 @@ def test_strip_summaries_replaces(tmp_path):
     assert TraceReader(run_dir).meta() is not None
 
 
+# -- windowing --------------------------------------------------------------
+
+
+def test_plan_windows_fill_and_overlap():
+    from ebrowse_evals.annotate import plan_windows
+
+    blocks = [(i, "x" * 100) for i in range(1, 11)]  # 10 steps, 100 chars each
+    assert plan_windows(blocks, budget_chars=2000) == [(0, 9)]  # fits in one
+    wins = plan_windows(blocks, budget_chars=400, overlap=2)
+    assert wins[0] == (0, 3)
+    for (alo, ahi), (blo, _) in zip(wins, wins[1:], strict=False):
+        assert blo == ahi - 1  # 2-step overlap
+        assert blo > alo  # always advances
+    assert wins[-1][1] == 9  # covers the tail
+    # a single oversized block still gets a window of its own
+    assert plan_windows([(1, "y" * 999)], budget_chars=10) == [(0, 0)]
+    assert plan_windows([], budget_chars=100) == []
+
+
+def test_windowed_text_pass_merges(tmp_path):
+    run_dir = _copy_sample(tmp_path)
+    calls = []
+
+    def stub(system, user):
+        calls.append(system)
+        if "consolidating" in system:  # merge call
+            return (
+                "VERDICT: merged view of the whole run.\n\nISSUES:\n"
+                "steps 1-3 | inefficiency | low | merged incident\n\nSTUCK_SPANS: none"
+            )
+        if "screenshot" in system.lower():
+            return "ADEQUATE"
+        return (
+            "VERDICT: window view.\n\nISSUES:\n"
+            "steps 2-3 | tool_bug | low | window incident\n\nSTUCK_SPANS: none"
+        )
+
+    # tiny budget forces windowing on the 3-step sample trace
+    recs = annotate_run(run_dir, stub, "stub-model", context_tokens=8_100)
+    windows = [s for s in calls if "auditing" in s]
+    merges = [s for s in calls if "consolidating" in s]
+    assert len(windows) >= 2 and len(merges) == 1
+    verdict = next(r for r in recs if r.kind == "verdict")
+    assert verdict.text == "merged view of the whole run."
+
+
+def test_windowed_mechanical_fallback(tmp_path):
+    run_dir = _copy_sample(tmp_path)
+
+    def stub(system, user):
+        if "consolidating" in system:
+            return "garbage with no structure"
+        if "screenshot" in system.lower():
+            return "ADEQUATE"
+        return (
+            "VERDICT: window view.\n\nISSUES:\n"
+            "steps 2-3 | tool_bug | high | window incident\n\nSTUCK_SPANS: 2-3"
+        )
+
+    recs = annotate_run(run_dir, stub, "stub-model", context_tokens=8_100)
+    verdict = next(r for r in recs if r.kind == "verdict")
+    assert "window view" in verdict.text
+    issues = [r for r in recs if r.kind == "issue"]
+    # identical issues from overlapping windows dedupe to one
+    assert len(issues) == 1 and issues[0].severity == "high"
+    assert [r for r in recs if r.kind == "stuck_span"]
+
+
 # -- issues lens ------------------------------------------------------------
 
 

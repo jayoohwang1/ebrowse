@@ -139,8 +139,9 @@ class LlamaClient:
 # -- trajectory rendering ---------------------------------------------------
 
 
-def render_trajectory(reader: TraceReader, max_output_chars: int = 4000) -> str:
-    parts: list[str] = []
+def render_steps(reader: TraceReader, max_output_chars: int = 4000) -> list[tuple[int, str]]:
+    """Per-step rendered blocks, keyed by step id (windowing splits on these)."""
+    parts: list[tuple[int, str]] = []
     for s in reader.steps():
         lines = []
         if s.agent_text:
@@ -153,11 +154,69 @@ def render_trajectory(reader: TraceReader, max_output_chars: int = 4000) -> str:
         url = (s.browser or {}).get("url")
         if url:
             lines.append(f"[url after] {url}")
-        parts.append(f"=== step {s.step} ===\n" + "\n".join(lines))
+        parts.append((s.step or 0, f"=== step {s.step} ===\n" + "\n".join(lines)))
+    return parts
+
+
+def _end_block(reader: TraceReader) -> str:
     end = reader.end()
-    if end is not None:
-        parts.append(f"=== run end === outcome={end.outcome} steps={end.steps}")
-    return "\n\n".join(parts)
+    return f"=== run end === outcome={end.outcome} steps={end.steps}" if end else ""
+
+
+def render_trajectory(reader: TraceReader, max_output_chars: int = 4000) -> str:
+    blocks = [text for _, text in render_steps(reader, max_output_chars)]
+    if end := _end_block(reader):
+        blocks.append(end)
+    return "\n\n".join(blocks)
+
+
+# -- windowing (trajectories larger than the annotator's context) -----------
+
+# Conservative chars-per-token for Qwen-class tokenizers; the budget also
+# reserves room for the system prompt, response, and windowing overhead.
+CHARS_PER_TOKEN = 3
+DEFAULT_CONTEXT_TOKENS = 110_000
+WINDOW_OVERLAP_STEPS = 5
+
+
+def plan_windows(
+    blocks: list[tuple[int, str]], budget_chars: int, overlap: int = WINDOW_OVERLAP_STEPS
+) -> list[tuple[int, int]]:
+    """Greedy fill: contiguous index ranges [lo, hi] over `blocks`, each within
+    budget_chars, consecutive windows overlapping by `overlap` steps so an
+    incident on a boundary is fully visible to at least one window. A single
+    oversized block still gets its own window (it was already truncated)."""
+    if not blocks:
+        return []
+    windows: list[tuple[int, int]] = []
+    i = 0
+    while i < len(blocks):
+        size = 0
+        j = i
+        while j < len(blocks) and (size + len(blocks[j][1]) <= budget_chars or j == i):
+            size += len(blocks[j][1])
+            j += 1
+        windows.append((i, j - 1))
+        if j >= len(blocks):
+            break
+        i = max(i + 1, j - overlap)
+    return windows
+
+
+MERGE_SYSTEM = """You are consolidating audit reports from several overlapping windows of one \
+web-browsing agent trajectory into a single report. Windows overlap, so the same incident may \
+appear twice with slightly different spans — merge duplicates, keep the widest accurate span. \
+Produce exactly the structure below (same format as the window reports):
+
+VERDICT: one sentence for the WHOLE run — the task, what the agent did overall, how it ended.
+
+ISSUES:
+steps <start>-<end> | <category> | <severity> | one-sentence description
+(categories tool_bug|agent_confusion|site_behavior|inefficiency; severity high|low; max 8, most \
+severe first; only step numbers that appear in the window reports)
+
+STUCK_SPANS: comma-separated step ranges, or `none`. If the same flailing behavior resumes across \
+windows, report it as one span. /no_think"""
 
 
 # -- response parsing -------------------------------------------------------
@@ -257,12 +316,87 @@ def _span_text(steps: list[Step], lo: int, hi: int, limit: int = 6, chars: int =
 # -- orchestration ----------------------------------------------------------
 
 
+def _text_call(complete: Completer, task: str, traj: str, header: str = "") -> str:
+    body = f"TASK GIVEN TO THE AGENT:\n{task}\n\n{header}TRAJECTORY:\n{traj}"
+    return complete(TEXT_SYSTEM, [{"type": "text", "text": body}])
+
+
+def _mechanical_merge(window_anns: list[Annotation], max_step: int) -> Annotation:
+    """Fallback when the merge call produces nothing parseable: concat issue
+    lists (severity-major, span order), union stuck spans, join verdicts."""
+    issues = [i for a in window_anns for i in a.issues]
+    issues.sort(key=lambda i: (i.severity != "high", i.step_start))
+    seen: set[tuple[int, int, str]] = set()
+    deduped = []
+    for i in issues:
+        key = (i.step_start, i.step_end, i.category)
+        if key not in seen:
+            seen.add(key)
+            deduped.append(i)
+    return Annotation(
+        verdict=" / ".join(a.verdict for a in window_anns if a.verdict),
+        issues=deduped[:8],
+        stuck_spans=_merge_spans([s for a in window_anns for s in a.stuck_spans]),
+    )
+
+
+def run_text_pass(
+    reader: TraceReader,
+    complete: Completer,
+    task: str,
+    max_step: int,
+    context_tokens: int = DEFAULT_CONTEXT_TOKENS,
+    log: Callable[[str], None] = lambda _: None,
+) -> Annotation:
+    """Single-pass when the trajectory fits the annotator's context, else
+    overlapping windows + a merge call (mechanical fallback if that fails)."""
+    blocks = render_steps(reader)
+    end = _end_block(reader)
+    # 8k tokens reserved for system prompt + window header + response
+    budget_chars = max(context_tokens - 8_000, 100) * CHARS_PER_TOKEN
+    total = sum(len(t) for _, t in blocks) + len(end)
+    if total <= budget_chars:
+        traj = "\n\n".join([t for _, t in blocks] + ([end] if end else []))
+        log(f"text pass: {total} chars, {len(blocks)} steps, single window")
+        return parse_annotation(_text_call(complete, task, traj), max_step)
+
+    windows = plan_windows(blocks, budget_chars)
+    log(f"text pass: {total} chars > budget {budget_chars}, {len(windows)} windows")
+    reports: list[str] = []
+    window_anns: list[Annotation] = []
+    for n, (lo, hi) in enumerate(windows, 1):
+        a_step, b_step = blocks[lo][0], blocks[hi][0]
+        parts = [t for _, t in blocks[lo : hi + 1]]
+        if hi == len(blocks) - 1 and end:
+            parts.append(end)
+        header = (
+            f"NOTE: you are seeing WINDOW {n}/{len(windows)} of a long run — "
+            f"steps {a_step}-{b_step} of {max_step}. Report only what this window shows; "
+            f"the reports will be merged afterwards.\n\n"
+        )
+        raw = _text_call(complete, task, "\n\n".join(parts), header)
+        log(f"  window {n}/{len(windows)} (steps {a_step}-{b_step}): {len(raw)} chars back")
+        reports.append(f"--- window {n} (steps {a_step}-{b_step}) ---\n{raw}")
+        window_anns.append(parse_annotation(raw, max_step))
+
+    merged_raw = complete(
+        MERGE_SYSTEM,
+        [{"type": "text", "text": f"TASK GIVEN TO THE AGENT:\n{task}\n\n" + "\n\n".join(reports)}],
+    )
+    merged = parse_annotation(merged_raw, max_step)
+    if not merged.verdict and not merged.issues:
+        log("merge response unparseable — falling back to mechanical merge")
+        return _mechanical_merge(window_anns, max_step)
+    return merged
+
+
 def annotate_run(
     run_dir: Path,
     complete: Completer,
     model_name: str,
     vision: bool = True,
     max_vision: int = 4,
+    context_tokens: int = DEFAULT_CONTEXT_TOKENS,
     log: Callable[[str], None] = lambda _: None,
 ) -> list[Summary]:
     """Run both passes and append `summary` records to the trace.
@@ -277,15 +411,9 @@ def annotate_run(
     max_step = max(s.step or 0 for s in steps)
     task = meta.prompt if meta else ""
 
-    traj = render_trajectory(reader)
-    log(f"text pass: {len(traj)} chars, {len(steps)} steps")
-    raw = complete(
-        TEXT_SYSTEM,
-        [{"type": "text", "text": f"TASK GIVEN TO THE AGENT:\n{task}\n\nTRAJECTORY:\n{traj}"}],
-    )
-    ann = parse_annotation(raw, max_step)
+    ann = run_text_pass(reader, complete, task, max_step, context_tokens, log)
     if not ann.verdict:
-        raise ValueError(f"annotation response had no VERDICT line — raw response:\n{raw[:500]}")
+        raise ValueError("annotation text pass produced no VERDICT line")
 
     records: list[Summary] = [
         Summary(step_start=1, step_end=max_step, text=ann.verdict, model=model_name, kind="verdict")
