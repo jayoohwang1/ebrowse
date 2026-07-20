@@ -66,7 +66,7 @@ async def run(url: str, cmd: str, arg: str | None, cursor: int, ax: bool = False
     cfg = load_config()
     pw, browser, page = await _with_page(url)
     try:
-        snap = await capture(page)
+        snap = await capture(page, cfg.browser.capture_engine)
         if cmd == "capture":
             out = Path(arg or "snapshot.json")
             out.write_text(json.dumps(snap.to_dict(), indent=1))

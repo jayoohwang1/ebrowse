@@ -70,6 +70,12 @@ class ElementDesc:
     text_head: str = ""  # first 80 chars visible text, whitespace-collapsed
     nth_hint: int = 0  # disambiguator among identical descriptors on a page
     iframe_path: tuple[str, ...] = ()  # ancestor frame ids/titles; () = main frame
+    # Locator HINTS for otherwise-anonymous elements (ADR 0015 follow-up) —
+    # deliberately EXCLUDED from match_key(): cls keeps hashy build tokens
+    # (great within-session discriminators, unstable across deploys) and
+    # neither may churn ref identity/reuse.
+    cls: str = ""  # state-filtered class tokens, space-joined, document order
+    attrs: tuple[tuple[str, str], ...] = ()  # filtered custom attrs, sorted, capped
 
     def match_key(self) -> tuple:
         """Exact-match identity used by RefRegistry (excludes nth_hint)."""
@@ -106,6 +112,7 @@ class ElementDesc:
     def from_dict(cls, d: dict[str, Any]) -> ElementDesc:
         d = dict(d)
         d["iframe_path"] = tuple(d.get("iframe_path") or ())
+        d["attrs"] = tuple(tuple(a) for a in d.get("attrs") or ())
         return cls(**d)
 
 
@@ -144,9 +151,19 @@ class Element:
     ref: str  # "@e12" — session-scoped, durable
     desc: ElementDesc
     state: ElementState
+    # CDP backend node id from capture (None on the js engine / from fixtures).
+    # Same-document node identity: diff pairs elements on it first, fixing
+    # misattribution among descriptor-identical siblings and reporting
+    # in-place relabels instead of remove+add pairs (ADR 0015 follow-up).
+    node_id: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"ref": self.ref, "desc": self.desc.to_dict(), "state": self.state.to_dict()}
+        return {
+            "ref": self.ref,
+            "desc": self.desc.to_dict(),
+            "state": self.state.to_dict(),
+            "node_id": self.node_id,
+        }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Element:
@@ -154,6 +171,7 @@ class Element:
             ref=d["ref"],
             desc=ElementDesc.from_dict(d["desc"]),
             state=ElementState.from_dict(d["state"]),
+            node_id=d.get("node_id"),
         )
 
 

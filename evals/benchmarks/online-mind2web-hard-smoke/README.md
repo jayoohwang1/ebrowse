@@ -6,19 +6,19 @@ officially scored benchmark: tasks intentionally have no evaluator.
 
 The benchmark uses the browser-only Pi policy: one shell-free custom `ebrowse`
 tool, the standard verb allowlist (`eval` and host/file escape verbs blocked), a
-200-call limit, and navigation restricted to each task's starting hostname. A
-policy block is expected experiment signal rather than a harness failure. Add a
-known login/redirect hostname with `--allow-domain` if a selected task needs one.
-The Best Buy task already records the observed Canadian geo/asset redirect hosts
-as task-level exceptions.
+200-call limit, and redirect-aware task navigation. Before Pi starts, the harness
+opens the trusted task URL, records a bounded public main-frame redirect chain,
+then restarts with the observed domain scope frozen. A policy block is expected
+experiment signal rather than a harness failure. Add a known login hostname with
+`--allow-domain` only when a task legitimately needs one beyond startup redirects.
 
 The sites were checked on 2026-07-18 with local, non-stealth ebrowse Chromium.
 Each selected homepage produced a real page title and usable DOM outline.
 Cars.com and SourceForge stopped at Cloudflare challenges; Apartments.com
 returned Akamai Access Denied, so tasks on those sites were excluded.
 
-The browser-only policy was validated on 2026-07-19 against GOV.UK (one
-five-call local-Qwen trace) and Best Buy (restricted read-only open + outline).
+The browser-only policy was validated on 2026-07-19 against GOV.UK and Best Buy,
+including parallel local-Qwen runs, redirect metadata, and frozen-scope startup.
 
 Run the full overnight slice with the provider/model configured in
 `experiments/.env`:

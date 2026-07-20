@@ -8,6 +8,15 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- Page capture now uses CDP `DOMSnapshot.captureSnapshot` by default
+  (`browser.capture_engine = "cdp"`), producing the existing DomSnapshot shape
+  without running page JavaScript and attaching backend-node-id bindings (ADR 0015).
+- Anonymous elements can fall back to their capture-time CDP binding when descriptor
+  resolution refuses, with unique descriptor fallbacks for replaced nodes.
+- Diffs pair elements by CDP node identity before descriptors, preserving attribution
+  across identical-element reorders and in-place relabels.
+- Suspicious descriptor picks are geometry-checked against node bindings;
+  `browser.act_via_binding = true` enables binding-first eval experiments.
 - Redirect-aware eval startup discovers bounded regional task redirects before the
   agent runs, freezes the resulting domain scope, and records the chain in trace
   metadata and `navigation-bootstrap.json`. Harness preparation completes before the
@@ -21,7 +30,7 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 - Pi/ebrowse evals now expose one shell-free custom browser tool instead of
   Bash. A configurable verb/argument/output/timeout policy blocks `eval`, file
   upload, process control, CDP attachment, session overrides, and caller-chosen
-  paths by default; task-host navigation is enforced for explicit opens,
+  paths by default; frozen task navigation is enforced for explicit opens,
   clicks, redirects, and popups, with structured policy errors retained in traces.
 - Eval traces now preserve the exact starting prompt, Pi's effective system
   prompt, and every finalized conversation message/content block. The viewer is

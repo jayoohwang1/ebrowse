@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- Inner scroll container PRE-SCROLLED at capture time: pins the translator's
+     scrollRects-as-scroll-offset interpretation (issue verified for ADR 0015 —
+     a wrong scr silently corrupts "more below the fold" guidance). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Scroll Panel — Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; }
+    header { background: #322; color: #fff; padding: 14px 24px; }
+    main { padding: 24px; max-width: 640px; }
+    #panel { height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 8px; }
+    #panel p { margin: 0 0 60px 0; }
+  </style>
+</head>
+<body>
+  <header><strong>Scroll Panel Fixture</strong></header>
+  <main>
+    <h1>Terms</h1>
+    <div id="panel">
+      <p>Clause 1 — lorem ipsum dolor sit amet.</p>
+      <p>Clause 2 — consectetur adipiscing elit.</p>
+      <p>Clause 3 — sed do eiusmod tempor.</p>
+      <p>Clause 4 — incididunt ut labore et dolore.</p>
+      <p>Clause 5 — magna aliqua ut enim.</p>
+      <p>Clause 6 — ad minim veniam quis.</p>
+      <p>Clause 7 — nostrud exercitation ullamco.</p>
+      <p>Clause 8 — laboris nisi ut aliquip.</p>
+      <button>Agree</button>
+    </div>
+  </main>
+  <script>
+    // pre-scroll the panel so captures see a non-zero scrollTop
+    document.getElementById("panel").scrollTop = 150;
+  </script>
+</body>
+</html>

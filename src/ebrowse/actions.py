@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from ebrowse.model import Section
 
 from ebrowse import debug
+from ebrowse.cdp_target import CdpBridge, CdpTarget, manual_drag, rescue_target
 from ebrowse.core import render
 from ebrowse.core.diff import diff_pages
 from ebrowse.core.locate import resolve
@@ -74,6 +75,8 @@ class ActionsMixin(InteractionMixin):
         nav_events: int
         page_mem: PageMem | None
         raw_by_sid: dict[str, RawSection]
+        ref_bindings: dict[str, int]
+        _cdp_bridge: CdpBridge | None
         _notes: list[str]
         _blocking_modal: str | None
         _hover_delivery_suspect: bool
@@ -188,7 +191,43 @@ class ActionsMixin(InteractionMixin):
             if n == 0:
                 raise CommandError(f"no element matches CSS '{target}'", ExitCode.USAGE)
             return loc.first, desc
-        return await resolve(self.page, element.desc, ref=element.ref), desc
+        # binding-first (browser.act_via_binding, eval A/B; ADR 0015): act on
+        # the exact bound node whenever the binding is alive, descriptors only
+        # as fallback. Default remains descriptor-first with binding rescue.
+        if self.cfg.browser.act_via_binding:
+            fast = None
+            with contextlib.suppress(Exception):
+                fast = await rescue_target(
+                    self._binding_bridge(), self.ref_bindings, element.ref, element.desc.tag
+                )
+            if fast is not None:
+                return fast, desc
+        witness = None
+        bid = self.ref_bindings.get(element.ref or "")
+        if bid is not None:
+            with contextlib.suppress(Exception):
+                witness = CdpTarget(self._binding_bridge(), bid, element.ref)
+        try:
+            return await resolve(self.page, element.desc, ref=element.ref, witness=witness), desc
+        except CommandError:
+            # descriptor chain refused — rescue via the capture-time node
+            # binding (ADR 0015): acts on the exact node the outline described,
+            # so refuse-over-misbind is preserved. Dead/absent binding keeps
+            # the descriptor error (re-outline now re-binds, so its recovery
+            # hint is genuinely actionable).
+            rescued = None
+            with contextlib.suppress(Exception):
+                rescued = await rescue_target(
+                    self._binding_bridge(), self.ref_bindings, element.ref, element.desc.tag
+                )
+            if rescued is not None:
+                return rescued, desc
+            raise
+
+    def _binding_bridge(self) -> CdpBridge:
+        if self._cdp_bridge is None or self._cdp_bridge.page is not self.page:
+            self._cdp_bridge = CdpBridge(self.page)
+        return self._cdp_bridge
 
     def _section_texts(self) -> dict[str, str]:
         # per-node cap must be able to carry diff.EXPANDED_TEXT_BUDGET worth of
@@ -524,7 +563,12 @@ class ActionsMixin(InteractionMixin):
         async def do() -> None:
             with contextlib.suppress(Exception):
                 await src.scroll_into_view_if_needed(timeout=2000)
-            await src.drag_to(dst, timeout=_ACTION_TIMEOUT_MS)
+            if isinstance(src, CdpTarget) or isinstance(dst, CdpTarget):
+                # binding-rescued endpoint: Locator.drag_to can't consume a
+                # CdpTarget — manual pointer sequence over both bounding boxes
+                await manual_drag(self.page, src, dst)
+            else:
+                await src.drag_to(dst, timeout=_ACTION_TIMEOUT_MS)
 
         return await self._act(f"DRAG {sdesc} → {ddesc}", do, loc=src, target=source)
 

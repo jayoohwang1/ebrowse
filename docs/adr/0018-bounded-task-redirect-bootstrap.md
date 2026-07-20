@@ -1,4 +1,4 @@
-# 0017 — Bounded task-redirect bootstrap
+# 0018 — Bounded task-redirect bootstrap
 
 Status: accepted
 

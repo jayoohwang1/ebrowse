@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- FULLY identical interactive siblings: three "Buy" buttons whose
+     ElementDescs are indistinguishable (same tag/role/text, no id/testid).
+     "Reverse order" reorders the cards (same DOM nodes) after a delay past
+     ebrowse's quiescence window, so the last observation's nth_hint points at
+     a different sibling while identity facts still verify — the misbind case
+     only the binding witness can catch (ADR 0015). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Identical Row — Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; }
+    header { background: #232; color: #fff; padding: 14px 24px; }
+    main { padding: 24px; max-width: 640px; }
+    .cards { display: flex; gap: 16px; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 16px; flex: 1; }
+    .card h3 { margin-top: 0; }
+    #bought { margin-top: 16px; font-weight: bold; min-height: 1.2em; }
+  </style>
+</head>
+<body>
+  <header><strong>Identical Row Fixture</strong></header>
+  <main>
+    <h1>Products</h1>
+    <div class="cards" id="cards">
+      <div class="card"><h3>Alpha</h3><p>$10</p><button>Buy</button></div>
+      <div class="card"><h3>Beta</h3><p>$20</p><button>Buy</button></div>
+      <div class="card"><h3>Gamma</h3><p>$30</p><button>Buy</button></div>
+    </div>
+    <button id="reverse">Reverse order</button>
+    <p id="bought">bought: none</p>
+  </main>
+  <script>
+    document.getElementById("cards").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      document.getElementById("bought").textContent =
+        "bought: " + b.closest(".card").querySelector("h3").textContent;
+    });
+    document.getElementById("reverse").addEventListener("click", () => {
+      // delayed past the post-action quiescence window (300ms quiet default):
+      // ebrowse re-observes the OLD order, then the cards move
+      setTimeout(() => {
+        const cards = document.getElementById("cards");
+        for (const card of [...cards.children].reverse()) cards.appendChild(card);
+      }, 2000);
+    });
+  </script>
+</body>
+</html>

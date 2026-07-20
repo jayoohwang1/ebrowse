@@ -1,0 +1,81 @@
+<!doctype html>
+<!-- Anonymous interactive elements: no id/testid/aria-label/text/placeholder.
+     Unlocatable by descriptor (zero candidates) — exercises the act-time CDP
+     node-binding rescue path (ADR 0015). Modeled on real icon-only search
+     buttons (petfinder.com PetSearchBar). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Anonymous Controls — Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; }
+    header { background: #223; color: #fff; padding: 14px 24px; }
+    main { padding: 24px; max-width: 640px; }
+    .searchbar { display: flex; gap: 8px; align-items: center; }
+    .searchbar input { flex: 1; padding: 8px; }
+    .iconbtn { border: 0; background: #eef; border-radius: 6px; padding: 8px; cursor: pointer; }
+    .iconbtn svg { display: block; width: 20px; height: 20px; fill: #223; }
+    .barefield { margin-top: 24px; }
+    .barefield input { width: 100%; padding: 8px; }
+    #result, #echo { margin-top: 12px; min-height: 1.2em; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <header><strong>Anonymous Fixture</strong></header>
+  <main>
+    <h1>Search</h1>
+    <div class="searchbar">
+      <input type="search" placeholder="Search terms">
+      <button class="iconbtn" type="button" data-kind="search">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 4a6 6 0 1 0 3.9 10.6l4.3 4.3 1.4-1.4-4.3-4.3A6 6 0 0 0 10 4zm0 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/>
+        </svg>
+      </button>
+    </div>
+    <div id="result"></div>
+    <!-- self-relabeling control: same node, new text after click — the diff
+         must report an in-place relabel, not remove+add (node-identity diff) -->
+    <button class="follow" type="button">Follow</button>
+
+    <h2>Notes</h2>
+    <div class="barefield">
+      <!-- input with no placeholder/label/id: anonymous form control -->
+      <input type="text">
+    </div>
+    <div id="echo"></div>
+  </main>
+  <script>
+    document.querySelector(".follow").addEventListener("click", (e) => {
+      e.target.textContent = "Following \u2713";
+    });
+    document.querySelector(".iconbtn").addEventListener("click", () => {
+      document.getElementById("result").textContent =
+        "search-clicked: " + (document.querySelector(".searchbar input").value || "(empty)");
+    });
+    document.querySelector(".barefield input").addEventListener("input", (e) => {
+      document.getElementById("echo").textContent = "note: " + e.target.value;
+    });
+    // #mutate: replace the icon button a few seconds after load — a spontaneous
+    // page mutation with no ebrowse verb in between, so the node binding from
+    // the last observe is genuinely dead (tests the loud-stale path)
+    if (location.hash === "#mutate") {
+      setTimeout(() => {
+        const b = document.querySelector(".iconbtn");
+        const n = b.cloneNode(true);
+        b.replaceWith(n);
+        n.addEventListener("click", () => {
+          document.getElementById("result").textContent = "search-clicked: replaced";
+        });
+        // the bare input too: no class, no custom attrs — NO descriptor
+        // fallback exists, so its dead binding must fail loudly
+        const f = document.querySelector(".barefield input");
+        const g = f.cloneNode(true);
+        f.replaceWith(g);
+        g.addEventListener("input", (e) => {
+          document.getElementById("echo").textContent = "note: " + e.target.value;
+        });
+      }, 6000);
+    }
+  </script>
+</body>
+</html>

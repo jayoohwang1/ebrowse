@@ -33,6 +33,28 @@ def normalize_class(cls: str) -> str:
     return " ".join(sorted(tokens)[:_MAX_CLASS_TOKENS])
 
 
+# CSS-safe class token: needs no escaping in a compound selector. Excludes
+# Tailwind-style tokens (md:flex, hover:bg-x) — weak discriminators anyway.
+_SAFE_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+_MAX_LOCATOR_TOKENS = 6
+
+
+def locator_class_tokens(cls: str) -> list[str]:
+    """Class tokens for LOCATING an element within this session (ElementDesc
+    .cls). Unlike normalize_class (fingerprints: cross-visit stability, hashy
+    tokens stripped), locating only needs within-session stability — hashy
+    CSS-module tokens (Button__HOBKK) are kept as the BEST discriminators.
+    Only state classes and CSS-unsafe tokens are dropped; document order kept."""
+    out = []
+    for tok in cls.split():
+        if _STATE_CLASS_RE.search(tok) or not _SAFE_IDENT_RE.match(tok):
+            continue
+        out.append(tok)
+        if len(out) >= _MAX_LOCATOR_TOKENS:
+            break
+    return out
+
+
 def _short_hash(*parts: str) -> str:
     return hashlib.sha1("\x1f".join(parts).encode()).hexdigest()[:10]
 

@@ -1,4 +1,4 @@
-# 0015 — Pi session transcript plus observer extension for conversation traces
+# 0016 — Pi session transcript plus observer extension for conversation traces
 
 Status: accepted (2026-07-19)
 

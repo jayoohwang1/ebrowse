@@ -262,6 +262,13 @@ Sprite Stasis Ball added. [View cart (@e51)](→ /cart) [Checkout (@e52)](→ /c
   disappeared → changed: `+ sid: [added elements with refs]`,
   `- sid: N element(s) removed (names)`, `~ @ref field: "old" → "new"`,
   `~ sid: new text: "status/validation message"`.
+- **In-place relabels** (cdp captures only; same live DOM node, new
+  description): `~ @old → @new label: "Add to cart" → "Added ✓"` — the
+  element was NOT removed; use the new ref from here on. Elements are paired
+  across observations by CDP node identity first (fixes state attribution
+  among identical siblings after a reorder), descriptors second; more than 8
+  relabels in one section is a bulk content swap and reports as
+  added/removed instead.
 - **`new text` quoting rules** (deterministic; word-level diff of the section's
   text): a replaced fragment carries one unchanged word of context per side
   (a `20` → `30` count tick quotes as `Showing 30 results.`, not a bare `30`);

@@ -63,6 +63,9 @@ the DOM truth. The `◉` line appears only when a vision sidecar is running.
   control exists but can't be used yet: something must enable it first (fill a
   required field, close a modal). Clicking it fails fast telling you so; when
   another action enables it, the diff shows `~ @e9 disabled: "true" → "false"`.
+- `~ @e5 → @e97 label: "Add to cart" → "Added ✓"` — the SAME element changed
+  its own label in place (it was not removed). Your old ref is stale; use the
+  new one from here on.
 - A `?` inside the ref parens — `[Save changes (@e4 ?)]` — marks a **candidate**:
   a custom widget discovered from weak evidence (a real JS listener, `tabindex`,
   or ARIA state) rather than proven control semantics. Click it like any ref,

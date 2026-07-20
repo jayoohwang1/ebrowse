@@ -18,10 +18,12 @@ observation, one round trip per micro-interaction, and session amnesia.
    output formats have golden tests so token regressions are visible diffs.
 3. **Core is pure.** The `core/` package operates on plain data (`DomSnapshot` in,
    `PageMem`/`Diff`/rendered text out) with no Playwright, daemon, or network
-   dependency. All page inspection happens in a single injected-JS pass that returns
-   JSON — browser round trips are O(1) per observation, never O(elements). Playwright
-   is allowed only in `core/snapshot.py` (the evaluate wrapper), `core/locate.py`, and
-   screenshot clipping.
+   dependency. All page inspection happens in one pass — by default a CDP
+   `DOMSnapshot.captureSnapshot` that runs **no JavaScript in the page** (ADR 0015;
+   the discover.js evaluate walk remains a temporary fallback) — so browser round
+   trips are O(1) per observation, never O(elements). Browser I/O (Playwright or
+   CDP) is allowed only in `core/snapshot.py` (the capture wrappers),
+   `core/locate.py`, and screenshot clipping.
 4. **The data model is the stable interface.** Modules communicate through `model.py`
    dataclasses and the renderers. Extend by adding optional fields; never repurpose
    existing ones. `model.py` and the [output contracts](output-contracts.md) are FROZEN.
@@ -100,8 +102,9 @@ src/ebrowse/
   config.py           # TOML + env config (see configuration.md)
   errors.py           # CommandError with agent-facing message + exit code
   core/
-    js/discover.js    # single-pass DOM walker (the only page-side code)
-    snapshot.py       # DomSnapshot types + the evaluate() wrapper
+    js/discover.js    # single-pass DOM walker (fallback engine's page-side code)
+    snapshot.py       # DomSnapshot types + the capture wrappers (CDP + evaluate)
+    cdp_capture.py    # pure translator: captureSnapshot arrays -> DomSnapshot
     split.py          # DomSnapshot → [RawSection]
     collection.py     # shared native/ARIA list-table item semantics
     clickable.py      # interactable predicate (canonical sets, templated into JS)
