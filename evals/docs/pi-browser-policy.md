@@ -51,17 +51,28 @@ scope are written to `navigation-bootstrap.json` and `run_meta.config`; the time
 and host cap are configurable with the two keys above. This is the Online-Mind2Web
 smoke benchmark default so regional redirects do not require machine-specific task
 exceptions. `allowlist` uses only the configured list.
-`unrestricted` is an explicit escape hatch for experiments that need cross-site
-navigation; it does not restore Bash or other Pi tools.
+
+`unrestricted` permits navigation to any public host (empty allowlist = all
+domains). It is a reasonable default when the point of the run is to see where
+agents go: the harness is already tightly sandboxed (only the `ebrowse` tool, a
+restricted verb allowlist, no `eval`/shell), so an allowlist adds little, and
+task-host/task-redirects break tasks whose functionality lives on a sibling
+subdomain (e.g. `awt.cbp.gov` from `www.cbp.gov`) or a linked company domain —
+scope a redirect chain can't capture, since those are agent-followed links, not
+redirects. `unrestricted` still keeps private/loopback blocking on (below) and
+does not restore Bash or other Pi tools.
 
 Explicit `open` calls permit only HTTP(S), reject URL credentials, and validate the
 hostname. The browser separately restricts top-level document navigation from clicks,
 redirects, and popups. It intentionally does not restrict scripts, images, API calls,
 or other subresources because modern sites commonly load those cross-domain.
 
-Private and loopback literal targets are blocked during public-task bootstrap. This
-does not attempt DNS pinning; use network/container isolation when protection from
-DNS rebinding or a compromised browser is required.
+Private and loopback literal targets are blocked under `task-redirects` and
+`unrestricted` (a local `task.url`, e.g. a fixture server, opts its own host
+out). Dropping the domain allowlist therefore does not also open localhost or
+cloud-metadata to the agent. This does not attempt DNS pinning; use
+network/container isolation when protection from DNS rebinding or a compromised
+browser is required.
 
 ## Security boundary
 

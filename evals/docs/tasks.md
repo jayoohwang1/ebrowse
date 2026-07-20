@@ -46,6 +46,24 @@ Config layering (later overrides earlier): harness defaults → benchmark
 `[config]` → task `[config]` → CLI flags. The fully resolved result is
 persisted into the run's `run_meta` record.
 
+## Generated benchmarks
+
+A benchmark sourced from an external dataset is materialized by a checked-in
+`generate.py` beside its `benchmark.toml` (re-run it on a dataset drop; edit the
+generator, not the emitted `task.toml` files). This keeps the task set
+reproducible and lets the generator encode selection metadata as tags. The
+convention used by `online-mind2web-hard` (see its README):
+
+- `open` — site verified reachable with local non-stealth Chromium.
+- `blocked-site` — the site walls the automation (bot challenge, interior-page
+  block, or geo restriction); kept in the benchmark but skippable, since `--tag`
+  is AND-only so `--tag open` selects the reachable complement.
+
+A homepage-only reach check is not sufficient — sites that load their homepage
+but block interior task pages must be listed explicitly in the generator.
+Excluded-host and reachability decisions live as constants + comments in the
+generator so the next dataset drop inherits them.
+
 For the pi/ebrowse harness, `url` is also the initial browser location. The
 harness opens it before the agent starts; this setup action is excluded from
 the trace's agent-step numbering and tool-call limit. Relevant config keys are
