@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Shadow Shell — Fixture</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 24px; }
+  </style>
+</head>
+<body>
+  <!-- Web-component app shell (ServiceNow Polaris / Lightning shape): the whole
+       page body is light-DOM content slotted through nested shadow roots. -->
+  <app-shell>
+    <main slot="content">
+      <h1>Workspace</h1>
+      <p>Everything below reaches the renderer through two levels of &lt;slot&gt;.</p>
+      <form>
+        <label for="q">Search records</label>
+        <input type="text" id="q" placeholder="Search records">
+        <button type="button" id="go">Run search</button>
+      </form>
+      <p><a href="/help.html">Shell help</a></p>
+      <iframe id="workframe" title="Work area" src="frame_child.html" width="640" height="360"></iframe>
+    </main>
+  </app-shell>
+  <script>
+    class InnerLayout extends HTMLElement {
+      connectedCallback() {
+        const root = this.attachShadow({ mode: 'open' });
+        root.innerHTML = '<div style="padding:8px"><slot></slot></div>';
+      }
+    }
+    class AppShell extends HTMLElement {
+      connectedCallback() {
+        const root = this.attachShadow({ mode: 'open' });
+        root.innerHTML = '<inner-layout><slot name="content"></slot></inner-layout>';
+      }
+    }
+    customElements.define('inner-layout', InnerLayout);
+    customElements.define('app-shell', AppShell);
+  </script>
+</body>
+</html>

@@ -469,6 +469,20 @@ def test_parent_page_cover_over_iframe(server, env):
     assert "Payment accepted." in r.stdout
 
 
+def test_duplicate_title_iframes_resolve_to_visible_frame(server, env):
+    # two id-less iframes share a title (Salesforce keeps a hidden stale
+    # duplicate of its Report Builder frame): frame_locator CSS re-query dies
+    # on strict mode, the live frame-graph walk picks the visible one
+    ebrowse(env, "open", server.url("iframe_dup.html"))
+    card = ref_anywhere(env, r"Card number")
+    r = ebrowse(env, "fill", card, "4242 4242 4242 4242")
+    assert r.returncode == 0, r.stderr
+    pay = ref_anywhere(env, r"\[Pay")
+    r = ebrowse(env, "click", pay)
+    assert r.returncode == 0, r.stderr
+    assert "Payment accepted." in r.stdout
+
+
 def test_iframe_without_id_form_flow(server, env):
     # an iframe with no id/title used to capture refs that locate() could
     # never resolve (frame identity fell back to the frame URL)

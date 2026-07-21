@@ -28,3 +28,4 @@ ADRs 0001–0006 were backfilled from the v1 implementation log (see git history
 | [0016](0016-pi-session-conversation-traces.md) | Pi session transcript plus observer extension for conversation traces |
 | [0017](0017-browser-only-pi-eval-boundary.md) | Browser-only custom Pi tool with task-scoped navigation policy |
 | [0018](0018-bounded-task-redirect-bootstrap.md) | Bounded regional-redirect discovery before freezing eval navigation scope |
+| [0019](0019-live-frame-graph-resolution.md) | Iframe scopes resolve via the live frame graph with geometry disambiguation |

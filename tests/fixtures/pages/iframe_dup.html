@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Duplicate Frames — Fixture</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 24px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Complete your order</h1>
+    <p>Two id-less iframes share the title "Payment form" (Salesforce keeps a
+       hidden stale duplicate of its Report Builder frame the same way); only
+       the second is visible.</p>
+    <iframe title="Payment form" name="pay-stale-001" src="frame_child.html"
+            width="640" height="360" style="display:none"></iframe>
+    <iframe title="Payment form" name="pay-live-002" src="frame_child.html"
+            width="640" height="360"></iframe>
+    <p><a href="/help.html">Need help?</a></p>
+  </main>
+</body>
+</html>

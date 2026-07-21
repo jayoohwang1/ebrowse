@@ -35,6 +35,7 @@ PAGES = [
     "anonymous.html",
     "identical_row.html",
     "scrollpanel.html",
+    "shadow_slots.html",
 ]
 
 

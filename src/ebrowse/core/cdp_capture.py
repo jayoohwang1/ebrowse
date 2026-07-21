@@ -489,24 +489,36 @@ class _DocWalker:
             self.stitch.iframe(node, idx, self)
             return node
 
+        node.children = self._child_nodes(idx, cursor_pointer, fieldset_disabled, in_inert)
+        return node
+
+    def _child_nodes(self, idx: int, cursor_pointer: bool,
+                     fieldset_disabled: bool, in_inert: bool) -> list[DomNode]:  # fmt: skip
+        """Walk idx's children, flattening composed-tree containers.
+
+        The flattened DOMSnapshot tree parents shadow content under a
+        document-fragment child (shadowRootType set) and slotted light-DOM
+        nodes under their <slot>. Both are pass-throughs: emit their element
+        children in place, never a node of their own. Skipping <slot> as a
+        plain SKIP_TAG discarded its assigned subtree — on web-component
+        shells (ServiceNow Polaris, Lightning) that was the entire app.
+        """
+        d = self.d
         kids: list[DomNode] = []
         for ci in d.children[idx]:
             if d.node_type[ci] != _ELEMENT_NODE:
-                # shadow roots appear as document-fragment children with a
-                # shadowRootType; inline author roots, skip UA internals
+                # author shadow roots are inlined; UA internals are skipped
                 st = d.shadow_type.get(ci)
                 if st is not None and self._string(st) != "user-agent":
-                    for si in d.children[ci]:
-                        if d.node_type[si] == _ELEMENT_NODE:
-                            cn = self.walk(si, cursor_pointer, fieldset_disabled, in_inert)
-                            if cn:
-                                kids.append(cn)
+                    kids.extend(self._child_nodes(ci, cursor_pointer, fieldset_disabled, in_inert))
+                continue
+            if d.tag[ci] == "slot":
+                kids.extend(self._child_nodes(ci, cursor_pointer, fieldset_disabled, in_inert))
                 continue
             cn = self.walk(ci, cursor_pointer, fieldset_disabled, in_inert)
             if cn:
                 kids.append(cn)
-        node.children = kids
-        return node
+        return kids
 
     def scroll_rect(self, li: int) -> list[float] | None:
         sr = self.d.scroll_rects

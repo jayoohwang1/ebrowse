@@ -31,15 +31,73 @@ def _css_escape_value(s: str) -> str:
     return s.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _frame_scope(page, desc: ElementDesc):
-    """Resolve the frame the element lives in (iframe_path from discovery).
-    fid is the frame's id, title, or src attribute — whichever capture used
-    (core/snapshot.py) — so try all three."""
+def _frame_scope_css(page, desc: ElementDesc):
+    """CSS fallback frame resolution: re-query each path segment as an iframe
+    selector. Strict-mode fails when two iframes share the fid (Salesforce
+    keeps a hidden stale duplicate of its Report Builder frame), which is why
+    the live frame graph below is tried first."""
     scope = page
     for fid in desc.iframe_path:
         q = fid.replace("\\", "\\\\").replace('"', '\\"')
         scope = scope.frame_locator(f'iframe[id="{q}"], iframe[title="{q}"], iframe[src="{q}"]')
     return scope
+
+
+_FRAME_ATTRS_JS = "e => [e.id, e.title, e.getAttribute('src'), e.getAttribute('name')]"
+
+
+async def _match_child_frame(parent_frame, fid: str):
+    """The child Frame of parent_frame whose element matches fid (the id,
+    title, or src the capture recorded — core/snapshot.py), or None.
+    Duplicate matches are broken by visible geometry: the frame element with
+    the largest live box wins (a detached-but-lingering duplicate typically
+    has display:none and no box at all)."""
+    matches = []
+    for f in parent_frame.child_frames:
+        if f.is_detached():
+            continue
+        try:
+            el = await f.frame_element()
+            attrs = await el.evaluate(_FRAME_ATTRS_JS)
+        except Exception:
+            continue
+        src = attrs[2] or ""
+        if fid in (attrs[0], attrs[1], attrs[3]) or (src and src == fid) or f.url == fid:
+            matches.append((f, el))
+    if not matches:
+        return None
+    if len(matches) == 1:
+        return matches[0][0]
+    best, best_area = None, -1.0
+    for f, el in matches:
+        try:
+            box = await el.bounding_box()
+        except Exception:
+            box = None
+        area = (box["width"] * box["height"]) if box else 0.0
+        if area > best_area:
+            best, best_area = f, area
+    debug.emit("locate", "frame_ambiguous", level="warn", fid=fid,
+               matches=len(matches), picked_area=round(best_area))  # fmt: skip
+    return best
+
+
+async def _frame_scope(page, desc: ElementDesc):
+    """Resolve the frame the element lives in (iframe_path from discovery).
+
+    Walks the LIVE Playwright frame graph, matching each path segment against
+    the frame element's id/title/src/name — frame_locator CSS re-query is the
+    fallback only. Frame objects, unlike frame_locator, tolerate fid
+    duplicates (disambiguated by geometry above) and cost nothing per action
+    afterwards."""
+    if not desc.iframe_path:
+        return page
+    frame = page.main_frame
+    for fid in desc.iframe_path:
+        frame = await _match_child_frame(frame, fid)
+        if frame is None:
+            return _frame_scope_css(page, desc)
+    return frame
 
 
 # Live identity facts for pre-act verification. innerText (layout-aware,
@@ -133,7 +191,7 @@ async def resolve(page, desc: ElementDesc, ref: str | None = None, witness=None)
     described; ADR 0015). This closes the identical-siblings reorder hole the
     identity facts cannot see. The zero-cost happy path is unchanged.
     """
-    scope = _frame_scope(page, desc)
+    scope = await _frame_scope(page, desc)
     candidates: list[tuple] = []  # (locator, suspicious, unique_only)
     if desc.id:
         candidates.append((scope.locator(f"#{_css_escape(desc.id)}"), False, False))

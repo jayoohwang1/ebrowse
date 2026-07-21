@@ -8,6 +8,19 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Fixed
 
+- CDP capture discarded everything slotted through a `<slot>` (the flattened
+  DOMSnapshot tree parents slotted light-DOM nodes under the slot, which was a
+  skip-tag): web-component shells (ServiceNow Polaris, Salesforce Lightning)
+  rendered as a blank outline. Slots and shadow fragments are now flattening
+  pass-throughs, matching the composed tree the js engine walks.
+
+- Ref resolution inside iframes re-queried each frame by
+  `iframe[id|title|src]` CSS, which strict-mode-failed whenever two iframes
+  shared the fid (Salesforce keeps a hidden stale duplicate of its Report
+  Builder frame). Frames now resolve through the live Playwright frame graph
+  with geometry disambiguation (ADR 0019); capture-time stitching likewise
+  pairs a live frame to the iframe node whose rect matches its box.
+
 - `Session._check_url_allowed` treated an empty `allowed_domains` as deny-all
   whenever security was otherwise active (e.g. private-network blocking on),
   which would have rejected every navigation under `unrestricted`. An empty
