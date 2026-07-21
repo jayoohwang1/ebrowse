@@ -316,6 +316,12 @@ Sprite Stasis Ball added. [View cart (@e51)](→ /cart) [Checkout (@e52)](→ /c
   DOM change: restart with `ebrowse daemon stop` before retrying.
 - Occluded clicks fail *before* acting:
   `blocked: @e42 is covered by <dialog "Cookie consent"> — interact with that first` (exit 1).
+  When the cover is an iframe (the target is a stale parent-doc element the
+  frame has visually replaced), the error routes to the frame's real content:
+  `blocked: @e42 is behind the "Report Builder" iframe — … content is in
+  section(s) s5, s6` for a stitched frame, or `covered by the cross-origin
+  "…" iframe … use 'ebrowse screenshot --section s5'` when the frame's content
+  can't be read as refs.
   A modal that blocks the page *without* covering the target (native `showModal()`
   / `aria-modal` + `inert`, where there's no hit-testable overlay) can't be
   pre-empted safely, so the click is attempted; when it fails, the error names the

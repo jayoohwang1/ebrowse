@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Embedded Checkout — Replaced Region</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    header { background: #234; color: #fff; padding: 12px 24px; }
+    header a { color: #fff; }
+    /* A framework left stale parent-doc controls exactly where it then mounts
+       an iframe; the iframe (later in source, same stacking context) paints
+       over them, so a click on either lands on the frame — the refusal must
+       redirect the agent to the frame's real content. These are click-handler
+       <div>s (like Salesforce's listbox), which have no keyboard-activation
+       fallback, so the pointer refusal is terminal and surfaces the error. */
+    .picker { position: absolute; cursor: pointer; }
+    #stale-full { left: 100px; top: 150px; width: 200px; height: 40px; }
+    #stale-edge { left: 500px; top: 200px; width: 300px; height: 40px; }
+    #payframe { position: absolute; left: 50px; top: 100px; width: 640px; height: 360px; border: 1px solid #999; }
+  </style>
+</head>
+<body>
+  <header><a href="/">Fixture Pay</a> — <a href="/help.html">Need help?</a></header>
+  <main>
+    <div class="picker" id="stale-full" onclick="void 0">Old category picker</div>
+    <div class="picker" id="stale-edge" onclick="void 0">Old apply button</div>
+    <iframe id="payframe" title="Payment form" src="frame_child.html"></iframe>
+  </main>
+</body>
+</html>

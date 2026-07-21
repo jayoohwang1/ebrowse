@@ -60,6 +60,18 @@
     if (t && !within(el, t) && !within(t, el) && inLabel(t)) out.coverInLabel = 1;
     if (t && !within(el, t) && !within(t, el) && !inLabel(t)) {
       out.cover = name(t);
+      // an <iframe> cover means the target sits BEHIND a frame (its content is
+      // a separate document): report the frame's identity so the action layer
+      // can map it to the stitched section(s) or a cross-origin section (fid =
+      // id|title|src|name, per ADR 0019) and name the real recovery.
+      if (t.tagName === "IFRAME") {
+        out.coverIframe = {
+          id: t.id || null,
+          title: t.getAttribute("title") || null,
+          src: t.getAttribute("src") || null,
+          name: t.getAttribute("name") || null,
+        };
+      }
       const dlg = t.closest("dialog,[role=dialog],[role=alertdialog]");
       if (dlg) out.coverDialog = name(dlg);
       const ident = (n) => ({

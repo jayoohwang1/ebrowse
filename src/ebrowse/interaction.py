@@ -21,6 +21,7 @@ import asyncio
 import contextlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -36,6 +37,14 @@ from ebrowse.errors import CommandError, ExitCode
 # transient overlays/animations to clear, short enough to fail fast on a real one.
 _TRIAL_TIMEOUT_MS = 2_000
 _ACTIVATE_TIMEOUT_MS = 8_000
+
+
+def _host(src: str | None) -> str:
+    """Netloc of an iframe src, or "" — matches how build_page labels a
+    cross-origin section (preview = 'cross-origin: <host>')."""
+    if not src:
+        return ""
+    return urlsplit(src).netloc if "//" in src else src
 
 
 @dataclass(slots=True)
@@ -299,7 +308,42 @@ class InteractionMixin:
             if exposed is not None:
                 info["exposedRef"] = exposed.ref
                 info["exposedDesc"] = exposed.desc.short_desc()
+        if info.get("coverIframe"):
+            # the cover is a frame: the target sits behind a separate document.
+            # classify it against the last outline so the error can point at the
+            # real content (stitched refs) or a screenshot (cross-origin).
+            label, stitched, cross_sid = self._classify_iframe_cover(info["coverIframe"])
+            info["coverIframeLabel"] = label
+            if stitched:
+                info["coverIframeStitched"] = stitched
+            elif cross_sid:
+                info["coverIframeCrossSid"] = cross_sid
         return info
+
+    def _classify_iframe_cover(self, ident: dict) -> tuple[str, list[str], str | None]:
+        """Map an iframe cover to (label, stitched_sids, cross_origin_sid).
+
+        fid identity is id|title|src|name (the same keys capture recorded into
+        iframe_path, ADR 0019). A stitched frame's segments appear verbatim in
+        section.iframe_path; a cross-origin frame has no stitched sections, so
+        it is matched by src host against the cross-origin section's preview.
+        """
+        fids = {ident.get(k) for k in ("id", "title", "src", "name") if ident.get(k)}
+        src_host = _host(ident.get("src"))
+        label = ident.get("title") or ident.get("name") or ident.get("id") or src_host or "iframe"
+        stitched: list[str] = []
+        cross_sid: str | None = None
+        if self.page_mem and fids:
+            for s in self.page_mem.sections:
+                if s.cross_origin:
+                    if cross_sid is None and src_host and src_host in s.preview:
+                        cross_sid = s.sid
+                # the frame's content is usually stitched INTO a main-frame
+                # section, so its fid rides on the elements' iframe_path, not
+                # the section's — match there
+                elif any(f in el.desc.iframe_path for el in s.elements for f in fids):
+                    stitched.append(s.sid)
+        return label, stitched, cross_sid
 
     def _blocked_error(self, info: dict, target: str) -> CommandError | None:
         """Map a _probe_diagnosis result to an error naming an executable next
@@ -317,6 +361,30 @@ class InteractionMixin:
             return CommandError(
                 f"blocked: {target} is covered by {cover} — a dialog is open ({dialog}); "
                 "resolve it first (run 'ebrowse outline' to see its controls)",
+                ExitCode.ACTION_FAILED,
+            )
+        label = info.get("coverIframeLabel")
+        if info.get("coverIframeStitched"):
+            sids = info["coverIframeStitched"]
+            shown = ", ".join(sids[:4]) + (" …" if len(sids) > 4 else "")
+            return CommandError(
+                f'blocked: {target} is behind the "{label}" iframe — the element you named '
+                f"is in the page underneath it. Its live content is in section(s) {shown}; "
+                "the control you want is a ref there (run 'ebrowse outline').",
+                ExitCode.ACTION_FAILED,
+            )
+        if info.get("coverIframeCrossSid"):
+            return CommandError(
+                f'blocked: {target} is covered by the cross-origin "{label}" iframe, whose '
+                f"content isn't readable — use 'ebrowse screenshot --section "
+                f"{info['coverIframeCrossSid']}' to see it.",
+                ExitCode.ACTION_FAILED,
+            )
+        if info.get("coverIframe"):
+            return CommandError(
+                f'blocked: {target} is covered by the "{label}" iframe (its content is a '
+                "separate frame) — run 'ebrowse outline' to re-read the page; the frame "
+                "likely replaced this element.",
                 ExitCode.ACTION_FAILED,
             )
         if cover:
