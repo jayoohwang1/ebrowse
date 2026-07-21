@@ -135,6 +135,11 @@ Diff vocabulary:
   `ebrowse outline`; if nothing new appears, try `ebrowse press Escape` or
   `ebrowse screenshot` to see what's on top). Follow the named step rather
   than retrying the same click.
+- `blocked: @e42 is behind the "<name>" iframe — … content is in section(s) sX`
+  (exit 1) — you targeted a stale parent-page element the framework has since
+  replaced with a frame; the live control is a ref inside those sections. Expand
+  them and act there. A `cross-origin "<name>" iframe` variant instead points to
+  `ebrowse screenshot --section sX` (its content can't be read as refs).
 - `blocked: a modal is open ("…") and is intercepting the click` (exit 1) — a
   modal is blocking the page even though it isn't visually over your target
   (native `showModal()` / focus-trap). Don't retry the same click — resolve or

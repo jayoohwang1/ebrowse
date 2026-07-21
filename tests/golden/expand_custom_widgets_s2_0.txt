@@ -13,7 +13,14 @@ Adjust how your team workspace behaves.
 
 [Use dark appearance (@e6 ?)] [Notification preferences (@e7 ?) collapsed]
 
+### Category
+
+[Category (@e8)]
+[Recently Used (@e9)](→ #)
+[All (@e10)](→ #)
+[Accounts (@e11)](→ #)
+
 ### Default quantity
 
-[− (@e8)] 1 [+ (@e9)]
+[− (@e12)] 1 [+ (@e13)]
 No settings have changed.

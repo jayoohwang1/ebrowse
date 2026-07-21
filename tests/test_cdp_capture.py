@@ -63,6 +63,27 @@ def test_iframe_stitched_with_frame_path() -> None:
     assert inner.rect[0] >= iframe.rect[0] and inner.rect[1] >= iframe.rect[1]
 
 
+def test_slotted_content_survives_shadow_flattening() -> None:
+    # DOMSnapshot parents slotted light-DOM nodes under their <slot>; skipping
+    # slot as a plain SKIP_TAG used to discard the whole subtree (blank
+    # outlines on ServiceNow/Lightning shells). Slots and shadow fragments are
+    # pass-throughs: their content lands in the tree, they themselves do not.
+    snap = translate(_load("shadow_slots.json"), (1280, 800))
+    tags = {n.tag for n in snap.root.walk()}
+    assert "slot" not in tags
+    assert {"input", "button", "a", "iframe"} <= tags
+    descs = [
+        e.desc.short_desc()
+        for s in build_page(snap, RefRegistry(), ObserveConfig())[0].sections
+        for e in s.elements
+    ]
+    assert 'input "Search records"' in descs
+    assert 'button "Run search"' in descs
+    # the iframe reached through two slot levels still stitches its content doc
+    framed = [n for n in snap.root.walk() if n.iframe_path]
+    assert any(n.tag == "button" for n in framed)
+
+
 def test_labels_are_not_click_candidates() -> None:
     # Blink marks <label> isClickable (click forwarding); the translator must
     # not surface that as a weak `el` signal (parity + ADR 0009 label route)

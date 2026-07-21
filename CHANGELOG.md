@@ -8,6 +8,38 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Fixed
 
+- A click on a stale parent-document element that an iframe has visually
+  replaced was refused with a dead-end "covered by iframe, which has no
+  exposed ref". The refusal now identifies the frame and routes to its real
+  content: a stitched frame points at the section(s) that hold its refs
+  (`behind the "Report Builder" iframe — … content is in section(s) s5`), a
+  cross-origin frame suggests `screenshot --section`. (Extraction-time
+  suppression of such phantoms was prototyped and dropped: geometry alone
+  can't tell an element *behind* a frame from a parent-doc overlay drawn *on
+  top* of it, and wrongly hid a consent bar's recovery button — it needs
+  paint-order data the snapshot doesn't carry.)
+
+- The markdown renderer stopped descending at the first ref'd node, so a
+  clickable ARIA container (`role=listbox|menu|tree|…`) swallowed all of its
+  interactive descendants' refs — the Salesforce "Create Report" Category
+  listbox rendered as one opaque `[Category]` with 16 invisible options an
+  agent could only reach by keyboard. Container widgets now render their own
+  ref followed by their items' refs (native `<select>` still summarizes via
+  `▾`); see docs/output-contracts.md.
+
+- CDP capture discarded everything slotted through a `<slot>` (the flattened
+  DOMSnapshot tree parents slotted light-DOM nodes under the slot, which was a
+  skip-tag): web-component shells (ServiceNow Polaris, Salesforce Lightning)
+  rendered as a blank outline. Slots and shadow fragments are now flattening
+  pass-throughs, matching the composed tree the js engine walks.
+
+- Ref resolution inside iframes re-queried each frame by
+  `iframe[id|title|src]` CSS, which strict-mode-failed whenever two iframes
+  shared the fid (Salesforce keeps a hidden stale duplicate of its Report
+  Builder frame). Frames now resolve through the live Playwright frame graph
+  with geometry disambiguation (ADR 0019); capture-time stitching likewise
+  pairs a live frame to the iframe node whose rect matches its box.
+
 - `Session._check_url_allowed` treated an empty `allowed_domains` as deny-all
   whenever security was otherwise active (e.g. private-network blocking on),
   which would have rejected every navigation under `unrestricted`. An empty

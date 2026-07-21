@@ -123,6 +123,13 @@ accessibility tree.
   it)`. `scroll <sid|@ref> down|up` scrolls inside that container and reports
   `container div#results scroll y=600/660` (` — at the bottom/top` at the
   edges); newly mounted lazy/virtualized rows show in the action diff.
+- **Container widgets**: an ARIA container that is itself clickable
+  (`role=listbox|menu|tree|grid|…`, e.g. a custom `<ul role="listbox">`) is
+  rendered as its own ref AND followed by its interactive descendants' refs —
+  the container is a valid target (some widgets act on the container) but the
+  items inside are the usual ones. The renderer descends past any ref'd node
+  that has ref'd descendants; native `<select>` is the exception (its options
+  render through the `▾` summary, not as child refs).
 - **Effective state**: disabled controls keep their refs and are marked —
   `[Place order (@e9) disabled]`, `[Street (@e4: empty, disabled)]` — including
   fieldset-inherited disabling; elements under `[inert]` are marked ` inert`.
@@ -309,6 +316,12 @@ Sprite Stasis Ball added. [View cart (@e51)](→ /cart) [Checkout (@e52)](→ /c
   DOM change: restart with `ebrowse daemon stop` before retrying.
 - Occluded clicks fail *before* acting:
   `blocked: @e42 is covered by <dialog "Cookie consent"> — interact with that first` (exit 1).
+  When the cover is an iframe (the target is a stale parent-doc element the
+  frame has visually replaced), the error routes to the frame's real content:
+  `blocked: @e42 is behind the "Report Builder" iframe — … content is in
+  section(s) s5, s6` for a stitched frame, or `covered by the cross-origin
+  "…" iframe … use 'ebrowse screenshot --section s5'` when the frame's content
+  can't be read as refs.
   A modal that blocks the page *without* covering the target (native `showModal()`
   / `aria-modal` + `inert`, where there's no hit-testable overlay) can't be
   pre-empted safely, so the click is attempted; when it fails, the error names the

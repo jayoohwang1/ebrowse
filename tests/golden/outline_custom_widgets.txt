@@ -1,3 +1,3 @@
 PAGE Workspace Settings — Custom Widgets — http://127.0.0.1:8901/custom_widgets.html
 s1 header  3 links  ~26t  | "Acme Workspace Dashboard Help"
-s2 content 2 buttons  ~95t  | "Workspace settings — Adjust how your team workspace behaves. Save changes Settings saved…"
+s2 content 3 links, 1 input, 2 buttons  ~121t  | "Workspace settings — Adjust how your team workspace behaves. Save changes Settings saved…"

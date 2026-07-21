@@ -268,7 +268,7 @@ async def _stitch_child_frames(page, snap: DomSnapshot) -> None:
             or await handle.get_attribute("src")
             or frame.url
         )
-        node = _match_iframe_node(iframe_nodes, fid, frame.url)
+        node = _match_iframe_node(iframe_nodes, fid, frame.url, box)
         if node is None:
             continue
         try:
@@ -284,16 +284,29 @@ async def _stitch_child_frames(page, snap: DomSnapshot) -> None:
         node.children = [child]
 
 
-def _match_iframe_node(nodes: list[DomNode], fid: str, url: str) -> DomNode | None:
+def _match_iframe_node(nodes: list[DomNode], fid: str, url: str, box: dict) -> DomNode | None:
+    """The unstitched iframe DomNode this live frame belongs to. Several
+    iframes can share an fid (duplicate titles — Salesforce Report Builder);
+    the node whose captured rect best matches the live frame element's box
+    wins, so content never stitches onto a lookalike sibling."""
+    candidates = []
     for n in nodes:
         if n.children:  # already stitched
             continue
-        if n.attrs.get("id") == fid or n.attrs.get("ttl") == fid:
-            return n
         src = n.attrs.get("src") or ""
-        if src and (src == fid or url.endswith(src) or src in url):
-            return n
-    return None
+        if (
+            n.attrs.get("id") == fid
+            or n.attrs.get("ttl") == fid
+            or (src and (src == fid or url.endswith(src) or src in url))
+        ):
+            candidates.append(n)
+    if len(candidates) <= 1:
+        return candidates[0] if candidates else None
+    return min(
+        candidates,
+        key=lambda n: abs(n.rect[0] - box["x"]) + abs(n.rect[1] - box["y"])
+        + abs(n.rect[2] - box["width"]) + abs(n.rect[3] - box["height"]),
+    )  # fmt: skip
 
 
 def _offset_and_tag(node: DomNode, dx: int, dy: int, path: tuple[str, ...]) -> None:
