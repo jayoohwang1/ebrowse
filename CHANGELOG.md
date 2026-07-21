@@ -8,6 +8,14 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Fixed
 
+- The markdown renderer stopped descending at the first ref'd node, so a
+  clickable ARIA container (`role=listbox|menu|tree|…`) swallowed all of its
+  interactive descendants' refs — the Salesforce "Create Report" Category
+  listbox rendered as one opaque `[Category]` with 16 invisible options an
+  agent could only reach by keyboard. Container widgets now render their own
+  ref followed by their items' refs (native `<select>` still summarizes via
+  `▾`); see docs/output-contracts.md.
+
 - CDP capture discarded everything slotted through a `<slot>` (the flattened
   DOMSnapshot tree parents slotted light-DOM nodes under the slot, which was a
   skip-tag): web-component shells (ServiceNow Polaris, Salesforce Lightning)

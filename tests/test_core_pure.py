@@ -498,15 +498,39 @@ def test_candidate_discovery_semantics():
     assert any("Save changes" in t for t in texts)
     # decoy with zero signals never becomes an element
     assert not any(t == "Settings saved automatically" for t in texts)
-    # the tabindex wrapper around native buttons is suppressed; buttons stay
-    strong = [e for e in s2.elements if not e.state.candidate]
-    assert {e.desc.text_head for e in strong} == {"−", "+"}
-    # outline counts ignore candidates entirely
-    assert s2.counts_desc() == "2 buttons"
+    # the tabindex wrapper around native buttons is suppressed; buttons stay.
+    # the listbox is a container widget: it AND its option children are all
+    # strong elements (a role=listbox is clickable, its role=option items are
+    # the real targets — clickable.py) — so the qty wrapper is the only
+    # tabindex node that must not appear.
+    strong = {e.desc.text_head for e in s2.elements if not e.state.candidate}
+    assert {"−", "+", "Recently Used", "All", "Accounts"} <= strong
+    assert "1" not in strong  # #quantity-row tabindex wrapper suppressed
+    # outline counts ignore candidates entirely (listbox + 3 options + 2 qty
+    # buttons are all strong; the 4 weak custom widgets are excluded)
+    assert s2.counts_desc() == "3 links, 1 input, 2 buttons"
     # expand renders the '?' provenance marker, outline never does
     md = render.render_section_markdown(s2, raw_by_sid["s2"], ObserveConfig(), cursor=0)
     assert "(@e4 ?)" in md
     assert "?" not in render.render_outline(page)
+
+
+def test_container_widget_children_render_their_own_refs():
+    """A clickable ARIA container (role=listbox) must not swallow the refs of
+    its interactive descendants: the renderer descends past a ref'd node that
+    has ref'd descendants. Regression for the Salesforce Category listbox that
+    rendered as one opaque [Category] with 16 invisible-but-clickable options.
+    """
+    page, raw_by_sid = build("custom_widgets")
+    s2 = page.section("s2")
+    assert s2 is not None
+    refs = {e.desc.text_head: e.ref for e in s2.elements}
+    container_ref = next(e.ref for e in s2.elements if e.desc.role == "listbox")
+    md = render.render_section_markdown(s2, raw_by_sid["s2"], ObserveConfig(), cursor=0)
+    # the container ref AND every option ref appear as distinct lines
+    assert f"({container_ref})" in md
+    for opt in ("Recently Used", "All", "Accounts"):
+        assert f"[{opt} ({refs[opt]})]" in md.replace("](→ #)", "]")
 
 
 def test_section_fingerprints_stable_and_distinct():

@@ -280,13 +280,31 @@ def _img_md(node: DomNode) -> str:
     return f"![{body}]({node.ref})" if node.ref else (f"![{body}]" if label else "")
 
 
+def _has_ref_descendant(node: DomNode) -> bool:
+    """Whether any descendant carries its own ref. Extraction deliberately
+    refs BOTH a container widget (listbox/menu/…) and the items inside it,
+    and both an <a>/<button> and a form control nested in it — the renderer
+    must keep descending past a ref'd node in those cases or the inner refs
+    are never shown (a Salesforce category listbox rendered as one opaque
+    element with 16 invisible-but-clickable options)."""
+    return any(c.ref is not None or _has_ref_descendant(c) for c in node.children)
+
+
 def _inline(node: DomNode) -> str:
     """Aggregate a subtree into one inline string."""
     if node.tag == "img":
         md = _img_md(node)
         return md
     if node.ref:
-        return _element_md(node)
+        md = _element_md(node)
+        if not _has_ref_descendant(node):
+            return md
+        parts = [md]
+        for c in node.children:
+            sub = _inline(c)
+            if sub:
+                parts.append(sub)
+        return " ".join(parts)
     parts: list[str] = []
     # <label> text is already carried as the associated control's accessible
     # name; rendering it again would double every form line. Children (the
@@ -314,6 +332,9 @@ def _blocks(raw: RawSection, skip_heading: str | None = None) -> list[str]:
             return
         if node.ref:
             _append_inline(lines, _element_md(node))
+            if _has_ref_descendant(node):  # see _has_ref_descendant
+                for c in node.children:
+                    rec(c)
             return
         if node.tag == "label":  # see _inline: label text lives on its control
             for c in node.children:
