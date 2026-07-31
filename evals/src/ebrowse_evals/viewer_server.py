@@ -16,8 +16,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 
+from ebrowse_evals.trace.records import Anomaly, RunEnd, RunMeta, Step, Summary
 from ebrowse_evals.trace.store import TraceReader
-from ebrowse_evals.viewer import render_run, render_step_fragment
+from ebrowse_evals.viewer import render_run, render_step_fragment, website
 
 
 def _e(value: object) -> str:
@@ -30,16 +31,36 @@ class RunSummary:
     group: str
     run_id: str
     task_id: str
+    prompt: str
+    website: str
     model: str
     outcome: str
+    verdict: str
     steps: int
     anomalies: int
     updated: float
 
 
 def _summary(root: Path, run_dir: Path) -> RunSummary:
+    """One pass over events.jsonl -- the index reads every run on every
+    refresh, so re-scanning the file per field does not scale."""
     reader = TraceReader(run_dir)
-    meta, end = reader.meta(), reader.end()
+    meta: RunMeta | None = None
+    end: RunEnd | None = None
+    steps = anomalies = 0
+    verdict = first_url = ""
+    for rec in reader.records():
+        if isinstance(rec, RunMeta):
+            meta = meta or rec
+        elif isinstance(rec, RunEnd):
+            end = end or rec
+        elif isinstance(rec, Step):
+            steps += 1
+            first_url = first_url or str((rec.browser or {}).get("url") or "")
+        elif isinstance(rec, Anomaly):
+            anomalies += 1
+        elif isinstance(rec, Summary) and rec.kind == "verdict" and not verdict:
+            verdict = rec.text
     relative = run_dir.relative_to(root)
     agent: dict[str, Any] = meta.agent if meta is not None else {}
     return RunSummary(
@@ -47,10 +68,13 @@ def _summary(root: Path, run_dir: Path) -> RunSummary:
         group=str(relative.parent) if relative.parent != Path(".") else "Runs",
         run_id=(meta.run_id if meta and meta.run_id else run_dir.name),
         task_id=(meta.task_id if meta and meta.task_id else "?"),
+        prompt=(meta.prompt.strip() if meta and meta.prompt else ""),
+        website=website(meta.config if meta else {}, first_url),
         model=str(agent.get("model", "")),
         outcome=(end.outcome if end else "in progress"),
-        steps=(end.steps if end else len(reader.steps())),
-        anomalies=len(reader.anomalies()),
+        verdict=verdict,
+        steps=(end.steps if end else steps),
+        anomalies=anomalies,
         updated=(run_dir / "events.jsonl").stat().st_mtime,
     )
 
@@ -75,19 +99,27 @@ _CSS = """
 @media (prefers-color-scheme:dark) { :root { --bg:#15171b; --panel:#202329; --fg:#e7e8ea;
   --muted:#9da3ad; --line:#343941; --accent:#78a9ed; --good:#69c98b; --bad:#ef8175; --warn:#dfbd67; } }
 * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--fg);
-  font:14px/1.45 system-ui,sans-serif; } main { max-width:1200px; margin:auto; padding:2rem 1.25rem 5rem; }
+  font:14px/1.45 system-ui,sans-serif; } main { max-width:1800px; margin:auto; padding:2rem 1.25rem 5rem; }
 header { display:flex; align-items:end; justify-content:space-between; gap:1rem; margin-bottom:1.5rem; }
 h1 { margin:0; font-size:1.6rem; } h2 { margin:1.8rem 0 .55rem; font-size:1rem; }
 .root,.muted,.count { color:var(--muted); } .group { background:var(--panel); border:1px solid var(--line);
-  border-radius:9px; overflow:hidden; } table { width:100%; border-collapse:collapse; }
+  border-radius:9px; overflow:hidden; } table { width:100%; border-collapse:collapse; table-layout:fixed; }
 th { color:var(--muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;
-  text-align:left; padding:.55rem .7rem; } td { padding:.65rem .7rem; border-top:1px solid var(--line); }
+  text-align:left; padding:.55rem .7rem; } td { padding:.65rem .7rem; border-top:1px solid var(--line);
+  vertical-align:top; }
 tr:hover td { background:color-mix(in srgb,var(--accent) 5%,transparent); }
 a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
-.run { font-weight:650; } .task { max-width:22rem; } .num { text-align:right; white-space:nowrap; }
+.num { text-align:right; white-space:nowrap; }
+.c-task { width:34%; } .c-outcome { width:7rem; } .c-verdict { width:32%; }
+.c-model { width:11rem; } .c-num { width:5.5rem; } .c-updated { width:6.5rem; }
+.run { display:block; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sub { color:var(--muted); font-size:.78rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.site { color:var(--fg); } .verdict { font-size:.86rem; line-height:1.35;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 .status { display:inline-block; border-radius:10px; padding:.08rem .48rem; background:var(--line); }
 .status-success { color:var(--good); } .status-error,.status-failure,.status-timeout,.status-tool_limit { color:var(--bad); }
-.status-in_progress { color:var(--warn); } @media(max-width:800px) { .optional { display:none; } .task { max-width:12rem; } }
+.status-in_progress { color:var(--warn); }
+@media(max-width:1100px) { .optional { display:none; } .c-task { width:40%; } .c-verdict { width:36%; } }
 .pick { width:2.2rem; text-align:center; } h2 label { cursor:pointer; }
 .toolbar { position:sticky; top:0; z-index:2; display:flex; justify-content:flex-end; align-items:center;
   gap:.8rem; padding:.65rem 0; background:var(--bg); }
@@ -96,6 +128,13 @@ button { border:0; border-radius:7px; padding:.48rem .8rem; background:var(--bad
 .notice { border:1px solid var(--good); color:var(--good); background:var(--panel); padding:.65rem .8rem;
   border-radius:7px; margin-bottom:.7rem; } .notice.error { border-color:var(--bad); color:var(--bad); }
 """
+
+
+def _run_label(run_id: str, task_id: str) -> str:
+    """Run ids are conventionally `<run-name>-<task-id>`; the task id is already
+    implied by the instruction line, so show only the run-name part."""
+    label = run_id.replace(task_id, "").strip("-_ ") if task_id else run_id
+    return label or run_id
 
 
 def _age(ts: float, now: float) -> str:
@@ -128,21 +167,35 @@ def render_index(
         for run in items:
             href = "/run/" + quote(run.relative.as_posix(), safe="/")
             status_class = run.outcome.replace(" ", "_")
+            # Line 1 is the instruction (the only thing that distinguishes tasks
+            # at a glance); line 2 carries the site plus the run id, which the
+            # instruction alone cannot disambiguate across repeated runs.
+            instruction = run.prompt or run.task_id
+            site = f'<span class="site">{_e(run.website)}</span> &middot; ' if run.website else ""
+            verdict = (
+                f'<div class="verdict" title="{_e(run.verdict)}">{_e(run.verdict)}</div>'
+                if run.verdict
+                else '<span class="muted">&mdash;</span>'
+            )
             rows.append(
                 f'<tr><td class="pick"><input type="checkbox" name="run" '
                 f'value="{_e(run.relative.as_posix())}" data-group="{group_id}" '
                 f'aria-label="Select {_e(run.run_id)}"></td>'
-                f'<td><a class="run" href="{href}">{_e(run.run_id)}</a></td>'
-                f'<td class="task">{_e(run.task_id)}</td>'
+                f'<td class="task"><a class="run" href="{href}" title="{_e(instruction)}">'
+                f'{_e(instruction)}</a><div class="sub" title="{_e(run.run_id)}">'
+                f"{site}{_e(_run_label(run.run_id, run.task_id))}</div></td>"
                 f'<td><span class="status status-{_e(status_class)}">{_e(run.outcome)}</span></td>'
-                f'<td class="optional">{_e(run.model)}</td><td class="num">{run.steps}</td>'
+                f"<td>{verdict}</td>"
+                f'<td class="optional sub">{_e(run.model)}</td><td class="num">{run.steps}</td>'
                 f'<td class="num">{run.anomalies}</td><td class="num muted">{_e(_age(run.updated, now))}</td></tr>'
             )
         sections.append(
             f'<h2><label><input class="group-pick" type="checkbox" data-group="{group_id}"> '
-            f"{_e(group)}</label></h2><div class='group'><table><thead><tr><th></th><th>Run</th><th>Task</th>"
-            "<th>Outcome</th><th class='optional'>Model</th><th class='num'>Steps</th>"
-            "<th class='num'>Anomalies</th><th class='num'>Updated</th>"
+            f"{_e(group)}</label></h2><div class='group'><table><thead><tr><th class='pick'></th>"
+            "<th class='c-task'>Task</th><th class='c-outcome'>Outcome</th>"
+            "<th class='c-verdict'>Summary</th><th class='optional c-model'>Model</th>"
+            "<th class='num c-num'>Steps</th><th class='num c-num'>Anomalies</th>"
+            "<th class='num c-updated'>Updated</th>"
             f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
         )
     content = (
