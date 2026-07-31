@@ -88,13 +88,26 @@ omitted when capture was unavailable. Thinking, ordinary assistant text, every
 tool call, every tool result, and final assistant-only answers are retained;
 non-ebrowse tools no longer disappear from the browser-oriented view.
 
-Every row uses the same two-column grid. Conversation content is on the left;
-the right column is always reserved for post-action browser state. Rows without
-a browser interaction keep an intentionally empty browser lane so screenshots,
-URL changes, and other browser transitions stand out while scrolling. A tool
-result joined to an ebrowse step shows the screenshot, URL/title, timings,
-anomalies, and expandable browser internals in that lane. Large transcript
-blocks and browser blobs remain content-addressed and lazy-loaded.
+Rows are grouped by **page**: consecutive rows whose steps captured a
+byte-identical screenshot (the blob store is content-addressed, so an equal ref
+is an unchanged page) share one two-column group — conversation on the left,
+a single browser panel on the right that sticks while you scroll the chain of
+calls made against that page. The next page-changing action opens a visibly
+separate group. A chain used to reserve a full screenshot's worth of height per
+row and repeat the same image, which is what left the big gaps between calls.
+
+The panel shows the group's last screenshot, URL/title, anomaly badges pooled
+across its steps, and one `browser details` expander holding every step's
+timings, browser state, blob refs, events, logs and errors, labelled per step.
+A run of rows with no browser step at all (non-browser tools, the final answer)
+renders full width instead of reserving an empty lane. Large transcript blocks
+and browser blobs remain content-addressed and lazy-loaded.
+
+Grouping is deliberately strict: identical bytes only. A page with a carousel,
+animation or rotating ad re-captures differently on every step and therefore
+does not group — the viewer never claims two different-looking screenshots are
+the same page. Switching to a looser key (URL + title) is a one-line change in
+`_page_key`.
 
 ## Legacy layout
 

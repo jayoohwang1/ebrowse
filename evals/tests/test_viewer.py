@@ -142,8 +142,8 @@ def test_conversation_view_shows_all_blocks_and_fixed_browser_lane(tmp_path: Pat
     assert "ordinary assistant output" in page
     assert "non-browser tool output" in page
     assert "notes.txt" in page
-    assert page.count('class="browser-side browser-empty"') >= 3
-    assert "grid-template-columns:minmax(0,1fr) 340px" in page
+    assert "grid-template-columns:minmax(0,1fr) 340px" in page  # on the page group now
+    assert page.count('class="browser-side"') == page.count('class="page-group"')
 
 
 def test_tolerates_torn_tail_missing_blobs_unknown_types(tmp_path: Path) -> None:

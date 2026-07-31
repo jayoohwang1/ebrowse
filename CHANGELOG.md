@@ -50,6 +50,13 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- Conversation rows are grouped by page: consecutive steps that captured a
+  byte-identical screenshot share one sticky browser panel instead of repeating
+  the same image once per row, and the next page-changing action starts a
+  visually separate group. Rows with no browser step render full width rather
+  than reserving an empty lane. Per-step internals are preserved under the
+  panel's single expander.
+
 - The trace header leads with the site and the instruction instead of a task-id
   hash; the id, run metadata and resolved config move into a collapsed `run
   details` expander, and the anomaly list (82 entries on one real run, which

@@ -21,6 +21,7 @@ import html
 import json
 import re
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -336,27 +337,19 @@ def _message_content(
     return "".join(blocks)
 
 
-def _browser_side(
-    step: dict[str, Any] | None,
+def _step_details(
+    step: dict[str, Any],
     attached: dict[str, list[dict[str, Any]]],
     blobs: BlobStore,
     blob_url: Callable[[str], str] | None,
+    labelled: bool,
 ) -> str:
-    if step is None or not (
-        step.get("browser")
-        or step.get("screenshot")
-        or step.get("dom_snapshot")
-        or (
-            step.get("tool_name") in (None, "bash")
-            and _EBROWSE_COMMAND.search(str(step.get("command", "")))
-        )
-    ):
-        return (
-            '<aside class="browser-side browser-empty" aria-label="No browser interaction"></aside>'
-        )
+    """One step's internals, for the browser panel's expander."""
     browser = step.get("browser", {}) if isinstance(step.get("browser"), dict) else {}
-    url, title = browser.get("url", ""), browser.get("title", "")
     detail: list[str] = []
+    if labelled:
+        detail.append(f'<h4 class="step-detail">step {_e(step.get("step", "?"))}</h4>')
+    detail.append(_timing_bar(step.get("timing", {}) or {}))
     if browser:
         detail.append("<h4>browser state</h4>" + _kv_table(browser))
     detail.append("<h4>blobs</h4>" + _dom_snapshot_block(step.get("dom_snapshot"), blobs, blob_url))
@@ -380,26 +373,65 @@ def _browser_side(
             + _e("\n".join(json.dumps(record, ensure_ascii=False) for record in unknown))
             + "</pre>"
         )
-    return (
-        f'<aside class="browser-side"><div class="browser-label">Browser after action · step {_e(step.get("step", "?"))}</div>'
-        + _screenshot_cell(step.get("screenshot"), blobs, blob_url)
-        + f'<div class="pageid"><strong>{_e(title)}</strong><br><span class="url">{_e(url)}</span></div>'
-        + _timing_bar(step.get("timing", {}) or {})
-        + (
-            f'<div class="badges">{_anomaly_badges(attached.get("anomaly", []))}</div>'
-            if attached.get("anomaly")
-            else ""
+    return "".join(detail)
+
+
+def _browser_panel(
+    group: list[tuple[dict[str, Any], dict[str, list[dict[str, Any]]]]],
+    blobs: BlobStore,
+    blob_url: Callable[[str], str] | None,
+) -> str:
+    """One screenshot for a chain of steps that left the page unchanged, plus
+    every step's internals behind a single expander."""
+    if not group:
+        return (
+            '<aside class="browser-side browser-empty" aria-label="No browser interaction"></aside>'
         )
-        + "<details class='internals'><summary>browser details</summary>"
-        + "".join(detail)
+    shot = next((s for s, _ in reversed(group) if s.get("screenshot")), None)
+    state = next((s for s, _ in reversed(group) if s.get("browser")), None)
+    browser = (
+        (state or {}).get("browser", {}) if isinstance((state or {}).get("browser"), dict) else {}
+    )
+    numbers = [s.get("step") for s, _ in group]
+    label = (
+        f"step {_e(numbers[0])}"
+        if len(numbers) == 1
+        else f"steps {_e(numbers[0])}&ndash;{_e(numbers[-1])} <span class='muted'>unchanged</span>"
+    )
+    anomalies = [a for _, attached in group for a in attached.get("anomaly", [])]
+    return (
+        f'<aside class="browser-side"><div class="browser-label">Browser after action · {label}</div>'
+        + _screenshot_cell((shot or {}).get("screenshot"), blobs, blob_url)
+        + f'<div class="pageid"><strong>{_e(browser.get("title", ""))}</strong><br>'
+        f'<span class="url">{_e(browser.get("url", ""))}</span></div>'
+        + (f'<div class="badges">{_anomaly_badges(anomalies)}</div>' if anomalies else "")
+        + "<details class='internals'><summary>browser details"
+        + (f" · {len(group)} steps" if len(group) > 1 else "")
+        + "</summary>"
+        + "".join(
+            _step_details(step, attached, blobs, blob_url, labelled=len(group) > 1)
+            for step, attached in group
+        )
         + "</details></aside>"
+    )
+
+
+def _has_browser(step: dict[str, Any] | None) -> bool:
+    """Whether a step deserves a place in the browser lane at all."""
+    return step is not None and bool(
+        step.get("browser")
+        or step.get("screenshot")
+        or step.get("dom_snapshot")
+        or (
+            step.get("tool_name") in (None, "bash")
+            and _EBROWSE_COMMAND.search(str(step.get("command", "")))
+        )
     )
 
 
 def _conversation_row(
     message: dict[str, Any],
     step: dict[str, Any] | None,
-    attached: dict[str, list[dict[str, Any]]],
     blobs: BlobStore,
     blob_url: Callable[[str], str] | None,
 ) -> str:
@@ -436,9 +468,7 @@ def _conversation_row(
             if isinstance(metadata, dict) and metadata
             else ""
         )
-        + "</article>"
-        + _browser_side(step, attached, blobs, blob_url)
-        + "</section>"
+        + "</article></section>"
     )
 
 
@@ -639,11 +669,18 @@ body:not(.show-debug) .log-debug { display:none; }
 .system-prompt { background:var(--panel); border:1px solid var(--line); border-radius:6px;
   padding:.4rem .65rem; }
 .system-prompt summary { cursor:pointer; font-weight:600; }
-.conversation-row { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:1.2rem;
-  border-bottom:1px solid var(--line); align-items:start; }
-.conversation-main,.browser-side { min-width:0; padding:1rem 0; }
-.browser-side { border-left:1px solid var(--line); padding-left:1.2rem; }
-.browser-empty { min-height:4rem; background:linear-gradient(90deg,color-mix(in srgb,var(--panel) 45%,transparent),transparent); }
+/* One page = one group: rows on the left, a single screenshot on the right
+   that sticks while you scroll the chain of calls made against that page. */
+.page-group { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:1.2rem;
+  align-items:start; border-bottom:2px solid var(--line); }
+.page-group.no-browser { grid-template-columns:minmax(0,1fr); }
+.group-main { min-width:0; }
+.conversation-row { padding:.7rem 0; }
+.conversation-row + .conversation-row { border-top:1px dashed var(--line); }
+.conversation-main { min-width:0; }
+.browser-side { min-width:0; position:sticky; top:.5rem; padding:1rem 0 1rem 1.2rem;
+  border-left:1px solid var(--line); }
+.step-detail { color:var(--fg); border-top:1px solid var(--line); padding-top:.4rem; }
 .message-head,.browser-label { color:var(--muted); font-size:.8rem; margin-bottom:.45rem; }
 .message-head strong { color:var(--fg); text-transform:capitalize; }
 .message-text { white-space:pre-wrap; overflow-wrap:anywhere; margin:.35rem 0; }
@@ -657,7 +694,7 @@ body:not(.show-debug) .log-debug { display:none; }
    in full, but scrolling, so it can't push the trajectory off the screen. */
 .is-start .message-text { max-height:16rem; overflow-y:auto; background:var(--panel);
   border-radius:6px; padding:.5rem .7rem; }
-@media (max-width:800px) { .conversation-row { grid-template-columns:minmax(0,1fr) 180px; gap:.6rem; }
+@media (max-width:800px) { .page-group { grid-template-columns:minmax(0,1fr) 180px; gap:.6rem; }
   .browser-side { padding-left:.6rem; } }
 """
 
@@ -744,6 +781,63 @@ def _compact_step(step: dict[str, Any]) -> str:
         f'<span class="compact-page">{_e(_short_text(page, 100))}</span>'
         f"{thought_html}<code>{_e(action)}</code></div>"
     )
+
+
+# -- page groups ------------------------------------------------------------
+#
+# A chain of tool calls that leaves the page untouched (expand, a failed
+# action, a non-browser tool) produced one identical screenshot per step, and
+# each of those rows reserved a full screenshot's worth of height. Consecutive
+# steps whose capture is byte-identical -- the blob store is content-addressed,
+# so an equal ref IS an unchanged page -- now share a single sticky panel, and
+# the next page-changing action starts a visibly separate group.
+
+
+@dataclass(slots=True)
+class _Row:
+    step: int | None
+    html: str
+    record: dict[str, Any] | None = None
+    attached: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+
+
+def _page_key(record: dict[str, Any] | None) -> str | None:
+    """Identity of the page a step left behind: its screenshot blob ref.
+    None means "nothing to show" -- the row joins whatever group it is in."""
+    if record is None or not _has_browser(record):
+        return None
+    ref = record.get("screenshot")
+    return str(ref) if ref else None
+
+
+def _page_groups(rows: list[_Row], blobs: BlobStore, blob_url: Callable[[str], str] | None) -> str:
+    """Wrap consecutive rows sharing a page into one two-column group."""
+    out: list[str] = []
+    pending: list[_Row] = []
+    key: str | None = None
+
+    def flush() -> None:
+        nonlocal pending, key
+        if not pending:
+            return
+        panel = [(row.record, row.attached) for row in pending if row.record is not None]
+        aside = _browser_panel(panel, blobs, blob_url) if key is not None else ""
+        css = "page-group" if key is not None else "page-group no-browser"
+        out.append(
+            f'<section class="{css}"><div class="group-main">'
+            + "".join(row.html for row in pending)
+            + f"</div>{aside}</section>"
+        )
+        pending, key = [], None
+
+    for row in rows:
+        this = _page_key(row.record)
+        if this is not None and key is not None and this != key:
+            flush()
+        pending.append(row)
+        key = key or this
+    flush()
+    return "".join(out)
 
 
 # -- annotation-driven segmentation ----------------------------------------
@@ -851,28 +945,30 @@ def _overview(verdicts: list[dict[str, Any]], n_segments: int, n_steps: int) -> 
 
 
 def _segmented_body(
-    rows: list[tuple[Any, str]], segments: list[tuple[int, int, list[dict[str, Any]]]]
+    rows: list[_Row],
+    segments: list[tuple[int, int, list[dict[str, Any]]]],
+    render: Callable[[list[_Row]], str],
 ) -> list[str]:
     """Wrap step-bound rows in their segment's <details>; rows before the first
     and after the last step (starting prompt, final answer) stay visible."""
-    numbered = [i for i, (step, _) in enumerate(rows) if isinstance(step, int)]
+    numbered = [i for i, row in enumerate(rows) if row.step is not None]
     if not numbered:
-        return [html for _, html in rows]
+        return [render(rows)]
     first, last = numbered[0], numbered[-1]
     # A row with no step of its own (assistant thinking, a tool call) belongs
     # with the step it leads into, not the one it followed.
     owners: list[int] = []
-    nxt = rows[last][0]
-    for step, _ in reversed(rows[first : last + 1]):
-        nxt = step if isinstance(step, int) else nxt
-        owners.append(nxt)
+    nxt = rows[last].step
+    for row in reversed(rows[first : last + 1]):
+        nxt = row.step if row.step is not None else nxt
+        owners.append(nxt if nxt is not None else 0)
     owners.reverse()
 
-    out = [html for _, html in rows[:first]]
-    middle = [html for _, html in rows[first : last + 1]]
+    out = [render(rows[:first])] if first else []
+    middle = rows[first : last + 1]
     cursor = 0
     for index, (start, end, findings) in enumerate(segments):
-        taken: list[str] = []
+        taken: list[_Row] = []
         while cursor < len(middle) and (
             owners[cursor] <= end or index == len(segments) - 1  # never drop a row
         ):
@@ -881,9 +977,10 @@ def _segmented_body(
         out.append(
             f'<details class="segment" id="segment-{start}">'
             + _segment_head(start, end, findings)
-            + f'<div class="seg-body">{"".join(taken)}</div></details>'
+            + f'<div class="seg-body">{render(taken)}</div></details>'
         )
-    out.extend(html for _, html in rows[last + 1 :])
+    if rows[last + 1 :]:
+        out.append(render(rows[last + 1 :]))
     return out
 
 
@@ -960,12 +1057,13 @@ def render_run(
     if annotations:
         head.append(_overview(verdicts, len(segments), len(steps)))
 
-    # (step number | None, html): the segmenter groups rows by step, and rows
-    # that belong to no step (assistant turns, chunk placeholders) ride along.
-    rows: list[tuple[Any, str]] = []
+    # The segmenter groups rows by step; rows belonging to no step (assistant
+    # turns, chunk placeholders) ride along with the step they lead into.
+    rows: list[_Row] = []
 
-    def emit(html: str, step: Any = None) -> None:
-        rows.append((step if isinstance(step, int) else None, html))
+    def emit(html: str, step: Any = None, record: dict[str, Any] | None = None) -> None:
+        number = step if isinstance(step, int) else None
+        rows.append(_Row(number, html, record, attached.get(number, {}) if record else {}))
 
     def full_step(step: dict[str, Any]) -> None:
         n = step.get("step")
@@ -1008,14 +1106,9 @@ def render_run(
             if step is not None:
                 rendered_steps.add(step.get("step"))
             emit(
-                _conversation_row(
-                    message,
-                    step,
-                    attached.get(step.get("step"), {}) if step else {},
-                    reader.blobs,
-                    blob_url,
-                ),
+                _conversation_row(message, step, reader.blobs, blob_url),
                 step.get("step") if step else None,
+                step,
             )
             if step is not None:
                 for marker in markers_after.pop(step.get("step"), []):
@@ -1032,14 +1125,9 @@ def render_run(
                 "is_error": bool(step.get("error")),
             }
             emit(
-                _conversation_row(
-                    fallback,
-                    step,
-                    attached.get(step.get("step"), {}),
-                    reader.blobs,
-                    blob_url,
-                ),
+                _conversation_row(fallback, step, reader.blobs, blob_url),
                 step.get("step"),
+                step,
             )
             for marker in markers_after.pop(step.get("step"), []):
                 emit(marker, step.get("step"))
@@ -1067,7 +1155,14 @@ def render_run(
         for marker in leftovers:
             emit(marker)
 
-    body = head + (_segmented_body(rows, segments) if segments else [html for _, html in rows])
+    # Page grouping is a property of the conversation layout; legacy step rows
+    # carry their own screenshot lane.
+    def render(chunk: list[_Row]) -> str:
+        if messages:
+            return _page_groups(chunk, reader.blobs, blob_url)
+        return "".join(row.html for row in chunk)
+
+    body = head + (_segmented_body(rows, segments, render) if segments else [render(rows)])
     title = f"ebrowse trace — {meta.get('task_id', run_dir.name) if meta else run_dir.name}"
     return (
         "<!doctype html>\n<html lang='en'>\n<head>\n<meta charset='utf-8'>\n"
