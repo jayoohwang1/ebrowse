@@ -10,9 +10,15 @@ uv run ebrowse-eval serve runs/online-mind2web --port 9000
 ```
 
 The index is generated dynamically, so newly completed or currently running
-traces appear on refresh. Each row shows task, outcome, model, step/anomaly
-counts, and last update time. Opening a new trace renders the full conversation and
-provides a link back to the index.
+traces appear on refresh. Each row identifies its run by the **task cell**: the
+instruction the agent was given on the first line, then the site it started on
+and the run-name part of the run id (the task id, which the instruction already
+implies, is stripped). The site comes from the run's navigation bootstrap when
+present, else the task url, else the first step's URL. Next to the outcome, the
+**summary** column shows the annotation pipeline's one-line VERDICT for the run
+(`ebrowse-eval annotate`); runs without annotations show a dash. The remaining
+columns are model, step/anomaly counts, and last update time. Opening a trace
+renders the full conversation and provides a link back to the index.
 
 Legacy step-only traces retain the first-25/last-10 optimization.
 For those traces, the server renders the first 25 and last 10 steps in full.
@@ -40,22 +46,68 @@ uv run ebrowse-eval view runs/my-run              # writes runs/my-run/trace.htm
 uv run ebrowse-eval view runs/my-run -o /tmp/t.html --open
 ```
 
+## Trace header
+
+The header leads with what identifies a run to a human: the **site** and
+outcome on one line, then the **instruction** as the page title. The task id is
+a hash, so it drops into a collapsed `run details` expander alongside the run
+id, benchmark, agent, git sha and resolved config. Totals and the eval result
+stay visible. The **anomaly list** is collapsed — a run can carry dozens, and
+they buried everything else — but still links each entry to its step.
+
+## Segmented overview
+
+When a run carries model annotations (`ebrowse-eval annotate`), opening it
+leads with an **overview**: the one-line verdict, then the trajectory cut into
+collapsed segments. Every annotation edge is a cut, so overlapping spans (a
+vision finding straddling two issues) split rather than merge and each segment
+lists every finding that overlaps it — category/severity badges plus the
+model's sentence. A span states itself once and thins to `continues` on the
+later segments it runs through. The stretches nobody annotated stay as
+`no findings` segments, so the run is still covered end to end.
+
+Opening a segment reveals that step range's full detail rows — the same
+conversation/step rendering as always, just gated. Screenshots inside a
+collapsed segment are never fetched, which is what keeps a 136-step run
+openable. **Expand all** / **Collapse all** sit in the overview, and following
+an anchor (an anomaly's `#step-N` link) opens whatever segments enclose it.
+
+Unannotated runs are not segmented — they render as a plain vertical log, as
+before. Plain (kind-less) step-range summaries keep their inline markers;
+annotation records (`verdict`/`issue`/`stuck_span`/`vision`) appear in the
+overview instead of duplicating there.
+
 ## Conversation layout
 
 New traces preserve every finalized Pi message and its original content-block
-order. The exact starting prompt is the first, fully visible user row. Pi's
+order. The exact starting prompt is the first visible user row, in full but
+height-capped and scrolling — it embeds the whole operating guide and would
+otherwise push the trajectory off screen. Pi's
 effective system prompt is shown above it behind a collapsed expander and is
 omitted when capture was unavailable. Thinking, ordinary assistant text, every
 tool call, every tool result, and final assistant-only answers are retained;
 non-ebrowse tools no longer disappear from the browser-oriented view.
 
-Every row uses the same two-column grid. Conversation content is on the left;
-the right column is always reserved for post-action browser state. Rows without
-a browser interaction keep an intentionally empty browser lane so screenshots,
-URL changes, and other browser transitions stand out while scrolling. A tool
-result joined to an ebrowse step shows the screenshot, URL/title, timings,
-anomalies, and expandable browser internals in that lane. Large transcript
-blocks and browser blobs remain content-addressed and lazy-loaded.
+Rows are grouped by **page**: consecutive rows whose steps captured a
+byte-identical screenshot (the blob store is content-addressed, so an equal ref
+is an unchanged page) share one two-column group — conversation on the left,
+a single browser panel on the right that sticks while you scroll the chain of
+calls made against that page. The next page-changing action opens a visibly
+separate group. A chain used to reserve a full screenshot's worth of height per
+row and repeat the same image, which is what left the big gaps between calls.
+
+The panel shows the group's last screenshot, URL/title, anomaly badges pooled
+across its steps, and one `browser details` expander holding every step's
+timings, browser state, blob refs, events, logs and errors, labelled per step.
+A run of rows with no browser step at all (non-browser tools, the final answer)
+renders full width instead of reserving an empty lane. Large transcript blocks
+and browser blobs remain content-addressed and lazy-loaded.
+
+Grouping is deliberately strict: identical bytes only. A page with a carousel,
+animation or rotating ad re-captures differently on every step and therefore
+does not group — the viewer never claims two different-looking screenshots are
+the same page. Switching to a looser key (URL + title) is a one-line change in
+`_page_key`.
 
 ## Legacy layout
 

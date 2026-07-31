@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import threading
 import urllib.error
@@ -16,9 +17,16 @@ import pytest
 from ebrowse_evals import viewer_server
 from ebrowse_evals.cli import main
 from ebrowse_evals.trace import AgentMessage, PromptSnapshot, TraceWriter
+from ebrowse_evals.trace.records import Summary
 from ebrowse_evals.trace.store import TraceReader
 from ebrowse_evals.viewer import render_run
-from ebrowse_evals.viewer_server import discover_runs, make_handler, render_index, trash_runs
+from ebrowse_evals.viewer_server import (
+    _run_label,
+    discover_runs,
+    make_handler,
+    render_index,
+    trash_runs,
+)
 
 SAMPLE = Path(__file__).parent / "fixtures" / "sample-trace"
 
@@ -49,6 +57,14 @@ def test_header_metadata_outcome_and_anomalies(html: str) -> None:
     assert 'href="#step-3"' in html  # anomaly links to its step
     assert "element_moved" in html
     assert "resolved config" in html
+
+
+def test_header_leads_with_site_and_instruction(html: str) -> None:
+    assert "<h1>Open http://127.0.0.1:8196/list.html and count the products.</h1>" in html
+    assert '<span class="site">127.0.0.1:8196</span>' in html  # from the first step's url
+    # the noisy blocks open on demand, not on load
+    assert '<details class="anomaly-list"><summary>anomalies (1)</summary>' in html
+    assert '<details class="facts"><summary>run details</summary>' in html
 
 
 def test_left_lane_internals_sections(html: str) -> None:
@@ -126,8 +142,8 @@ def test_conversation_view_shows_all_blocks_and_fixed_browser_lane(tmp_path: Pat
     assert "ordinary assistant output" in page
     assert "non-browser tool output" in page
     assert "notes.txt" in page
-    assert page.count('class="browser-side browser-empty"') >= 3
-    assert "grid-template-columns:minmax(0,1fr) 340px" in page
+    assert "grid-template-columns:minmax(0,1fr) 340px" in page  # on the page group now
+    assert page.count('class="browser-side"') == page.count('class="page-group"')
 
 
 def test_tolerates_torn_tail_missing_blobs_unknown_types(tmp_path: Path) -> None:
@@ -154,6 +170,45 @@ def test_cli_view_missing_dir(tmp_path: Path) -> None:
     assert main(["view", str(tmp_path / "nope")]) == 2
 
 
+def test_unannotated_trace_is_not_segmented(html: str) -> None:
+    assert 'class="segment"' not in html and 'class="overview"' not in html
+    assert "summary steps 1&ndash;3" in html  # plain range summary keeps its marker
+
+
+def test_annotation_spans_segment_the_trajectory(tmp_path: Path) -> None:
+    run = tmp_path / "run"
+    shutil.copytree(SAMPLE, run)
+    writer = TraceWriter(run)
+    writer.write(Summary(step_start=1, step_end=3, kind="verdict", text="Counted the products."))
+    writer.write(
+        Summary(
+            step_start=2,
+            step_end=2,
+            kind="issue",
+            category="tool_bug",
+            severity="high",
+            text="expand returned a stale section",
+        )
+    )
+    writer.write(Summary(step_start=2, step_end=3, kind="vision", text="the filter chip is hidden"))
+    page = render_run(run)
+
+    assert "Counted the products." in page  # verdict heads the overview
+    assert "Expand all" in page and "Collapse all" in page
+    # edges at 2 and 3 -> [1,1] [2,2] [3,3]; the vision span reaches into two
+    assert [int(n) for n in re.findall(r'id="segment-(\d+)"', page)] == [1, 2, 3]
+    assert page.count("no findings") == 1  # only step 1 is unannotated
+    assert "tool_bug" in page and "expand returned a stale section" in page
+    # a span states itself once, then thins to a marker where it continues
+    assert page.count("the filter chip is hidden") == 1
+    assert page.count(">continues</span>") == 1
+
+    chunks = re.split(r'<details class="segment" id="segment-\d+">', page)[1:]
+    assert [re.findall(r'id="step-(\d+)"', chunk) for chunk in chunks] == [["1"], ["2"], ["3"]]
+    # plain (kind-less) summaries still render inline, inside their segment
+    assert "summary steps 1&ndash;3" in page
+
+
 def test_central_index_discovers_and_groups_nested_runs(tmp_path: Path) -> None:
     root = tmp_path / "runs"
     shutil.copytree(SAMPLE, root / "batch-a" / "run-one")
@@ -164,10 +219,32 @@ def test_central_index_discovers_and_groups_nested_runs(tmp_path: Path) -> None:
     assert "2 runs" in page
     assert "batch-a" in page and "batch-b/nested" in page
     assert "/run/batch-a/run-one" in page
-    assert "list-count" in page and "success" in page
+    assert "success" in page
     assert 'action="/trash"' in page
     assert page.count('class="group-pick"') == 2
     assert "Move selected to trash" in page
+
+
+def test_index_task_cell_shows_instruction_site_and_verdict(tmp_path: Path) -> None:
+    root = tmp_path / "runs"
+    run = root / "batch" / "run-one"
+    shutil.copytree(SAMPLE, run)
+    TraceWriter(run).write(
+        Summary(step_start=1, step_end=3, kind="verdict", text="Counted 24 products and answered.")
+    )
+    (summary,) = discover_runs(root)
+    assert summary.prompt.startswith("Open http://127.0.0.1:8196/list.html")
+    assert summary.website == "127.0.0.1:8196"  # no bootstrap url: taken from step 1
+    assert summary.verdict == "Counted 24 products and answered."
+    assert summary.steps == 3 and summary.anomalies == 1
+
+    page = render_index(root, [summary])
+    assert "count the products." in page  # instruction line, not the task id
+    assert "127.0.0.1:8196" in page and "sample-001" in page  # site &middot; run label
+    assert _run_label("qwen-hard-abc123", "abc123") == "qwen-hard"  # task id not repeated
+    assert 'class="verdict"' in page and "Counted 24 products" in page
+    assert ">Task</th>" in page and ">Summary</th>" in page
+    assert ">Run</th>" not in page
 
 
 def test_central_server_routes_index_trace_and_rejects_escape(tmp_path: Path) -> None:

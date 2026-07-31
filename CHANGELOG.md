@@ -50,6 +50,32 @@ versions follow [SemVer](https://semver.org/). Unimplemented plans live in
 
 ### Added
 
+- Conversation rows are grouped by page: consecutive steps that captured a
+  byte-identical screenshot share one sticky browser panel instead of repeating
+  the same image once per row, and the next page-changing action starts a
+  visually separate group. Rows with no browser step render full width rather
+  than reserving an empty lane. Per-step internals are preserved under the
+  panel's single expander.
+
+- The trace header leads with the site and the instruction instead of a task-id
+  hash; the id, run metadata and resolved config move into a collapsed `run
+  details` expander, and the anomaly list (82 entries on one real run, which
+  pushed everything else off the first screen) is collapsed by default.
+
+- An annotated trace now opens as a segmented overview: the verdict, then the
+  trajectory cut on every annotation edge into collapsed segments, each headed
+  by the findings overlapping it (badges + the model's sentence, thinned to
+  `continues` where a span runs on). Expanding a segment reveals its detail
+  rows, so a 136-step run opens at ~4700px with no screenshots fetched instead
+  of rendering everything up front. Anchors (`#step-N` from the anomaly list)
+  open the segments enclosing them. Unannotated runs render as before.
+
+- `ebrowse-eval serve` index rows are readable at a glance: the run and task
+  columns (which repeated the same task id) collapse into one two-line task
+  cell — instruction, then site · run name — and a new **summary** column next
+  to the outcome carries the annotation pipeline's one-line verdict. The table
+  is laid out for a desktop-width window.
+
 - `evals/benchmarks/online-mind2web-hard` — all 79 hard tasks, generated from
   the current Online-Mind2Web dataset drop by a checked-in `generate.py`
   (re-run it on dataset updates; revision-suffixed task ids replace the older

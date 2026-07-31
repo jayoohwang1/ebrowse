@@ -21,8 +21,10 @@ import html
 import json
 import re
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from ebrowse_evals.trace.store import BlobStore, TraceReader
 
@@ -35,6 +37,15 @@ _EBROWSE_COMMAND = re.compile(r"(?:^|[;&|(]|\$\(|`)\s*(?:[\w./\-]*/)?ebrowse\b")
 
 def _e(text: object) -> str:
     return html.escape(str(text), quote=True)
+
+
+def website(config: dict[str, Any], fallback_url: str = "") -> str:
+    """Host the run started on: the bootstrap target when the runner recorded
+    one, else the task url, else wherever the first step ended up."""
+    bootstrap = config.get("navigation_bootstrap")
+    url = str(bootstrap.get("requested_url") or "") if isinstance(bootstrap, dict) else ""
+    url = url or str(config.get("url") or "") or fallback_url
+    return (urlparse(url).netloc or url).removeprefix("www.") if url else ""
 
 
 def _image_data_uri(data: bytes) -> str | None:
@@ -265,6 +276,9 @@ def _step_row(
     )
 
 
+_ANNOTATION_KINDS = ("verdict", "issue", "stuck_span", "vision")
+
+
 def _summary_marker(rec: dict[str, Any]) -> str:
     a, b = rec.get("step_start", "?"), rec.get("step_end", "?")
     model = f" <span class='muted'>({_e(rec['model'])})</span>" if rec.get("model") else ""
@@ -323,27 +337,19 @@ def _message_content(
     return "".join(blocks)
 
 
-def _browser_side(
-    step: dict[str, Any] | None,
+def _step_details(
+    step: dict[str, Any],
     attached: dict[str, list[dict[str, Any]]],
     blobs: BlobStore,
     blob_url: Callable[[str], str] | None,
+    labelled: bool,
 ) -> str:
-    if step is None or not (
-        step.get("browser")
-        or step.get("screenshot")
-        or step.get("dom_snapshot")
-        or (
-            step.get("tool_name") in (None, "bash")
-            and _EBROWSE_COMMAND.search(str(step.get("command", "")))
-        )
-    ):
-        return (
-            '<aside class="browser-side browser-empty" aria-label="No browser interaction"></aside>'
-        )
+    """One step's internals, for the browser panel's expander."""
     browser = step.get("browser", {}) if isinstance(step.get("browser"), dict) else {}
-    url, title = browser.get("url", ""), browser.get("title", "")
     detail: list[str] = []
+    if labelled:
+        detail.append(f'<h4 class="step-detail">step {_e(step.get("step", "?"))}</h4>')
+    detail.append(_timing_bar(step.get("timing", {}) or {}))
     if browser:
         detail.append("<h4>browser state</h4>" + _kv_table(browser))
     detail.append("<h4>blobs</h4>" + _dom_snapshot_block(step.get("dom_snapshot"), blobs, blob_url))
@@ -367,26 +373,65 @@ def _browser_side(
             + _e("\n".join(json.dumps(record, ensure_ascii=False) for record in unknown))
             + "</pre>"
         )
-    return (
-        f'<aside class="browser-side"><div class="browser-label">Browser after action · step {_e(step.get("step", "?"))}</div>'
-        + _screenshot_cell(step.get("screenshot"), blobs, blob_url)
-        + f'<div class="pageid"><strong>{_e(title)}</strong><br><span class="url">{_e(url)}</span></div>'
-        + _timing_bar(step.get("timing", {}) or {})
-        + (
-            f'<div class="badges">{_anomaly_badges(attached.get("anomaly", []))}</div>'
-            if attached.get("anomaly")
-            else ""
+    return "".join(detail)
+
+
+def _browser_panel(
+    group: list[tuple[dict[str, Any], dict[str, list[dict[str, Any]]]]],
+    blobs: BlobStore,
+    blob_url: Callable[[str], str] | None,
+) -> str:
+    """One screenshot for a chain of steps that left the page unchanged, plus
+    every step's internals behind a single expander."""
+    if not group:
+        return (
+            '<aside class="browser-side browser-empty" aria-label="No browser interaction"></aside>'
         )
-        + "<details class='internals'><summary>browser details</summary>"
-        + "".join(detail)
+    shot = next((s for s, _ in reversed(group) if s.get("screenshot")), None)
+    state = next((s for s, _ in reversed(group) if s.get("browser")), None)
+    browser = (
+        (state or {}).get("browser", {}) if isinstance((state or {}).get("browser"), dict) else {}
+    )
+    numbers = [s.get("step") for s, _ in group]
+    label = (
+        f"step {_e(numbers[0])}"
+        if len(numbers) == 1
+        else f"steps {_e(numbers[0])}&ndash;{_e(numbers[-1])} <span class='muted'>unchanged</span>"
+    )
+    anomalies = [a for _, attached in group for a in attached.get("anomaly", [])]
+    return (
+        f'<aside class="browser-side"><div class="browser-label">Browser after action · {label}</div>'
+        + _screenshot_cell((shot or {}).get("screenshot"), blobs, blob_url)
+        + f'<div class="pageid"><strong>{_e(browser.get("title", ""))}</strong><br>'
+        f'<span class="url">{_e(browser.get("url", ""))}</span></div>'
+        + (f'<div class="badges">{_anomaly_badges(anomalies)}</div>' if anomalies else "")
+        + "<details class='internals'><summary>browser details"
+        + (f" · {len(group)} steps" if len(group) > 1 else "")
+        + "</summary>"
+        + "".join(
+            _step_details(step, attached, blobs, blob_url, labelled=len(group) > 1)
+            for step, attached in group
+        )
         + "</details></aside>"
+    )
+
+
+def _has_browser(step: dict[str, Any] | None) -> bool:
+    """Whether a step deserves a place in the browser lane at all."""
+    return step is not None and bool(
+        step.get("browser")
+        or step.get("screenshot")
+        or step.get("dom_snapshot")
+        or (
+            step.get("tool_name") in (None, "bash")
+            and _EBROWSE_COMMAND.search(str(step.get("command", "")))
+        )
     )
 
 
 def _conversation_row(
     message: dict[str, Any],
     step: dict[str, Any] | None,
-    attached: dict[str, list[dict[str, Any]]],
     blobs: BlobStore,
     blob_url: Callable[[str], str] | None,
 ) -> str:
@@ -403,8 +448,9 @@ def _conversation_row(
         meta.append("error")
     metadata = message.get("metadata")
     anchor = f' id="step-{_e(step.get("step"))}"' if step else ""
+    start = " is-start" if message.get("is_start") else ""
     return (
-        f'<section class="conversation-row role-{_e(role)}"{anchor}>'
+        f'<section class="conversation-row role-{_e(role)}{start}"{anchor}>'
         '<article class="conversation-main">'
         f'<div class="message-head"><strong>{_e(label)}</strong>{turn} '
         f'<span class="muted">{_e(message.get("message_id", ""))}</span></div>'
@@ -422,9 +468,7 @@ def _conversation_row(
             if isinstance(metadata, dict) and metadata
             else ""
         )
-        + "</article>"
-        + _browser_side(step, attached, blobs, blob_url)
-        + "</section>"
+        + "</article></section>"
     )
 
 
@@ -469,7 +513,7 @@ def _header(
     end: dict[str, Any] | None,
     anomalies: list[dict[str, Any]],
     n_steps: int,
-    show_legacy_prompt: bool = True,
+    site: str = "",
 ) -> str:
     meta = meta or {}
     end = end or {}
@@ -509,14 +553,19 @@ def _header(
         if config
         else ""
     )
+    # The instruction is what identifies a run to a human; the task id is a
+    # hash, so it drops to the facts table.
+    instruction = str(meta.get("prompt") or "").strip() or str(meta.get("task_id", "trace"))
+    site_line = f'<span class="site">{_e(site)}</span>' if site else ""
     return f"""<header>
-<h1>{_e(meta.get("task_id", "trace"))} <span class="outcome outcome-{_e(outcome)}">{_e(outcome)}</span></h1>
-{f'<p class="prompt">{_e(meta.get("prompt", ""))}</p>' if show_legacy_prompt else ""}
-<table class="kv">{fact_rows}</table>
-{config_block}
+<div class="run-line">{site_line}<span class="outcome outcome-{_e(outcome)}">{_e(outcome)}</span></div>
+<h1>{_e(instruction)}</h1>
+<details class="facts"><summary>run details</summary><table class="kv">{fact_rows}</table>
+{config_block}</details>
 <div class="totals">{n_steps} steps &middot; {totals_line}</div>
 {eval_line}
-<div class="anomaly-list"><h3>anomalies ({len(anomalies)})</h3><ul>{anomaly_items}</ul></div>
+<details class="anomaly-list"><summary>anomalies ({len(anomalies)})</summary>
+<ul>{anomaly_items}</ul></details>
 <label class="debug-toggle"><input type="checkbox" id="show-debug"> show debug log events</label>
 </header>"""
 
@@ -535,7 +584,11 @@ code,pre { font:12px/1.45 ui-monospace,Menlo,Consolas,monospace; }
 pre { background:var(--code-bg); padding:.6rem .7rem; border-radius:6px; overflow-x:auto;
   white-space:pre-wrap; word-break:break-word; margin:.4rem 0; }
 header { border-bottom:2px solid var(--line); padding-bottom:1rem; margin-bottom:1rem; }
-.prompt { font-style:italic; }
+header h1 { margin:.2rem 0 .5rem; line-height:1.3; }
+.run-line { display:flex; align-items:center; gap:.6rem; }
+.run-line .site { font-weight:600; color:var(--accent); }
+.facts summary,.anomaly-list summary { cursor:pointer; color:var(--muted); font-size:.85rem; }
+.facts { margin:.2rem 0; } .anomaly-list { margin-top:.5rem; }
 .kv { border-collapse:collapse; margin:.4rem 0; }
 .kv th { text-align:left; padding:.1rem .8rem .1rem 0; color:var(--muted); font-weight:500;
   vertical-align:top; white-space:nowrap; }
@@ -575,6 +628,28 @@ body:not(.show-debug) .log-debug { display:none; }
 .stats { color:var(--muted); font-size:.8rem; }
 .summary-marker { border-left:3px solid var(--accent); background:var(--panel); padding:.5rem .8rem;
   margin:.8rem 0; border-radius:0 6px 6px 0; font-size:.9rem; }
+.overview { border:1px solid var(--line); border-radius:8px; background:var(--panel);
+  padding:.7rem 1rem; margin:1rem 0; }
+.overview h3 { margin:0 0 .4rem; font-size:.8rem; text-transform:uppercase; letter-spacing:.04em;
+  color:var(--muted); }
+.overview .verdict { margin:.2rem 0; font-size:1.02rem; }
+.seg-controls { display:flex; align-items:center; gap:.6rem; margin-top:.6rem; }
+.seg-toggle { border:1px solid var(--line); background:transparent; color:var(--fg);
+  border-radius:6px; padding:.2rem .6rem; font-size:.8rem; cursor:pointer; }
+.segment { border:1px solid var(--line); border-radius:8px; margin:.5rem 0; background:var(--bg); }
+.segment[open] { border-color:var(--accent); }
+.seg-head { cursor:pointer; padding:.55rem .8rem; list-style:none; }
+.seg-head::-webkit-details-marker { display:none; }
+.seg-head::before { content:"▸"; color:var(--muted); margin-right:.5rem; }
+.segment[open] > .seg-head::before { content:"▾"; }
+.seg-range { font-weight:600; margin-right:.5rem; }
+.seg-finding { margin:.3rem 0 0 1.2rem; font-size:.87rem; }
+.seg-badge { display:inline-block; border:1px solid var(--line); border-radius:9px;
+  padding:.02rem .45rem; font-size:.72rem; margin-right:.35rem; color:var(--muted); }
+.seg-badge.seg-high { border-color:var(--bad); color:var(--bad); background:#c04a3a14; }
+.seg-stuck_span { border-color:var(--warn); color:var(--warn); }
+.seg-vision { border-color:var(--accent); color:var(--accent); }
+.seg-body { padding:0 .8rem; border-top:1px solid var(--line); }
 .error-box { border:1px solid var(--bad); border-radius:6px; padding:.3rem .6rem; }
 .muted { color:var(--muted); }
 .back { margin:.2rem 0 1rem; } .back a { color:var(--accent); text-decoration:none; }
@@ -594,11 +669,18 @@ body:not(.show-debug) .log-debug { display:none; }
 .system-prompt { background:var(--panel); border:1px solid var(--line); border-radius:6px;
   padding:.4rem .65rem; }
 .system-prompt summary { cursor:pointer; font-weight:600; }
-.conversation-row { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:1.2rem;
-  border-bottom:1px solid var(--line); align-items:start; }
-.conversation-main,.browser-side { min-width:0; padding:1rem 0; }
-.browser-side { border-left:1px solid var(--line); padding-left:1.2rem; }
-.browser-empty { min-height:4rem; background:linear-gradient(90deg,color-mix(in srgb,var(--panel) 45%,transparent),transparent); }
+/* One page = one group: rows on the left, a single screenshot on the right
+   that sticks while you scroll the chain of calls made against that page. */
+.page-group { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:1.2rem;
+  align-items:start; border-bottom:2px solid var(--line); }
+.page-group.no-browser { grid-template-columns:minmax(0,1fr); }
+.group-main { min-width:0; }
+.conversation-row { padding:.7rem 0; }
+.conversation-row + .conversation-row { border-top:1px dashed var(--line); }
+.conversation-main { min-width:0; }
+.browser-side { min-width:0; position:sticky; top:.5rem; padding:1rem 0 1rem 1.2rem;
+  border-left:1px solid var(--line); }
+.step-detail { color:var(--fg); border-top:1px solid var(--line); padding-top:.4rem; }
 .message-head,.browser-label { color:var(--muted); font-size:.8rem; margin-bottom:.45rem; }
 .message-head strong { color:var(--fg); text-transform:capitalize; }
 .message-text { white-space:pre-wrap; overflow-wrap:anywhere; margin:.35rem 0; }
@@ -608,7 +690,11 @@ body:not(.show-debug) .log-debug { display:none; }
   background:var(--panel); border-radius:0 6px 6px 0; }
 .tool-call pre,.raw-block { max-height:30rem; }
 .role-toolResult .conversation-main { background:color-mix(in srgb,var(--panel) 45%,transparent); padding:.8rem; }
-@media (max-width:800px) { .conversation-row { grid-template-columns:minmax(0,1fr) 180px; gap:.6rem; }
+/* The starting prompt embeds the whole operating guide; keep it in place and
+   in full, but scrolling, so it can't push the trajectory off the screen. */
+.is-start .message-text { max-height:16rem; overflow-y:auto; background:var(--panel);
+  border-radius:6px; padding:.5rem .7rem; }
+@media (max-width:800px) { .page-group { grid-template-columns:minmax(0,1fr) 180px; gap:.6rem; }
   .browser-side { padding-left:.6rem; } }
 """
 
@@ -632,6 +718,24 @@ document.addEventListener('toggle', async function (event) {
     catch (error) { prompt.textContent = 'failed to load system prompt: ' + error; }
   }
 }, true);
+document.addEventListener('click', function (event) {
+  const toggle = event.target.closest?.('.seg-toggle');
+  if (!toggle) return;
+  const open = toggle.dataset.open === '1';
+  document.querySelectorAll('.segment').forEach(function (segment) { segment.open = open; });
+});
+// An anchor (anomaly list, "#step-N") inside a collapsed segment cannot be
+// scrolled to, so open its ancestors first.
+function revealHash() {
+  const target = location.hash && document.getElementById(location.hash.slice(1));
+  if (!target) return;
+  for (let node = target.parentElement; node; node = node.parentElement) {
+    if (node.tagName === 'DETAILS') node.open = true;
+  }
+  target.scrollIntoView();
+}
+window.addEventListener('hashchange', revealHash);
+revealHash();
 document.addEventListener('click', async function (event) {
   const button = event.target.closest?.('.load-chunk');
   if (!button) return;
@@ -677,6 +781,207 @@ def _compact_step(step: dict[str, Any]) -> str:
         f'<span class="compact-page">{_e(_short_text(page, 100))}</span>'
         f"{thought_html}<code>{_e(action)}</code></div>"
     )
+
+
+# -- page groups ------------------------------------------------------------
+#
+# A chain of tool calls that leaves the page untouched (expand, a failed
+# action, a non-browser tool) produced one identical screenshot per step, and
+# each of those rows reserved a full screenshot's worth of height. Consecutive
+# steps whose capture is byte-identical -- the blob store is content-addressed,
+# so an equal ref IS an unchanged page -- now share a single sticky panel, and
+# the next page-changing action starts a visibly separate group.
+
+
+@dataclass(slots=True)
+class _Row:
+    step: int | None
+    html: str
+    record: dict[str, Any] | None = None
+    attached: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+
+
+def _page_key(record: dict[str, Any] | None) -> str | None:
+    """Identity of the page a step left behind: its screenshot blob ref.
+    None means "nothing to show" -- the row joins whatever group it is in."""
+    if record is None or not _has_browser(record):
+        return None
+    ref = record.get("screenshot")
+    return str(ref) if ref else None
+
+
+def _page_groups(rows: list[_Row], blobs: BlobStore, blob_url: Callable[[str], str] | None) -> str:
+    """Wrap consecutive rows sharing a page into one two-column group."""
+    out: list[str] = []
+    pending: list[_Row] = []
+    key: str | None = None
+
+    def flush() -> None:
+        nonlocal pending, key
+        if not pending:
+            return
+        panel = [(row.record, row.attached) for row in pending if row.record is not None]
+        aside = _browser_panel(panel, blobs, blob_url) if key is not None else ""
+        css = "page-group" if key is not None else "page-group no-browser"
+        out.append(
+            f'<section class="{css}"><div class="group-main">'
+            + "".join(row.html for row in pending)
+            + f"</div>{aside}</section>"
+        )
+        pending, key = [], None
+
+    for row in rows:
+        this = _page_key(row.record)
+        if this is not None and key is not None and this != key:
+            flush()
+        pending.append(row)
+        key = key or this
+    flush()
+    return "".join(out)
+
+
+# -- annotation-driven segmentation ----------------------------------------
+#
+# The model's span annotations (issue / stuck_span / vision) cut the trajectory
+# into a handful of stretches. Every cut point becomes a segment boundary, so
+# overlapping spans (a vision finding straddling two issues) split rather than
+# merge, and every segment lists all annotations overlapping it. The stretches
+# nobody annotated stay as unlabelled segments -- the run is still covered
+# end to end, just quietly.
+
+
+def _span(rec: dict[str, Any]) -> tuple[int, int] | None:
+    lo, hi = rec.get("step_start"), rec.get("step_end")
+    if not isinstance(lo, int) or not isinstance(hi, int) or hi < lo:
+        return None
+    return lo, hi
+
+
+def _segments(
+    spans: list[dict[str, Any]], lo: int, hi: int
+) -> list[tuple[int, int, list[dict[str, Any]]]]:
+    """Partition [lo, hi] on every annotation edge; attach overlapping spans."""
+    cuts = {lo, hi + 1}
+    for rec in spans:
+        bounds = _span(rec)
+        if bounds is None:
+            continue
+        a, b = bounds
+        if lo <= a <= hi:
+            cuts.add(a)
+        if lo <= b < hi:
+            cuts.add(b + 1)
+    edges = sorted(cuts)
+    out: list[tuple[int, int, list[dict[str, Any]]]] = []
+    for start, nxt in zip(edges, edges[1:], strict=False):
+        end = nxt - 1
+        overlapping = [
+            rec
+            for rec in spans
+            if (bounds := _span(rec)) is not None and bounds[0] <= end and bounds[1] >= start
+        ]
+        out.append((start, end, overlapping))
+    return out
+
+
+_SEG_BADGES = {"stuck_span": "stuck", "vision": "vision"}
+
+
+def _annotation_line(rec: dict[str, Any], segment: tuple[int, int]) -> str:
+    kind = str(rec.get("kind", ""))
+    label = rec.get("category") or _SEG_BADGES.get(kind, kind)
+    severity = str(rec.get("severity") or "")
+    classes = f"seg-badge seg-{_e(kind)}" + (" seg-high" if severity == "high" else "")
+    badge = f'<span class="{classes}">{_e(label)}</span>'
+    bounds = _span(rec)
+    # Only worth repeating when the finding spans more than this segment; a
+    # wide span states itself once, then thins to a marker on the segments it
+    # continues through (a run-wide issue would otherwise shout on every one).
+    steps = (
+        f'<span class="muted">steps {bounds[0]}&ndash;{bounds[1]}</span> '
+        if bounds is not None and bounds != segment
+        else ""
+    )
+    body = (
+        '<span class="muted">continues</span>'
+        if bounds is not None and bounds[0] < segment[0]
+        else _e(_short_text(rec.get("text"), 400))
+    )
+    return f'<div class="seg-finding">{badge} {steps}{body}</div>'
+
+
+def _segment_head(start: int, end: int, findings: list[dict[str, Any]]) -> str:
+    count = end - start + 1
+    label = f"steps {start}&ndash;{end}" if end > start else f"step {start}"
+    if not findings:
+        return (
+            f'<summary class="seg-head"><span class="seg-range">{label}</span> '
+            f'<span class="muted">{count} step{"s" if count != 1 else ""} · no findings</span>'
+            "</summary>"
+        )
+    return (
+        f'<summary class="seg-head"><span class="seg-range">{label}</span> '
+        f'<span class="muted">{count} step{"s" if count != 1 else ""}</span>'
+        + "".join(_annotation_line(rec, (start, end)) for rec in findings)
+        + "</summary>"
+    )
+
+
+def _overview(verdicts: list[dict[str, Any]], n_segments: int, n_steps: int) -> str:
+    lines = "".join(
+        f'<p class="verdict">{_e(rec.get("text", ""))}</p>'
+        + (f'<p class="muted">annotated by {_e(rec["model"])}</p>' if rec.get("model") else "")
+        for rec in verdicts
+    )
+    return (
+        '<section class="overview"><h3>overview</h3>'
+        + (lines or '<p class="muted">no verdict recorded</p>')
+        + f'<div class="seg-controls"><span class="muted">{n_segments} segments · '
+        f"{n_steps} steps</span>"
+        '<button type="button" class="seg-toggle" data-open="1">Expand all</button>'
+        '<button type="button" class="seg-toggle" data-open="">Collapse all</button></div>'
+        "</section>"
+    )
+
+
+def _segmented_body(
+    rows: list[_Row],
+    segments: list[tuple[int, int, list[dict[str, Any]]]],
+    render: Callable[[list[_Row]], str],
+) -> list[str]:
+    """Wrap step-bound rows in their segment's <details>; rows before the first
+    and after the last step (starting prompt, final answer) stay visible."""
+    numbered = [i for i, row in enumerate(rows) if row.step is not None]
+    if not numbered:
+        return [render(rows)]
+    first, last = numbered[0], numbered[-1]
+    # A row with no step of its own (assistant thinking, a tool call) belongs
+    # with the step it leads into, not the one it followed.
+    owners: list[int] = []
+    nxt = rows[last].step
+    for row in reversed(rows[first : last + 1]):
+        nxt = row.step if row.step is not None else nxt
+        owners.append(nxt if nxt is not None else 0)
+    owners.reverse()
+
+    out = [render(rows[:first])] if first else []
+    middle = rows[first : last + 1]
+    cursor = 0
+    for index, (start, end, findings) in enumerate(segments):
+        taken: list[_Row] = []
+        while cursor < len(middle) and (
+            owners[cursor] <= end or index == len(segments) - 1  # never drop a row
+        ):
+            taken.append(middle[cursor])
+            cursor += 1
+        out.append(
+            f'<details class="segment" id="segment-{start}">'
+            + _segment_head(start, end, findings)
+            + f'<div class="seg-body">{render(taken)}</div></details>'
+        )
+    if rows[last + 1 :]:
+        out.append(render(rows[last + 1 :]))
+    return out
 
 
 def render_step_fragment(
@@ -725,21 +1030,46 @@ def render_run(
     # "other records" instead of vanishing.
     attached = _attachments(records)
 
-    # Summaries become range markers placed after their step_end row.
+    # Model annotations drive the segmented overview; plain step-range
+    # summaries keep their inline markers.
+    annotations = [s for s in summaries if s.get("kind") in _ANNOTATION_KINDS]
+    verdicts = [s for s in annotations if s.get("kind") == "verdict"]
+    spans = [s for s in annotations if s.get("kind") != "verdict"]
     markers_after: dict[Any, list[str]] = {}
     for s in summaries:
-        markers_after.setdefault(s.get("step_end"), []).append(_summary_marker(s))
+        if s not in annotations:
+            markers_after.setdefault(s.get("step_end"), []).append(_summary_marker(s))
 
-    body: list[str] = []
+    step_numbers = [s["step"] for s in steps if isinstance(s.get("step"), int)]
+    segments = (
+        _segments(spans, min(step_numbers), max(step_numbers)) if spans and step_numbers else []
+    )
+
+    head: list[str] = []
     if back_href:
-        body.append(f'<nav class="back"><a href="{_e(back_href)}">&larr; all runs</a></nav>')
-    body.append(_header(meta, end, anomalies, len(steps), show_legacy_prompt=not messages))
-    body.append(_prompt_panels(prompts, reader.blobs, blob_url))
+        head.append(f'<nav class="back"><a href="{_e(back_href)}">&larr; all runs</a></nav>')
+    first_url = next(
+        (str((s.get("browser") or {}).get("url") or "") for s in steps if s.get("browser")), ""
+    )
+    site = website(meta.get("config", {}) if meta else {}, first_url)
+    head.append(_header(meta, end, anomalies, len(steps), site))
+    head.append(_prompt_panels(prompts, reader.blobs, blob_url))
+    if annotations:
+        head.append(_overview(verdicts, len(segments), len(steps)))
+
+    # The segmenter groups rows by step; rows belonging to no step (assistant
+    # turns, chunk placeholders) ride along with the step they lead into.
+    rows: list[_Row] = []
+
+    def emit(html: str, step: Any = None, record: dict[str, Any] | None = None) -> None:
+        number = step if isinstance(step, int) else None
+        rows.append(_Row(number, html, record, attached.get(number, {}) if record else {}))
 
     def full_step(step: dict[str, Any]) -> None:
         n = step.get("step")
-        body.append(_step_row(step, attached.get(n, {}), reader.blobs, t0, blob_url))
-        body.extend(markers_after.pop(n, []))
+        emit(_step_row(step, attached.get(n, {}), reader.blobs, t0, blob_url), n)
+        for marker in markers_after.pop(n, []):
+            emit(marker, n)
 
     if messages:
         start_prompt = next((p for p in prompts if p.get("kind") == "start"), None)
@@ -775,17 +1105,14 @@ def render_run(
             )
             if step is not None:
                 rendered_steps.add(step.get("step"))
-            body.append(
-                _conversation_row(
-                    message,
-                    step,
-                    attached.get(step.get("step"), {}) if step else {},
-                    reader.blobs,
-                    blob_url,
-                )
+            emit(
+                _conversation_row(message, step, reader.blobs, blob_url),
+                step.get("step") if step else None,
+                step,
             )
             if step is not None:
-                body.extend(markers_after.pop(step.get("step"), []))
+                for marker in markers_after.pop(step.get("step"), []):
+                    emit(marker, step.get("step"))
         for step in steps:
             if step.get("step") in rendered_steps:
                 continue
@@ -797,16 +1124,13 @@ def render_run(
                 "tool_name": step.get("tool_name"),
                 "is_error": bool(step.get("error")),
             }
-            body.append(
-                _conversation_row(
-                    fallback,
-                    step,
-                    attached.get(step.get("step"), {}),
-                    reader.blobs,
-                    blob_url,
-                )
+            emit(
+                _conversation_row(fallback, step, reader.blobs, blob_url),
+                step.get("step"),
+                step,
             )
-            body.extend(markers_after.pop(step.get("step"), []))
+            for marker in markers_after.pop(step.get("step"), []):
+                emit(marker, step.get("step"))
     elif compact_middle and fragment_url is not None and len(steps) > 35:
         for step in steps[:25]:
             full_step(step)
@@ -814,12 +1138,13 @@ def render_run(
         for offset in range(25, middle_end, 10):
             chunk = steps[offset : min(offset + 10, middle_end)]
             first, last = chunk[0].get("step", "?"), chunk[-1].get("step", "?")
-            body.append(
+            emit(
                 f'<section class="compact-chunk"><div class="compact-head">'
                 f'<button class="load-chunk" data-url="{_e(fragment_url(offset, len(chunk)))}">'
                 f"Expand steps {_e(first)}–{_e(last)}</button></div>"
                 + "".join(_compact_step(step) for step in chunk)
-                + "</section>"
+                + "</section>",
+                chunk[0].get("step"),
             )
         for step in steps[-10:]:
             full_step(step)
@@ -827,8 +1152,17 @@ def render_run(
         for step in steps:
             full_step(step)
     for leftovers in markers_after.values():  # summaries pointing past the last step
-        body.extend(leftovers)
+        for marker in leftovers:
+            emit(marker)
 
+    # Page grouping is a property of the conversation layout; legacy step rows
+    # carry their own screenshot lane.
+    def render(chunk: list[_Row]) -> str:
+        if messages:
+            return _page_groups(chunk, reader.blobs, blob_url)
+        return "".join(row.html for row in chunk)
+
+    body = head + (_segmented_body(rows, segments, render) if segments else [render(rows)])
     title = f"ebrowse trace — {meta.get('task_id', run_dir.name) if meta else run_dir.name}"
     return (
         "<!doctype html>\n<html lang='en'>\n<head>\n<meta charset='utf-8'>\n"
